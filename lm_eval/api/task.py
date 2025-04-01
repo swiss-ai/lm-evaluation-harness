@@ -3,6 +3,7 @@ import ast
 import logging
 import random
 import re
+import time
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -23,6 +24,7 @@ from typing import (
 import datasets
 import numpy as np
 from tqdm import tqdm
+import huggingface_hub
 
 from lm_eval import utils
 from lm_eval.api import samplers
@@ -931,11 +933,28 @@ class ConfigurableTask(Task):
                     )
 
     def download(self, dataset_kwargs: Optional[Dict[str, Any]] = None) -> None:
-        self.dataset = datasets.load_dataset(
-            path=self.DATASET_PATH,
-            name=self.DATASET_NAME,
-            **dataset_kwargs if dataset_kwargs is not None else {},
-        )
+        n_tries = 5
+        self.dataset = None
+        kw = {"path": self.DATASET_PATH, "name": self.DATASET_NAME,
+              **(dataset_kwargs if dataset_kwargs is not None else {})}
+
+        for _ in range(n_tries - 1):
+            if self.dataset is None:
+                timeout = None
+                try:
+                    self.dataset = datasets.load_dataset(**kw)
+                except huggingface_hub.errors.HfHubHTTPError:
+                    timeout = 15
+                except:
+                    timeout = 2
+
+                if timeout is not None:
+                    print(f"Failed loading {self.DATASET_PATH}, {self.DATASET_NAME}, {dataset_kwargs}. Attempting again in {timeout} second...")
+                    kw["download_mode"] = datasets.DownloadMode.FORCE_REDOWNLOAD
+                    time.sleep(timeout)
+
+        if self.dataset is None:  # Last attempt.
+            self.dataset = datasets.load_dataset(**kw)
 
     def has_training_docs(self) -> bool:
         if self.config.training_split is not None:
