@@ -943,10 +943,12 @@ class ConfigurableTask(Task):
                 timeout = None
                 try:
                     self.dataset = datasets.load_dataset(**kw)
-                except huggingface_hub.errors.HfHubHTTPError:
+                except huggingface_hub.errors.HfHubHTTPError as err:
                     timeout = 15
-                except:
+                    print(f"HF hub HTTP error when loading dataset: {err}")
+                except Exception as err:
                     timeout = 2
+                    print(f"Error when loading dataset: {err}")
 
                 if timeout is not None:
                     print(f"Failed loading {self.DATASET_PATH}, {self.DATASET_NAME}, {dataset_kwargs}. Attempting again in {timeout} second...")
