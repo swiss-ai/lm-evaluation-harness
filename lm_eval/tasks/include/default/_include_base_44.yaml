@@ -40,7 +40,6 @@ task:
   - include_base_44_telugu
   - include_base_44_turkish
   - include_base_44_ukrainian
-  - include_base_44_urdu
   - include_base_44_uzbek
   - include_base_44_vietnamese
 aggregate_metric_list:
