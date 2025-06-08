@@ -3,6 +3,7 @@ import ast
 import logging
 import random
 import re
+import time
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -23,6 +24,7 @@ from typing import (
 import datasets
 import numpy as np
 from tqdm import tqdm
+import huggingface_hub
 
 from lm_eval import utils
 from lm_eval.api import samplers
@@ -976,23 +978,40 @@ class ConfigurableTask(Task):
                         f'Both target_delimiter "{self.config.target_delimiter}" and target choice: "{choice}" do not have whitespace, ignore if the language you are evaluating on does not require/use whitespace'
                     )
 
-    def download(
-        self, dataset_kwargs: Optional[Dict[str, Any]] = None, **kwargs
-    ) -> None:
+
+    def _retry_load(self, load_fn, kwargs: dict, n_tries: int = 5) -> None:
+        for attempt in range(n_tries):
+            try:
+                return load_fn(**kwargs)
+            except huggingface_hub.errors.HfHubHTTPError as err:
+                timeout = 15
+                eval_logger.warning(f"HF hub HTTP error when loading dataset: {err}")
+            except Exception as err:
+                timeout = 2
+                eval_logger.warning(f"Error when loading dataset: {err}")
+            
+            if attempt < n_tries - 1:
+                eval_logger.info(f"Retrying in {timeout} seconds...")
+                time.sleep(timeout)
+                kwargs["download_mode"] = datasets.DownloadMode.FORCE_REDOWNLOAD
+                
+        return load_fn(**kwargs)
+    
+    def download(self, dataset_kwargs: Optional[Dict[str, Any]] = None) -> None:
+        self.dataset = None
+        
         if isinstance(self.config.custom_dataset, Callable):
             eval_logger.warning(
                 f"{self.config.task}: Custom kwargs can be passed to `--metadata` in console (as json string) or to the TaskManager."
                 + "\nFor example --metadata='{\"max_seq_lengths\":[4096, 8192]}'. For details see task Readme."
             )
-            self.dataset = self.config.custom_dataset(
-                **(self.config.metadata or {}), **(self.config.dataset_kwargs or {})
-            )
+            metadata = self.config.metadata or {}
+            extra_kwargs = self.config.dataset_kwargs or {}
+            self.dataset = self._retry_load(self.config.custom_dataset, kwargs={**metadata, **extra_kwargs})
         else:
-            self.dataset = datasets.load_dataset(
-                path=self.DATASET_PATH,
-                name=self.DATASET_NAME,
-                **dataset_kwargs if dataset_kwargs is not None else {},
-            )
+            kw = {"path": self.DATASET_PATH, "name": self.DATASET_NAME,
+              **(dataset_kwargs or {})}
+            self.dataset = self._retry_load(datasets.load_dataset, kwargs=kw)
 
     def has_training_docs(self) -> bool:
         if self.config.training_split is not None:
