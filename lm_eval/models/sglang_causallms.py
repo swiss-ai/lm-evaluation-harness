@@ -92,6 +92,7 @@ class SGLangLM(TemplateLM):
             "tp_size": self.tensor_parallel_size,
             "dp_size": self.data_parallel_size,
             "chunked_prefill_size": chunked_prefill_size,
+            "context_length": self.max_length,
         }
 
         self.model_args.update(kwargs)
