@@ -1,7 +1,6 @@
-group: multilingual
+group: multilingual_pt2
 task:
-  - multilingual_pt1
-  - multilingual_pt2
+  - m_hellaswag  # 303k but very expensive for some reason.
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

@@ -1,11 +1,21 @@
-group: multilingual
+group: english_pt1
 task:
-  - multilingual_pt1
-  - multilingual_pt2
+  - mmlu  # 393k
+  - hellaswag  # 303k
+  - mmlu_continuation  # 393k (?)
+  - winogrande  # 44k
+  - piqa  # 3k
+  - openbookqa  # 0.5k
+  - ai2_arc  # 8k (?)
+  - commonsense_qa  # 1k
+  - lambada_openai  # 5k
+  - lambada  # 5k
+  - wikitext  # 4k
+  - gsm8k  # 17k
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
-    weight_by_size: false  # Set to false if you want unweighted average
+    weight_by_size: false
   - metric: acc_norm
     aggregation: mean
     weight_by_size: false

@@ -1,22 +1,7 @@
 group: english
 task:
-  - lambada_openai
-  - winogrande
-  - piqa
-  - openbookqa
-  - ai2_arc
-  - commonsense_qa
-  - mmlu
-  - mmlu_continuation
-  - gsm8k
-  - wikitext
-  - lambada
-  - hellaswag
-  - squadv2
-  # heldout:
-  # - social_iqa
-  # - triviaqa
-  # - mmlu_pro
+  - english_pt1
+  - english_pt2
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

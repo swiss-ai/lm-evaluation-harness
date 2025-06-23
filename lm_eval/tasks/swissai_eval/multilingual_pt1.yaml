@@ -1,7 +1,12 @@
-group: multilingual
+group: multilingual_pt1
 task:
-  - multilingual_pt1
-  - multilingual_pt2
+  - include_base_44  # 23k
+  - xcopa  # 5k
+  - xnli  # 70k
+  - xwinograd  # 4k
+  - pawsx  # 12k
+  - m_arc  # 86k
+  - global_mmlu  #  601k
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

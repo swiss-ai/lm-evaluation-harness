@@ -1,11 +1,10 @@
-group: multilingual
+group: english_pt2
 task:
-  - multilingual_pt1
-  - multilingual_pt2
+  - squadv2  # 11k, but generate_until so expensive.
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
-    weight_by_size: false  # Set to false if you want unweighted average
+    weight_by_size: false
   - metric: acc_norm
     aggregation: mean
     weight_by_size: false
