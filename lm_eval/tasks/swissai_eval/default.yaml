@@ -1,11 +1,23 @@
 group: swissai_eval
 task:
-  - english
-  - multilingual
+  - general_abilities_english
+  - general_abilities_swiss
+  - general_abilities_europe
+  - general_abilities_global
+  # factual agnostic
+  - factual_agnostic_english
+  - factual_agnostic_swiss
+  - factual_agnostic_europe
+  - factual_agnostic_global
+  # factual regional
+  - factual_regional_english
+  - factual_regional_swiss
+  - factual_regional_europe
+  - factual_regional_global
 aggregate_metric_list:
-  - metric: acc
+  - metric: accs
     aggregation: mean
-    weight_by_size: false  # Set to false if you want unweighted average
+    weight_by_size: false
   - metric: acc_norm
     aggregation: mean
     weight_by_size: false

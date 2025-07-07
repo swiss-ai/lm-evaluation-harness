@@ -1,0 +1,36 @@
+group: factual_agnostic_eu
+task:
+  - factual_agnostic_czech
+  - factual_agnostic_dutch
+  - factual_agnostic_english
+  - factual_agnostic_french
+  - factual_agnostic_german
+  - factual_agnostic_greek
+  - factual_agnostic_italian
+  - factual_agnostic_lithuanian
+  - factual_agnostic_polish
+  - factual_agnostic_portuguese
+  - factual_agnostic_romanian
+  - factual_agnostic_russian
+  - factual_agnostic_serbian
+  - factual_agnostic_spanish
+  - factual_agnostic_swedish
+  - factual_agnostic_ukrainian
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: acc_norm
+    aggregation: mean
+    weight_by_size: false
+  - metric: perplexity
+    aggregation: mean
+    weight_by_size: false
+  - metric: f1
+    aggregation: mean
+    weight_by_size: false
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0

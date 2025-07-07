@@ -1,0 +1,90 @@
+group: factual_agnostic_global
+task:
+  - factual_agnostic_albanian
+  - factual_agnostic_amharic
+  - factual_agnostic_arabic
+  - factual_agnostic_armenian
+  - factual_agnostic_azerbaijani
+  - factual_agnostic_basque
+  - factual_agnostic_belarusian
+  - factual_agnostic_bengali
+  - factual_agnostic_bulgarian
+  - factual_agnostic_catalan
+  - factual_agnostic_chichewa
+  - factual_agnostic_chinese
+  - factual_agnostic_croatian
+  - factual_agnostic_czech
+  - factual_agnostic_danish
+  - factual_agnostic_dutch
+  - factual_agnostic_english
+  - factual_agnostic_estonian
+  - factual_agnostic_finnish
+  - factual_agnostic_french
+  - factual_agnostic_georgian
+  - factual_agnostic_german
+  - factual_agnostic_greek
+  - factual_agnostic_gujarati
+  - factual_agnostic_haitian creole
+  - factual_agnostic_hausa
+  - factual_agnostic_hebrew
+  - factual_agnostic_hindi
+  - factual_agnostic_hungarian
+  - factual_agnostic_igbo
+  - factual_agnostic_indonesian
+  - factual_agnostic_italian
+  - factual_agnostic_japanese
+  - factual_agnostic_kannada
+  - factual_agnostic_kazakh
+  - factual_agnostic_korean
+  - factual_agnostic_kyrgyz
+  - factual_agnostic_lithuanian
+  - factual_agnostic_malagasy
+  - factual_agnostic_malay
+  - factual_agnostic_malayalam
+  - factual_agnostic_marathi
+  - factual_agnostic_nepali
+  - factual_agnostic_north macedonian
+  - factual_agnostic_persian
+  - factual_agnostic_polish
+  - factual_agnostic_portuguese
+  - factual_agnostic_quechua
+  - factual_agnostic_romanian
+  - factual_agnostic_romansh
+  - factual_agnostic_russian
+  - factual_agnostic_serbian
+  - factual_agnostic_shona
+  - factual_agnostic_sinhala
+  - factual_agnostic_slovak
+  - factual_agnostic_somali
+  - factual_agnostic_spanish
+  - factual_agnostic_swahili
+  - factual_agnostic_swedish
+  - factual_agnostic_tagalog
+  - factual_agnostic_tamil
+  - factual_agnostic_telugu
+  - factual_agnostic_thai
+  - factual_agnostic_turkish
+  - factual_agnostic_ukrainian
+  - factual_agnostic_unknown
+  - factual_agnostic_urdu
+  - factual_agnostic_uzbek
+  - factual_agnostic_vietnamese
+  - factual_agnostic_yoruba
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: acc_norm
+    aggregation: mean
+    weight_by_size: false
+  - metric: perplexity
+    aggregation: mean
+    weight_by_size: false
+  - metric: f1
+    aggregation: mean
+    weight_by_size: false
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0

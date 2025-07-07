@@ -1,0 +1,90 @@
+group: general_abilities_global
+task:
+  - general_abilities_albanian
+  - general_abilities_amharic
+  - general_abilities_arabic
+  - general_abilities_armenian
+  - general_abilities_azerbaijani
+  - general_abilities_basque
+  - general_abilities_belarusian
+  - general_abilities_bengali
+  - general_abilities_bulgarian
+  - general_abilities_catalan
+  - general_abilities_chichewa
+  - general_abilities_chinese
+  - general_abilities_croatian
+  - general_abilities_czech
+  - general_abilities_danish
+  - general_abilities_dutch
+  - general_abilities_english
+  - general_abilities_estonian
+  - general_abilities_finnish
+  - general_abilities_french
+  - general_abilities_georgian
+  - general_abilities_german
+  - general_abilities_greek
+  - general_abilities_gujarati
+  - general_abilities_haitian creole
+  - general_abilities_hausa
+  - general_abilities_hebrew
+  - general_abilities_hindi
+  - general_abilities_hungarian
+  - general_abilities_igbo
+  - general_abilities_indonesian
+  - general_abilities_italian
+  - general_abilities_japanese
+  - general_abilities_kannada
+  - general_abilities_kazakh
+  - general_abilities_korean
+  - general_abilities_kyrgyz
+  - general_abilities_lithuanian
+  - general_abilities_malagasy
+  - general_abilities_malay
+  - general_abilities_malayalam
+  - general_abilities_marathi
+  - general_abilities_nepali
+  - general_abilities_north macedonian
+  - general_abilities_persian
+  - general_abilities_polish
+  - general_abilities_portuguese
+  - general_abilities_quechua
+  - general_abilities_romanian
+  - general_abilities_romansh
+  - general_abilities_russian
+  - general_abilities_serbian
+  - general_abilities_shona
+  - general_abilities_sinhala
+  - general_abilities_slovak
+  - general_abilities_somali
+  - general_abilities_spanish
+  - general_abilities_swahili
+  - general_abilities_swedish
+  - general_abilities_tagalog
+  - general_abilities_tamil
+  - general_abilities_telugu
+  - general_abilities_thai
+  - general_abilities_turkish
+  - general_abilities_ukrainian
+  - general_abilities_unknown
+  - general_abilities_urdu
+  - general_abilities_uzbek
+  - general_abilities_vietnamese
+  - general_abilities_yoruba
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: acc_norm
+    aggregation: mean
+    weight_by_size: false
+  - metric: perplexity
+    aggregation: mean
+    weight_by_size: false
+  - metric: f1
+    aggregation: mean
+    weight_by_size: false
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0

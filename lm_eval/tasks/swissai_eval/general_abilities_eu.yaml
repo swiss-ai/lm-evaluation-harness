@@ -1,0 +1,42 @@
+group: general_abilities_eu
+task:
+  - general_abilities_armenian
+  - general_abilities_basque
+  - general_abilities_bulgarian
+  - general_abilities_catalan
+  - general_abilities_croatian
+  - general_abilities_danish
+  - general_abilities_dutch
+  - general_abilities_english
+  - general_abilities_estonian
+  - general_abilities_french
+  - general_abilities_german
+  - general_abilities_greek
+  - general_abilities_hungarian
+  - general_abilities_italian
+  - general_abilities_portuguese
+  - general_abilities_romanian
+  - general_abilities_russian
+  - general_abilities_serbian
+  - general_abilities_slovak
+  - general_abilities_spanish
+  - general_abilities_swedish
+  - general_abilities_ukrainian
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: acc_norm
+    aggregation: mean
+    weight_by_size: false
+  - metric: perplexity
+    aggregation: mean
+    weight_by_size: false
+  - metric: f1
+    aggregation: mean
+    weight_by_size: false
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0
