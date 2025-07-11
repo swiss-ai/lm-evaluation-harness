@@ -1,6 +1,5 @@
 group: general_abilities_english
 task:
-  - xwinograd_en
   - xnli_en
 aggregate_metric_list:
   - metric: acc

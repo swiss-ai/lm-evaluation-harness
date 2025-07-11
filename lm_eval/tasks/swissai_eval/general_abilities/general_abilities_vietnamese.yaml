@@ -3,7 +3,6 @@ task:
   - hellaswag_vi
   - arc_vi
   - xnli_vi
-  - xcopa_vi
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

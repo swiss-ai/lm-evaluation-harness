@@ -1,7 +1,6 @@
 group: general_abilities_thai
 task:
   - xnli_th
-  - xcopa_th
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

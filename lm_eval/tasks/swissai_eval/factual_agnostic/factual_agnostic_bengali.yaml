@@ -1,7 +1,6 @@
 group: factual_agnostic_bengali
 task:
-  - global_mmlu_full_bn
-  - global_mmlu_full_bn
+  - global_mmlu_bn
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

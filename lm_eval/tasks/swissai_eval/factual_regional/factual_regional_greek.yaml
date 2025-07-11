@@ -1,6 +1,5 @@
 group: factual_regional_greek
 task:
-  - global_mmlu_full_el
   - include_base_44_greek
 aggregate_metric_list:
   - metric: acc

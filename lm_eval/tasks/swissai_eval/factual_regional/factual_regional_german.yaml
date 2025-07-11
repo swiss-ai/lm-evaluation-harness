@@ -1,6 +1,5 @@
 group: factual_regional_german
 task:
-  - global_mmlu_full_de
   - include_base_44_german
 aggregate_metric_list:
   - metric: acc

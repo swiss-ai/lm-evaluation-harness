@@ -1,7 +1,6 @@
 group: factual_agnostic_chinese
 task:
-  - global_mmlu_full_zh
-  - global_mmlu_full_zh
+  - global_mmlu_zh
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

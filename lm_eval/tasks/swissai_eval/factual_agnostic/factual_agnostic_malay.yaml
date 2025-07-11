@@ -1,7 +1,6 @@
 group: factual_agnostic_malay
 task:
-  - global_mmlu_full_ms
-  - global_mmlu_full_ms
+  - global_mmlu_ms
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

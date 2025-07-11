@@ -1,6 +1,5 @@
 group: factual_regional_french
 task:
-  - global_mmlu_full_fr
   - include_base_44_french
 aggregate_metric_list:
   - metric: acc

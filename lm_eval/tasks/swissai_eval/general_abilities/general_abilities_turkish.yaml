@@ -1,7 +1,6 @@
 group: general_abilities_turkish
 task:
   - xnli_tr
-  - xcopa_tr
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

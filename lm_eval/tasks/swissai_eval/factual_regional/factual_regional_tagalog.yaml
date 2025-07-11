@@ -1,6 +1,5 @@
 group: factual_regional_tagalog
 task:
-  - global_mmlu_full_fil
   - include_base_44_tagalog
 aggregate_metric_list:
   - metric: acc

@@ -1,6 +1,6 @@
 group: factual_regional_somali
 task:
-  - global_mmlu_full_so
+  - global_mmlu_so
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

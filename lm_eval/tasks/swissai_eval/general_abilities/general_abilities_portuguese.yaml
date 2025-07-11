@@ -2,7 +2,6 @@ group: general_abilities_portuguese
 task:
   - hellaswag_pt
   - arc_pt
-  - xwinograd_pt
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

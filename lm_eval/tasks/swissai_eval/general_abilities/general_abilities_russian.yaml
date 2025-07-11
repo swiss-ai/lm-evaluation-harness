@@ -2,7 +2,6 @@ group: general_abilities_russian
 task:
   - hellaswag_ru
   - arc_ru
-  - xwinograd_ru
   - xnli_ru
 aggregate_metric_list:
   - metric: acc

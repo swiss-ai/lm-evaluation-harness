@@ -1,6 +1,5 @@
 group: factual_regional_serbian
 task:
-  - global_mmlu_full_sr
   - include_base_44_serbian
 aggregate_metric_list:
   - metric: acc

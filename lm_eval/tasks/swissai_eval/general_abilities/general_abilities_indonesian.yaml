@@ -2,7 +2,6 @@ group: general_abilities_indonesian
 task:
   - hellaswag_id
   - arc_id
-  - xcopa_id
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

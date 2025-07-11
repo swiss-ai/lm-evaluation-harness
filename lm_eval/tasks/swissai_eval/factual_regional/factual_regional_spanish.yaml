@@ -1,6 +1,5 @@
 group: factual_regional_spanish
 task:
-  - global_mmlu_full_es
   - include_base_44_spanish
 aggregate_metric_list:
   - metric: acc

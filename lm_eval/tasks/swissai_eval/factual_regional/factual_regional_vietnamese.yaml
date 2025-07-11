@@ -1,6 +1,5 @@
 group: factual_regional_vietnamese
 task:
-  - global_mmlu_full_vi
   - include_base_44_vietnamese
 aggregate_metric_list:
   - metric: acc

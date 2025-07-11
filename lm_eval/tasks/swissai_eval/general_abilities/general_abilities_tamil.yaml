@@ -2,7 +2,6 @@ group: general_abilities_tamil
 task:
   - hellaswag_ta
   - arc_ta
-  - xcopa_ta
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

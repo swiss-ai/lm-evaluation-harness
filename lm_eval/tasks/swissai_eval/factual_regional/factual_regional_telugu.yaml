@@ -1,6 +1,5 @@
 group: factual_regional_telugu
 task:
-  - global_mmlu_full_te
   - include_base_44_telugu
 aggregate_metric_list:
   - metric: acc

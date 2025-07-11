@@ -2,7 +2,6 @@ group: general_abilities_french
 task:
   - hellaswag_fr
   - arc_fr
-  - xwinograd_fr
   - xnli_fr
 aggregate_metric_list:
   - metric: acc

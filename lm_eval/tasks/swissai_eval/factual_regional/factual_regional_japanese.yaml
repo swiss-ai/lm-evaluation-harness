@@ -1,6 +1,5 @@
 group: factual_regional_japanese
 task:
-  - global_mmlu_full_ja
   - include_base_44_japanese
 aggregate_metric_list:
   - metric: acc

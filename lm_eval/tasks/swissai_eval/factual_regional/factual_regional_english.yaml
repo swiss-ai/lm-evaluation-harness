@@ -1,6 +1,6 @@
 group: factual_regional_english
 task:
-  - global_mmlu_full_en
+  - global_mmlu_en
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

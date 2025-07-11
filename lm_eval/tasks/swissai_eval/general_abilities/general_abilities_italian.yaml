@@ -2,7 +2,6 @@ group: general_abilities_italian
 task:
   - hellaswag_it
   - arc_it
-  - xcopa_it
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

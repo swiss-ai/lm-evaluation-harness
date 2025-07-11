@@ -1,6 +1,5 @@
 group: factual_regional_nepali
 task:
-  - global_mmlu_full_ne
   - include_base_44_nepali
 aggregate_metric_list:
   - metric: acc

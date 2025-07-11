@@ -1,6 +1,5 @@
 group: factual_regional_turkish
 task:
-  - global_mmlu_full_tr
   - include_base_44_turkish
 aggregate_metric_list:
   - metric: acc

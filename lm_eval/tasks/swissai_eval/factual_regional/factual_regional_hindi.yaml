@@ -1,6 +1,5 @@
 group: factual_regional_hindi
 task:
-  - global_mmlu_full_hi
   - include_base_44_hindi
 aggregate_metric_list:
   - metric: acc

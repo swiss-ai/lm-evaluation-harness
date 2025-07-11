@@ -1,9 +1,7 @@
 group: general_abilities_chinese
 task:
   - arc_zh
-  - xwinograd_zh
   - xnli_zh
-  - xcopa_zh
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

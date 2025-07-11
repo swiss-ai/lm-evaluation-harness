@@ -1,7 +1,6 @@
 group: factual_agnostic_igbo
 task:
-  - global_mmlu_full_ig
-  - global_mmlu_full_ig
+  - global_mmlu_ig
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

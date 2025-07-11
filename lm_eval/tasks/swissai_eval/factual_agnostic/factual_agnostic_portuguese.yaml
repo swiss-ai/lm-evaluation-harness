@@ -1,7 +1,6 @@
 group: factual_agnostic_portuguese
 task:
-  - global_mmlu_full_pt
-  - global_mmlu_full_pt
+  - global_mmlu_pt
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

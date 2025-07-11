@@ -1,6 +1,5 @@
 group: factual_regional_ukrainian
 task:
-  - global_mmlu_full_uk
   - include_base_44_ukrainian
 aggregate_metric_list:
   - metric: acc

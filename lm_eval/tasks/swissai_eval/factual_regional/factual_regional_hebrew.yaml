@@ -1,6 +1,5 @@
 group: factual_regional_hebrew
 task:
-  - global_mmlu_full_he
   - include_base_44_hebrew
 aggregate_metric_list:
   - metric: acc

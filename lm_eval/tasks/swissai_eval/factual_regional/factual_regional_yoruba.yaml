@@ -1,6 +1,6 @@
 group: factual_regional_yoruba
 task:
-  - global_mmlu_full_yo
+  - global_mmlu_yo
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

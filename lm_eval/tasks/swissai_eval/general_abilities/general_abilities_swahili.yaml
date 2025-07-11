@@ -1,7 +1,6 @@
 group: general_abilities_swahili
 task:
   - xnli_sw
-  - xcopa_sw
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

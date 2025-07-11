@@ -1,6 +1,6 @@
 group: factual_regional_hausa
 task:
-  - global_mmlu_full_ha
+  - global_mmlu_ha
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

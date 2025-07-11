@@ -1,6 +1,5 @@
 group: factual_regional_polish
 task:
-  - global_mmlu_full_pl
   - include_base_44_polish
 aggregate_metric_list:
   - metric: acc

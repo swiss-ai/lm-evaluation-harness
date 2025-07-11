@@ -1,6 +1,5 @@
 group: factual_regional_lithuanian
 task:
-  - global_mmlu_full_lt
   - include_base_44_lithuanian
 aggregate_metric_list:
   - metric: acc
