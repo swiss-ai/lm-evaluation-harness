@@ -1,0 +1,4 @@
+group: cultural_bench
+task:
+  - cultural_bench_easy
+  - cultural_bench_hard
