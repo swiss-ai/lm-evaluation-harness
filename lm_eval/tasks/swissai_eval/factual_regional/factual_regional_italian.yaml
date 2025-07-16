@@ -1,6 +1,7 @@
 group: factual_regional_italian
 task:
   - include_base_44_italian
+  - switzerland_qa_it
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

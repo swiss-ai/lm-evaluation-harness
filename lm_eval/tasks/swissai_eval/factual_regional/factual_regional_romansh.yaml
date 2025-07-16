@@ -1,7 +1,6 @@
-group: factual_regional_german
+group: factual_regional_romansh
 task:
-  - include_base_44_german
-  - switzerland_qa_de
+  - switzerland_qa_rm
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
