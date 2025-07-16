@@ -1,5 +1,9 @@
 group: general_abilities_english
 task:
+  - ai2_arc
+  - hellaswag
+  - piqa
+  - winogrande
   - xnli_en
 aggregate_metric_list:
   - metric: acc

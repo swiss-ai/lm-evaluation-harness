@@ -99,8 +99,7 @@ task:
   - factual_regional_croatian
   - factual_regional_czech
   - factual_regional_dutch
-  - factual_regional_english
-  - factual_regional_estonian
+  # - factual_regional_estonian
   - factual_regional_finnish
   - factual_regional_french
   - factual_regional_georgian
@@ -140,7 +139,7 @@ task:
   - factual_regional_telugu
   - factual_regional_turkish
   - factual_regional_ukrainian
-  - factual_regional_urdu
+  # - factual_regional_urdu
   - factual_regional_uzbek
   - factual_regional_vietnamese
   - factual_regional_yoruba
