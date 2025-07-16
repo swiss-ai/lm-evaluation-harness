@@ -40,7 +40,6 @@ task:
   - general_abilities_thai
   - general_abilities_turkish
   - general_abilities_ukrainian
-  - general_abilities_unknown
   - general_abilities_urdu
   - general_abilities_vietnamese
   # - factual_agnostic_amharic
@@ -86,7 +85,6 @@ task:
   # - factual_agnostic_vietnamese
   - factual_agnostic_yoruba
   - factual_regional_albanian
-  - factual_regional_amharic
   - factual_regional_arabic
   - factual_regional_armenian
   - factual_regional_azerbaijani
@@ -94,10 +92,8 @@ task:
   - factual_regional_belarusian
   - factual_regional_bengali
   - factual_regional_bulgarian
-  - factual_regional_chichewa
   - factual_regional_chinese
   - factual_regional_croatian
-  - factual_regional_czech
   - factual_regional_dutch
   # - factual_regional_estonian
   - factual_regional_finnish
@@ -105,19 +101,15 @@ task:
   - factual_regional_georgian
   - factual_regional_german
   - factual_regional_greek
-  - factual_regional_hausa
   - factual_regional_hebrew
   - factual_regional_hindi
   - factual_regional_hungarian
-  - factual_regional_igbo
   - factual_regional_indonesian
   - factual_regional_italian
   - factual_regional_japanese
   - factual_regional_kazakh
   - factual_regional_korean
-  - factual_regional_kyrgyz
   - factual_regional_lithuanian
-  - factual_regional_malagasy
   - factual_regional_malay
   - factual_regional_malayalam
   - factual_regional_nepali
@@ -125,15 +117,9 @@ task:
   - factual_regional_persian
   - factual_regional_polish
   - factual_regional_portuguese
-  - factual_regional_romanian
   - factual_regional_russian
   - factual_regional_serbian
-  - factual_regional_shona
-  - factual_regional_sinhala
-  - factual_regional_somali
   - factual_regional_spanish
-  - factual_regional_swahili
-  - factual_regional_swedish
   - factual_regional_tagalog
   - factual_regional_tamil
   - factual_regional_telugu
@@ -142,7 +128,6 @@ task:
   # - factual_regional_urdu
   - factual_regional_uzbek
   - factual_regional_vietnamese
-  - factual_regional_yoruba
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
