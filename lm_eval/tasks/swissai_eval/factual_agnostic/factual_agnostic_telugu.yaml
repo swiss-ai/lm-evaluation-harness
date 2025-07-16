@@ -1,6 +1,6 @@
 group: factual_agnostic_telugu
 task:
-  - global_mmlu_te
+  - global_mmlu_full_te
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

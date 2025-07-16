@@ -1,6 +1,6 @@
 group: factual_agnostic_ukrainian
 task:
-  - global_mmlu_uk
+  - global_mmlu_full_uk
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

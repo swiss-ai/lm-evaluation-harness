@@ -1,6 +1,6 @@
 group: factual_agnostic_kyrgyz
 task:
-  - global_mmlu_ky
+  - global_mmlu_full_ky
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

@@ -1,6 +1,6 @@
 group: factual_agnostic_czech
 task:
-  - global_mmlu_cs
+  - global_mmlu_full_cs
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

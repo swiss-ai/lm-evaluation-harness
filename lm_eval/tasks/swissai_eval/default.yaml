@@ -43,47 +43,47 @@ task:
   - general_abilities_unknown
   - general_abilities_urdu
   - general_abilities_vietnamese
-  - factual_agnostic_amharic
+  # - factual_agnostic_amharic
   - factual_agnostic_arabic
   - factual_agnostic_bengali
-  - factual_agnostic_chichewa
+  # - factual_agnostic_chichewa
   - factual_agnostic_chinese
-  - factual_agnostic_czech
-  - factual_agnostic_dutch
+  # - factual_agnostic_czech
+  # - factual_agnostic_dutch
   - factual_agnostic_english
   - factual_agnostic_french
   - factual_agnostic_german
-  - factual_agnostic_greek
-  - factual_agnostic_hausa
-  - factual_agnostic_hebrew
+  # - factual_agnostic_greek
+  # - factual_agnostic_hausa
+  # - factual_agnostic_hebrew
   - factual_agnostic_hindi
-  - factual_agnostic_igbo
+  # - factual_agnostic_igbo
   - factual_agnostic_indonesian
   - factual_agnostic_italian
   - factual_agnostic_japanese
   - factual_agnostic_korean
-  - factual_agnostic_kyrgyz
-  - factual_agnostic_lithuanian
-  - factual_agnostic_malagasy
-  - factual_agnostic_malay
-  - factual_agnostic_nepali
-  - factual_agnostic_persian
-  - factual_agnostic_polish
+  # - factual_agnostic_kyrgyz
+  # - factual_agnostic_lithuanian
+  # - factual_agnostic_malagasy
+  # - factual_agnostic_malay
+  # - factual_agnostic_nepali
+  # - factual_agnostic_persian
+  # - factual_agnostic_polish
   - factual_agnostic_portuguese
-  - factual_agnostic_romanian
-  - factual_agnostic_russian
-  - factual_agnostic_serbian
-  - factual_agnostic_shona
-  - factual_agnostic_sinhala
-  - factual_agnostic_somali
+  # - factual_agnostic_romanian
+  # - factual_agnostic_russian
+  # - factual_agnostic_serbian
+  # - factual_agnostic_shona
+  # - factual_agnostic_sinhala
+  # - factual_agnostic_somali
   - factual_agnostic_spanish
   - factual_agnostic_swahili
-  - factual_agnostic_swedish
-  - factual_agnostic_tagalog
-  - factual_agnostic_telugu
-  - factual_agnostic_turkish
-  - factual_agnostic_ukrainian
-  - factual_agnostic_vietnamese
+  # - factual_agnostic_swedish
+  # - factual_agnostic_tagalog
+  # - factual_agnostic_telugu
+  # - factual_agnostic_turkish
+  # - factual_agnostic_ukrainian
+  # - factual_agnostic_vietnamese
   - factual_agnostic_yoruba
   - factual_regional_albanian
   - factual_regional_amharic

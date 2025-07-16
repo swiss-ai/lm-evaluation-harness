@@ -1,6 +1,6 @@
 group: factual_agnostic_hausa
 task:
-  - global_mmlu_ha
+  - global_mmlu_full_ha
 aggregate_metric_list:
   - metric: acc
     aggregation: mean

@@ -1,6 +1,6 @@
 group: factual_agnostic_vietnamese
 task:
-  - global_mmlu_vi
+  - global_mmlu_full_vi
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
