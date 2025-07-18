@@ -1,3 +1,11 @@
+"""
+Create the Hugging Face dataset for the HarmBench benchmark.
+
+This script expects the following files to be in the same directory:
+- human_jailbreak_test.json
+- human_jailbreak_val.json
+"""
+
 import json
 import os
 
