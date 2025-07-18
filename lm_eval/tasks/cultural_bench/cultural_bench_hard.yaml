@@ -45,12 +45,12 @@ task:
   - cultural_bench_hard_united_states
   - cultural_bench_hard_vietnam
   - cultural_bench_hard_zimbabwe
-metric_list:
+aggregate_metric_list:
   - metric: acc
     aggregation: mean
-    higher_is_better: true
+    weight_by_size: true
   - metric: acc_norm
     aggregation: mean
-    higher_is_better: true
+    weight_by_size: true
 metadata:
   version: 1.0
