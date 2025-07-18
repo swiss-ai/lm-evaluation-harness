@@ -32,7 +32,7 @@ def load_local_json_as_df(json_path):
     with open(os.path.join(ROOT_DIR, json_path), "r") as f:
         data = json.load(f)
 
-    return pd.DataFrame(list(data.items()), columns=["BehaviorID", "Jailbreak"])
+    return pd.DataFrame(list(data.items()), columns=["BehaviorID", "Behavior"])
 
 
 direct_val = load_csv_url_as_df("harmbench_behaviors_text_val.csv")
