@@ -3,6 +3,6 @@ task:
   - harmbench_direct_request
   - harmbench_human_jailbreaks
 metric_list:
-  - metric: exact_match
+  - metric: score
     aggregation: mean
     higher_is_better: false
