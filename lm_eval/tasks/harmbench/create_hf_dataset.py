@@ -40,7 +40,16 @@ def load_local_json_as_df(json_path):
     with open(os.path.join(ROOT_DIR, json_path), "r") as f:
         data = json.load(f)
 
-    return pd.DataFrame(list(data.items()), columns=["BehaviorID", "Behavior"])
+    # Expand the data so each behavior in the array becomes a separate row
+    expanded_data = []
+    for behavior_id, behaviors in data.items():
+        # Each key contains an array of 5 behaviors
+        for i, behavior in enumerate(behaviors):
+            # Create a unique ID for each behavior: original_id + index
+            unique_id = f"{behavior_id}_{i+1}"
+            expanded_data.append({"BehaviorID": unique_id, "Behavior": behavior})
+
+    return pd.DataFrame(expanded_data)
 
 
 direct_val = load_csv_url_as_df("harmbench_behaviors_text_val.csv")
