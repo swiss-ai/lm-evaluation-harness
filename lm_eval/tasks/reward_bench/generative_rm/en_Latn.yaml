@@ -1,5 +1,0 @@
-include: _base_yaml
-dataset_path: allenai/reward-bench
-dataset_name: null
-test_split: filtered
-task: reward_bench_en_Latn

@@ -1,0 +1,6 @@
+dataset_name: null
+dataset_path: allenai/reward-bench
+include: ../_rb_base_yaml
+process_docs: !function ../../utils.process_docs_reasoning
+task: reward_bench_en_Latn_reasoning
+test_split: filtered

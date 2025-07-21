@@ -1,0 +1,10 @@
+aggregate_metric_list:
+- metric: acc
+group: reward_bench_jpn_Jpan
+metadata:
+  version: 0.1.0
+task:
+- reward_bench_jpn_Jpan_chat
+- reward_bench_jpn_Jpan_chat_hard
+- reward_bench_jpn_Jpan_safety
+- reward_bench_jpn_Jpan_reasoning

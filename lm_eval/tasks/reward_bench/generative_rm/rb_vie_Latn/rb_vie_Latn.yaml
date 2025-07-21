@@ -1,0 +1,10 @@
+aggregate_metric_list:
+- metric: acc
+group: reward_bench_vie_Latn
+metadata:
+  version: 0.1.0
+task:
+- reward_bench_vie_Latn_chat
+- reward_bench_vie_Latn_chat_hard
+- reward_bench_vie_Latn_safety
+- reward_bench_vie_Latn_reasoning
