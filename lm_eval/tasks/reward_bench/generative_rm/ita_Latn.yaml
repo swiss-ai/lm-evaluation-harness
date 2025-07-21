@@ -1,0 +1,5 @@
+include: _base_yaml
+dataset_path: CohereLabsCommunity/multilingual-reward-bench
+dataset_name: ita_Latn
+test_split: test
+task: reward_bench_ita_Latn
