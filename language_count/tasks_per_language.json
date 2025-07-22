@@ -1,0 +1,773 @@
+{
+  "am": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "ar": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9176,
+      "truthfulqa_multilingual": 773
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000,
+      "multijail": 315
+    }
+  },
+  "bn": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9242,
+      "truthfulqa_multilingual": 781
+    },
+    "safety": {
+      "multijail": 315
+    }
+  },
+  "cs": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "de": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9368,
+      "truthfulqa_multilingual": 788
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "el": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "en": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9368
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000,
+      "multijail": 315
+    }
+  },
+  "es": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9374,
+      "truthfulqa_multilingual": 789
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "fa": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "fil": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "fr": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9338,
+      "truthfulqa_multilingual": 787
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "ha": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "he": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "hi": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9416,
+      "truthfulqa_multilingual": 773
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "id": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9314,
+      "truthfulqa_multilingual": 778
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "ig": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "it": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9193,
+      "truthfulqa_multilingual": 783
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000,
+      "multijail": 315
+    }
+  },
+  "ja": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "ko": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000,
+      "multijail": 315
+    }
+  },
+  "ky": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "lt": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "mg": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "ms": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "ne": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9318,
+      "truthfulqa_multilingual": 774
+    }
+  },
+  "nl": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9265,
+      "truthfulqa_multilingual": 785
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "ny": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "pl": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "pt": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9229,
+      "truthfulqa_multilingual": 788
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "ro": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9245,
+      "truthfulqa_multilingual": 779
+    }
+  },
+  "ru": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9272,
+      "truthfulqa_multilingual": 788
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "si": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "sn": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "so": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "sr": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9449,
+      "truthfulqa_multilingual": 785
+    }
+  },
+  "sv": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9122,
+      "truthfulqa_multilingual": 774
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000
+    }
+  },
+  "sw": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "safety": {
+      "multijail": 315
+    }
+  },
+  "te": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 8724,
+      "truthfulqa_multilingual": 705
+    }
+  },
+  "tr": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "uk": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9409,
+      "truthfulqa_multilingual": 770
+    }
+  },
+  "vi": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 9162,
+      "truthfulqa_multilingual": 785
+    },
+    "safety": {
+      "multijail": 315
+    }
+  },
+  "yo": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    }
+  },
+  "zh": {
+    "regional_knowledge": {
+      "global_mmlu": 14042
+    },
+    "reasoning": {
+      "hellaswag_multilingual": 0,
+      "truthfulqa_multilingual": 788
+    },
+    "safety": {
+      "polyglotoxicityprompts_full": 31000,
+      "multijail": 315
+    }
+  },
+  "ca": {
+    "reasoning": {
+      "hellaswag_multilingual": 9211,
+      "truthfulqa_multilingual": 777
+    }
+  },
+  "da": {
+    "reasoning": {
+      "hellaswag_multilingual": 9305,
+      "truthfulqa_multilingual": 781
+    }
+  },
+  "eu": {
+    "reasoning": {
+      "hellaswag_multilingual": 9255,
+      "truthfulqa_multilingual": 774
+    }
+  },
+  "gu": {
+    "reasoning": {
+      "hellaswag_multilingual": 8803,
+      "truthfulqa_multilingual": 731
+    }
+  },
+  "hr": {
+    "reasoning": {
+      "hellaswag_multilingual": 9471,
+      "truthfulqa_multilingual": 769
+    }
+  },
+  "hu": {
+    "reasoning": {
+      "hellaswag_multilingual": 9119,
+      "truthfulqa_multilingual": 771
+    }
+  },
+  "hy": {
+    "reasoning": {
+      "hellaswag_multilingual": 8632,
+      "truthfulqa_multilingual": 553
+    }
+  },
+  "kn": {
+    "reasoning": {
+      "hellaswag_multilingual": 8862,
+      "truthfulqa_multilingual": 678
+    }
+  },
+  "ml": {
+    "reasoning": {
+      "hellaswag_multilingual": 8933,
+      "truthfulqa_multilingual": 694
+    }
+  },
+  "mr": {
+    "reasoning": {
+      "hellaswag_multilingual": 9279,
+      "truthfulqa_multilingual": 764
+    }
+  },
+  "sk": {
+    "reasoning": {
+      "hellaswag_multilingual": 9485,
+      "truthfulqa_multilingual": 778
+    }
+  },
+  "ta": {
+    "reasoning": {
+      "hellaswag_multilingual": 8413,
+      "truthfulqa_multilingual": 743
+    }
+  },
+  "is": {
+    "reasoning": {
+      "hellaswag_multilingual": 9368
+    }
+  },
+  "nb": {
+    "reasoning": {
+      "hellaswag_multilingual": 9368
+    }
+  },
+  "China": {
+    "regional_knowledge": {
+      "cultural_bench": 295,
+      "blend": 20410
+    }
+  },
+  "South Africa": {
+    "regional_knowledge": {
+      "cultural_bench": 290
+    }
+  },
+  "Japan": {
+    "regional_knowledge": {
+      "cultural_bench": 265
+    }
+  },
+  "Mexico": {
+    "regional_knowledge": {
+      "cultural_bench": 245,
+      "blend": 20513
+    }
+  },
+  "India": {
+    "regional_knowledge": {
+      "cultural_bench": 230
+    }
+  },
+  "Philippines": {
+    "regional_knowledge": {
+      "cultural_bench": 225
+    }
+  },
+  "South Korea": {
+    "regional_knowledge": {
+      "cultural_bench": 205
+    }
+  },
+  "Spain": {
+    "regional_knowledge": {
+      "cultural_bench": 200,
+      "blend": 19280
+    }
+  },
+  "Turkey": {
+    "regional_knowledge": {
+      "cultural_bench": 190
+    }
+  },
+  "Iran": {
+    "regional_knowledge": {
+      "cultural_bench": 185,
+      "blend": 19371
+    }
+  },
+  "Hong Kong": {
+    "regional_knowledge": {
+      "cultural_bench": 180
+    }
+  },
+  "Italy": {
+    "regional_knowledge": {
+      "cultural_bench": 180
+    }
+  },
+  "Argentina": {
+    "regional_knowledge": {
+      "cultural_bench": 175
+    }
+  },
+  "Germany": {
+    "regional_knowledge": {
+      "cultural_bench": 160
+    }
+  },
+  "Russia": {
+    "regional_knowledge": {
+      "cultural_bench": 150
+    }
+  },
+  "Vietnam": {
+    "regional_knowledge": {
+      "cultural_bench": 135
+    }
+  },
+  "Thailand": {
+    "regional_knowledge": {
+      "cultural_bench": 135
+    }
+  },
+  "Indonesia": {
+    "regional_knowledge": {
+      "cultural_bench": 130,
+      "blend": 18417
+    }
+  },
+  "Czech Republic": {
+    "regional_knowledge": {
+      "cultural_bench": 125
+    }
+  },
+  "Brazil": {
+    "regional_knowledge": {
+      "cultural_bench": 125
+    }
+  },
+  "Netherlands": {
+    "regional_knowledge": {
+      "cultural_bench": 125
+    }
+  },
+  "United Kingdom": {
+    "regional_knowledge": {
+      "cultural_bench": 125
+    }
+  },
+  "Bangladesh": {
+    "regional_knowledge": {
+      "cultural_bench": 125
+    }
+  },
+  "Poland": {
+    "regional_knowledge": {
+      "cultural_bench": 120
+    }
+  },
+  "Singapore": {
+    "regional_knowledge": {
+      "cultural_bench": 115
+    }
+  },
+  "Nigeria": {
+    "regional_knowledge": {
+      "cultural_bench": 110
+    }
+  },
+  "Lebanon": {
+    "regional_knowledge": {
+      "cultural_bench": 110
+    }
+  },
+  "Chile": {
+    "regional_knowledge": {
+      "cultural_bench": 110
+    }
+  },
+  "Taiwan": {
+    "regional_knowledge": {
+      "cultural_bench": 110
+    }
+  },
+  "Nepal": {
+    "regional_knowledge": {
+      "cultural_bench": 105
+    }
+  },
+  "Ukraine": {
+    "regional_knowledge": {
+      "cultural_bench": 105
+    }
+  },
+  "United States": {
+    "regional_knowledge": {
+      "cultural_bench": 100
+    }
+  },
+  "Egypt": {
+    "regional_knowledge": {
+      "cultural_bench": 100
+    }
+  },
+  "Peru": {
+    "regional_knowledge": {
+      "cultural_bench": 95
+    }
+  },
+  "Morocco": {
+    "regional_knowledge": {
+      "cultural_bench": 85
+    }
+  },
+  "Zimbabwe": {
+    "regional_knowledge": {
+      "cultural_bench": 85
+    }
+  },
+  "Saudi Arabia": {
+    "regional_knowledge": {
+      "cultural_bench": 85
+    }
+  },
+  "Romania": {
+    "regional_knowledge": {
+      "cultural_bench": 75
+    }
+  },
+  "Australia": {
+    "regional_knowledge": {
+      "cultural_bench": 75
+    }
+  },
+  "Pakistan": {
+    "regional_knowledge": {
+      "cultural_bench": 70
+    }
+  },
+  "France": {
+    "regional_knowledge": {
+      "cultural_bench": 70
+    }
+  },
+  "Israel": {
+    "regional_knowledge": {
+      "cultural_bench": 65
+    }
+  },
+  "New Zealand": {
+    "regional_knowledge": {
+      "cultural_bench": 55
+    }
+  },
+  "Malaysia": {
+    "regional_knowledge": {
+      "cultural_bench": 55
+    }
+  },
+  "Canada": {
+    "regional_knowledge": {
+      "cultural_bench": 35
+    }
+  },
+  "Ethiopia": {
+    "regional_knowledge": {
+      "blend": 22712
+    }
+  },
+  "South_Korea": {
+    "regional_knowledge": {
+      "blend": 21439
+    }
+  },
+  "Assam": {
+    "regional_knowledge": {
+      "blend": 21293
+    }
+  },
+  "Greece": {
+    "regional_knowledge": {
+      "blend": 20383
+    }
+  },
+  "Algeria": {
+    "regional_knowledge": {
+      "blend": 20364
+    }
+  },
+  "Azerbaijan": {
+    "regional_knowledge": {
+      "blend": 19932
+    }
+  },
+  "North_Korea": {
+    "regional_knowledge": {
+      "blend": 17005
+    }
+  },
+  "UK": {
+    "regional_knowledge": {
+      "blend": 16723
+    }
+  },
+  "US": {
+    "regional_knowledge": {
+      "blend": 16491
+    }
+  },
+  "Northern_Nigeria": {
+    "regional_knowledge": {
+      "blend": 16317
+    }
+  },
+  "West_Java": {
+    "regional_knowledge": {
+      "blend": 15289
+    }
+  },
+  "arabic": {
+    "safety": {
+      "aya_redteaming": 900
+    }
+  },
+  "english": {
+    "safety": {
+      "aya_redteaming": 987
+    }
+  },
+  "filipino": {
+    "safety": {
+      "aya_redteaming": 1009
+    }
+  },
+  "french": {
+    "safety": {
+      "aya_redteaming": 813
+    }
+  },
+  "hindi": {
+    "safety": {
+      "aya_redteaming": 915
+    }
+  },
+  "russian": {
+    "safety": {
+      "aya_redteaming": 1007
+    }
+  },
+  "serbian": {
+    "safety": {
+      "aya_redteaming": 1006
+    }
+  },
+  "spanish": {
+    "safety": {
+      "aya_redteaming": 782
+    }
+  },
+  "th": {
+    "safety": {
+      "multijail": 315
+    }
+  },
+  "jv": {
+    "safety": {
+      "multijail": 315
+    }
+  }
+}

@@ -1,0 +1,9 @@
+harness_task,hf_dataset,category,language_info,column,split
+global_mmlu,CohereLabs/Global-MMLU,regional_knowledge,config,,test
+hellaswag_multilingual,alexandrainst/m_hellaswag,reasoning,config,,val
+truthfulqa_multilingual,alexandrainst/m_truthfulqa,reasoning,config,,val
+cultural_bench,kellycyy/CulturalBench,regional_knowledge,column,country,test
+blend,nayeon212/BLEnD,regional_knowledge,column,country,test
+polyglotoxicityprompts_full,ToxicityPrompts/PolygloToxicityPrompts,safety,,,
+aya_redteaming,CohereLabs/aya_redteaming,safety,,,
+multijail,DAMO-NLP-SG/MultiJail,safety,,,
