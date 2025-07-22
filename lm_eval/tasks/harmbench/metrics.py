@@ -1,3 +1,5 @@
+"""We recommend using the `VLLM_WORKER_MULTIPROC_METHOD=spawn` environment variable when running the HarmBench task."""
+
 import logging
 import pickle
 
