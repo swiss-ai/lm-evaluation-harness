@@ -1,5 +1,6 @@
 aggregate_metric_list:
-- metric: acc
+- metric: exact_match
+  filter_list: "extract-answer"
 group: reward_bench_kor_Hang
 metadata:
   version: 0.1.0
