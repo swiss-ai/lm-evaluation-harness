@@ -90,5 +90,6 @@ def generative_rm_doc_to_text(doc):
     return generative_rm_system_prompt + "\n\n" + generative_rm_user_prompt.format(
         question=doc["prompt"],
         answer_a=doc["answer_a"],
-        answer_b=doc["answer_b"]
+        answer_b=doc["answer_b"],
+        language=doc["language"]
     )

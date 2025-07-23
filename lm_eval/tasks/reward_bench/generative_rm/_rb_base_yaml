@@ -13,6 +13,7 @@ generation_kwargs:
   - </s>
   - <|im_end|>
   - <|endoftext|>
+  - <|eot_id|>
 filter_list:
   - name: "extract-answer"
     filter:
