@@ -4,6 +4,10 @@ hellaswag_multilingual,alexandrainst/m_hellaswag,reasoning,config,,val
 truthfulqa_multilingual,alexandrainst/m_truthfulqa,reasoning,config,,val
 cultural_bench,kellycyy/CulturalBench,regional_knowledge,column,country,test
 blend,nayeon212/BLEnD,regional_knowledge,column,country,test
-polyglotoxicityprompts_full,ToxicityPrompts/PolygloToxicityPrompts,safety,,,
+polyglotoxicityprompts,ToxicityPrompts/PolygloToxicityPrompts,safety,,,
 aya_redteaming,CohereLabs/aya_redteaming,safety,,,
 multijail,DAMO-NLP-SG/MultiJail,safety,,,
+polymath,Qwen/PolyMath,reasoning,,,
+mlogiqa,Qwen/P-MMEval,reasoning,,,
+mmlu_prox,li-lab/MMLU-ProX,knowledge,,,
+arc_multilingual,alexandrainst/m_arc,knowledge,,,
