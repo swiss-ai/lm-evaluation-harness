@@ -9,6 +9,12 @@ from lm_eval import utils
 from lm_eval.api.group import ConfigurableGroup, GroupConfig
 from lm_eval.api.task import ConfigurableTask, Task
 from lm_eval.evaluator_utils import get_subtask_list
+from . import multi_if
+
+import sys
+print("DEBUG tasks/__init__: multi_if imported?", 'lm_eval.tasks.multi_if' in sys.modules)
+from lm_eval.api.registry import TASK_REGISTRY
+print("DEBUG tasks/__init__: registry has multi_if?", 'multi_if' in TASK_REGISTRY)
 
 
 GROUP_ONLY_KEYS = list(GroupConfig().to_dict().keys())
