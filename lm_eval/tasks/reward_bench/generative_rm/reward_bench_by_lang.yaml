@@ -1,4 +1,4 @@
-group: reward_bench
+group: reward_bench_by_lang
 task:
 - reward_bench_ron_Latn
 - reward_bench_rus_Cyrl
