@@ -1,4 +1,4 @@
-group: reward_bench_by_task
+group: reward_bench
 task:
 - reward_bench_chat
 - reward_bench_chat_hard
