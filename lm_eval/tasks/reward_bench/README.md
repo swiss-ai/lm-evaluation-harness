@@ -21,21 +21,21 @@ The RewardBench dataset is a collection of prompt-chosen-rejected trios spanning
 
 A systematic evaluation of several reward models in multilingual settings shows that the performance of RMs is improved with improved translation quality and it is demonstrated that the models exhibit better performance for high-resource languages.
 
-### Tasks
+## Tasks
 
-* `reward_bench`: Evaluation on all languages and subtasks (Chat, Chat Hard, Safety, Reasoning). Averaging is done over tasks.
+* `reward_bench`: Evaluation on all languages and subtasks (Chat, Chat Hard, Safety, Reasoning). Final averaging is done over tasks.
 * `reward_bench_chat`: Evaluation on all languages for Chat tasks.
 * `reward_bench_chat_hard`: Evaluation on all languages for Chat Hard tasks.
 * `reward_bench_safety`: Evaluation on all languages for Safety tasks.
 * `reward_bench_reasoning`: Evaluation on all languages for Reasoning tasks.
-* `reward_bench_by_lang`: Evaluation on all languages and subtasks, but averaging is done over languages, not tasks.
+* `reward_bench_by_lang`: Evaluation on all languages and subtasks, but final averaging is done over languages, not tasks.
 * `reward_bench_{lang}`: Evaluation on all subtasks for a given language {lang}. List of languages can be found below.
 * `reward_bench_{lang}_{subtask}`: Evaluation on a given {subtask} for a given language {lang}. Subtasks are `chat`, `chat_hard`, `safety` and `reasoning`.
 
-### Languages
+## Languages
 Arabic (arb_Arab), Czech (ces_Latn), German (deu_Latn), Greek (ell_Grek), English (en_Latn), French (fra_Latn), Hebrew (heb_Hebr), Hindi (hin_Deva), Indonesian (ind_Latn), Italian (ita_Latn), Japanese (jpn_Jpan), Korean (kor_Hang), Dutch (nld_Latn), Persian (pes_Arab), Polish (pol_Latn), Romanian (ron_Latn), Russian (rus_Cyrl), Spanish (spa_Latn), Turkish (tur_Latn), Ukranian (ukr_Cyrl), Vietnamese (vie_Latn), Chinese Simplified (zho_Hans), Chinese Traditional (zho_Hant)
 
-### Citation
+## Citation
 ```bibtex
 @article{Lambert2024RewardBenchER,
   title={RewardBench: Evaluating Reward Models for Language Modeling},
