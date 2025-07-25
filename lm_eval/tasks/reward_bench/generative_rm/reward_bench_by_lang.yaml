@@ -22,7 +22,8 @@ task:
 - reward_bench_pes_Arab
 - reward_bench_pol_Latn
 - reward_bench_por_Latn
-- reward_bench_heb_Hebr  
+- reward_bench_heb_Hebr
+- reward_bench_nld_Latn
 aggregate_metric_list:
 - metric: exact_match
   weight_by_size: true
