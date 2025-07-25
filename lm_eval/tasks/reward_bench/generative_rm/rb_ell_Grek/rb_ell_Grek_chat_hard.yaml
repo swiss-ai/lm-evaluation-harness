@@ -1,0 +1,6 @@
+dataset_name: ell_Grek
+dataset_path: CohereLabsCommunity/multilingual-reward-bench
+include: ../_rb_base_yaml
+process_docs: !function ../../utils.process_docs_chat_hard
+task: reward_bench_ell_Grek_chat_hard
+test_split: test
