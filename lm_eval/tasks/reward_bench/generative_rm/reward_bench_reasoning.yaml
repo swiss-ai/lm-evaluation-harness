@@ -23,6 +23,7 @@ task:
 - reward_bench_pol_Latn_reasoning
 - reward_bench_por_Latn_reasoning
 - reward_bench_heb_Hebr_reasoning
+- reward_bench_nld_Latn_reasoning
 aggregate_metric_list:
 - metric: exact_match
   weight_by_size: true

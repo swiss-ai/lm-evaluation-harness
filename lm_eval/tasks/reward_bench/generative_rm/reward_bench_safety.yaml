@@ -23,6 +23,7 @@ task:
 - reward_bench_pol_Latn_safety
 - reward_bench_por_Latn_safety
 - reward_bench_heb_Hebr_safety
+- reward_bench_nld_Latn_safety
 aggregate_metric_list:
 - metric: exact_match
   weight_by_size: true
