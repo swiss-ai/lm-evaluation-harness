@@ -1,0 +1,26 @@
+dataset_path: null # Overridden by language-specific config.
+dataset_name: null # Overridden by language-specific config.
+test_split: null  # Overridden by language-specific config.
+task: null  # Overridden by language-specific config.
+output_type: generate_until
+process_docs: null  # Overridden by language-specific config.
+doc_to_text: !function ../utils.generative_rm_doc_to_text
+doc_to_target: target
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  until:
+  - </s>
+  - <|im_end|>
+  - <|endoftext|>
+  - <|eot_id|>
+filter_list:
+  - name: "extract-answer"
+    filter:
+    - function: regex
+      regex_pattern: \[\[[AB]\]\]
+    - function: take_first
+metric_list:
+  - metric: exact_match
+metadata:
+  version: 0.1.0
