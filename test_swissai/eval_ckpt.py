@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import json
 import os
 import re
 import shutil
@@ -40,6 +41,8 @@ from typing import Literal, Sequence
 
 # DEFAULT_TASKS = "winogrande,lambada_openai,piqa,social_iqa,openbookqa,arc_easy,commonsense_qa,triviaqa,mmlu_continuation,gsm8k,global_mmlu_ar,global_mmlu_bn,global_mmlu_de,global_mmlu_en,global_mmlu_es,global_mmlu_fr,global_mmlu_hi,global_mmlu_id,global_mmlu_it,global_mmlu_ja,global_mmlu_ko,global_mmlu_pt,global_mmlu_sw,global_mmlu_yo,global_mmlu_zh,wikitext,lambada,hellaswag,longbench,ruler"
 DEFAULT_TASKS = "longbench,ruler"
+# DEFAULT_TASKS = "longbench,ruler,hellaswag,piqa,winogrande,arc_easy,arc_challenge,lambada_openai,triviaqa,gsm8k,mathqa"
+
 
 ###############################################################################
 # Generic helpers
@@ -79,6 +82,8 @@ def convert_megatron_to_hf(
     megatron_lm_dir: Path,
     hf_out: Path,
     pipeline_mp_size: int | None = None,
+    iter: int = -1,
+    overwrite_max_seq_length: int = -1,
 ) -> None:
     """Convert *ckpt_dir* (Megatron‑LM) → HuggingFace under *hf_out*.
 
@@ -90,8 +95,9 @@ def convert_megatron_to_hf(
     ckpt_dir = ckpt_dir.resolve()
     hf_out = hf_out.resolve()
     hf_out.mkdir(parents=True, exist_ok=True)
+    iter_str = f"_iter{iter}" if iter != -1 else ""
 
-    torch_tmp = Path(str(hf_out) + "_torch")
+    torch_tmp = Path(str(hf_out) + f"_torch{iter_str}")
     torch_tmp.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
@@ -119,6 +125,8 @@ def convert_megatron_to_hf(
         "--ckpt-convert-save",
         str(torch_tmp),
     ]
+    if iter != -1:
+        torch_cmd += ["--ckpt-step", str(iter)]
     if pipeline_mp_size:
         torch_cmd += ["--pipeline-model-parallel-size", str(pipeline_mp_size)]
 
@@ -129,6 +137,8 @@ def convert_megatron_to_hf(
     # ---------------------------------------------------------------------
     core_dir = torch_tmp / "torch"
     hf_cmd = [
+        # "NVTE_DEBUG=1",
+        # "NVTE_DEBUG_LEVEL=2",
         sys.executable,
         str(convert_py),
         "--model-type",
@@ -137,7 +147,7 @@ def convert_megatron_to_hf(
         "core",
         "--saver",
         "swissai_hf",
-        "--test-logits",
+        # "--test-logits", # no logit test for long context models, OOMs
         "--load-dir",
         str(core_dir),
         "--save-dir",
@@ -149,6 +159,14 @@ def convert_megatron_to_hf(
 
     # Clean up intermediate torch checkpoint to save space
     shutil.rmtree(torch_tmp, ignore_errors=True)
+    
+    if overwrite_max_seq_length != -1:
+        hf_out_config = json.load(open(hf_out / "config.json", "r"))
+        # WARNING: hardcoded value to detect base model
+        if hf_out_config['max_position_embeddings'] < overwrite_max_seq_length:
+            hf_out_config['max_position_embeddings'] = overwrite_max_seq_length
+            json.dump(hf_out_config, open(hf_out / "config.json", "w"))
+            print(f"[info] overwritten max_position_embeddings to {overwrite_max_seq_length} for sglang eval")
 
 ###############################################################################
 # Benchmarking with lm‑eval‑harness + SGLang backend
@@ -159,15 +177,19 @@ def run_lm_eval(
     tasks: Sequence[str],
     dp_size: int,
     tp_size: int,
+    context_length: int,
     dtype: str = "auto",
     batch_size: str | int = "auto",
     extra_lm_eval_args: Sequence[str] | None = None,
 ) -> None:
-    if isinstance(batch_size, str) and batch_size != "auto":
-        raise ValueError("batch_size string value must be 'auto'")
+    # if isinstance(batch_size, str) and batch_size != "auto":
+    #     raise ValueError("batch_size string value must be 'auto'")
         
+    if 'longbench' in tasks:
+        context_length = max(context_length, 131072) # longbench need > 64k context length
+
     model_args = (
-        f"pretrained={hf_dir},mem_fraction_static=0.65,trust_remote_code=True,tokenizer_path=alehc/swissai-tokenizer,dp_size={dp_size},tp_size={tp_size},dtype={dtype},context_length=32768"
+        f"pretrained={hf_dir},mem_fraction_static=0.7,trust_remote_code=True,tokenizer_path=alehc/swissai-tokenizer,dp_size={dp_size},tp_size={tp_size},dtype={dtype},context_length={context_length}"
     )
 
     cmd = [
@@ -201,10 +223,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dtype", default="auto", help="Model dtype to request from SGLang (auto|bf16|fp16|fp32)")
     p.add_argument("--batch-size", default="auto", help="Batch size for lm‑eval‑harness (int or 'auto')")
     p.add_argument("--ruler-lengths", type=str, default="4096,8192,16384", help="Comma-separated list of sequence lengths for ruler task")
+    p.add_argument("--context-length", type=int, default=32768, help="Context length for SGLang evaluation")
     p.add_argument("--skip-eval", action="store_true", help="Only convert, do not run lm‑eval‑harness")
     p.add_argument("--wandb-entity", default="tiachen", help="Wandb entity")
-    p.add_argument("--wandb-project", default="swissai-eval-long-context-sglang-test", help="Wandb project")
+    p.add_argument("--wandb-project", default="swissai-eval-long-context-8b-mixture-long-ctx", help="Wandb project")
     p.add_argument("--wandb-id", required=True, help="Wandb id")
+    p.add_argument("--iter", type=int, default=-1, help="Iteration to evaluate")
+    p.add_argument("--overwrite-max-seq-length", type=int, default=-1, help="Overwrite max sequence length to avoid generation errors in sglang (see https://github.com/sgl-project/sglang/blob/4953f4ca9a3a440168cb4a0e9d1e4ae883c97d52/python/sglang/srt/layers/rotary_embedding.py#L130). This does not affect rope scaling (at least in sglang).")
 
     args = p.parse_args()
     
@@ -244,6 +269,8 @@ def main() -> None:
             ckpt_dir=ckpt_dir,
             megatron_lm_dir=args.megatron_lm_dir.expanduser().resolve(),
             hf_out=hf_out,
+            iter=args.iter,
+            overwrite_max_seq_length=args.overwrite_max_seq_length,
         )
     else:
         sys.exit("Unrecognised checkpoint structure — aborting")
@@ -262,6 +289,7 @@ def main() -> None:
         tasks=[t.strip() for t in args.tasks.split(",") if t.strip()],
         dp_size=args.dp_size,
         tp_size=args.tp_size,
+        context_length=args.context_length,
         dtype=args.dtype,
         batch_size=args.batch_size,
         extra_lm_eval_args=extra_args,
