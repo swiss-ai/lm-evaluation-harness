@@ -47,7 +47,7 @@ from datasets import load_dataset
 from lm_eval.api.task import Task
 from lm_eval.api.registry import register_task, TASK_REGISTRY
 
-from .instruction_checks import INSTRUCTION_REGISTRY
+from lm_eval.tasks.multi_if.instruction_checks import INSTRUCTION_REGISTRY
 
 
 # -------- Helpers for loose normalization --------
@@ -85,7 +85,6 @@ def check_instruction_loose(checker, resp: str, kw: Dict[str, Any]) -> bool:
     return False
 
 
-@dataclass
 class TurnSpec:
     prompt: str
     instruction_ids: List[str]
@@ -163,6 +162,10 @@ class MultiIF(Task):
     # --- Single-turn prompt (first turn only; real multi-turn handled externally) ---
     def doc_to_text(self, doc):
         return doc["turns"][0]["prompt"]
+    
+    def fewshot_context(self, *args, **kwargs):
+        # We don't do few-shot; return empty prefix.
+        return ""
 
     def construct_requests(self, doc, ctx):
         # We bypass harness request construction; multi-turn generation is custom.
@@ -320,13 +323,11 @@ class MultiIF(Task):
 
 
 # -------- Factory function registration (preferred) --------
-@register_task("multi_if")
+# @register_task("multi-if")
 def build_multi_if(**kwargs):
-    """
-    Factory returning a MultiIF instance.
-    Having a factory in the registry matches the pattern many harness
-    components expect (callable -> Task instance).
-    """
-    return MultiIF(**kwargs)
+    t = MultiIF(**kwargs)
+    t.task_name = "multi-if"   # ensure it’s set
+    t.download()
+    return t
 
 

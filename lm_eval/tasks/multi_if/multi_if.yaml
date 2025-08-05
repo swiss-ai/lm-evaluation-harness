@@ -1,0 +1,10 @@
+task: multi-if
+class: !function multi_if.build_multi_if   # or multi_if.MultiIF if the loader accepts classes
+args:
+  subset_size: null
+  languages: null
+  max_turns: 3
+output_type: generate_until
+metadata:
+  version: 0.0.1
+
