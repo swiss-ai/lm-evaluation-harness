@@ -1,0 +1,2 @@
+include: _tangale_template.yaml
+task: include_base_new_45_tangale
