@@ -1,0 +1,2 @@
+include: _sena_template_yaml
+task: include_base_new_45_sena
