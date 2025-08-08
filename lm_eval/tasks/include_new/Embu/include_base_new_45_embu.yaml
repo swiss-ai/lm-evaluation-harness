@@ -1,2 +1,3 @@
-include: _embu_template_yaml
+include: ../_base_template_yaml
+dataset_name: Embu
 task: include_base_new_45_embu
