@@ -1,15 +1,6 @@
 group: mlogiqa
 task:
-  - mlogiqa_ar
-  - mlogiqa_en
-  - mlogiqa_es
-  - mlogiqa_fr
-  - mlogiqa_ja
-  - mlogiqa_ko
-  - mlogiqa_pt
-  - mlogiqa_th
-  - mlogiqa_vi
-  - mlogiqa_zh
+  - mlogiqa_mcq
 aggregate_metric_list:
   - metric: acc
     aggregation: mean
