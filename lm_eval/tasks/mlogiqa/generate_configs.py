@@ -15,7 +15,9 @@ def main():
     if not token:
         raise ValueError("HF_TOKEN not found in .env file")
 
-    languages = get_dataset_config_names("swiss-ai/mlogiqa", token=token)
+    # languages = get_dataset_config_names("swiss-ai/mlogiqa", token=token)
+    languages = ["ar", "en", "es", "fr", "ja", "ko", "pt", "th", "vi", "zh"]
+
     output_dir = Path(__file__).parent
 
     for mode in ["mcq", "gen"]:
