@@ -1,7 +1,8 @@
 dataset_path: swiss-ai/mlogiqa
 test_split: test
-output_type: multiple_choice
-doc_to_text: !function utils.doc_to_text
+output_type: generate_until
+process_docs: !function utils.process_docs
+doc_to_text: !function utils.doc_to_text_gen
 doc_to_target: "{{answer}}"
 doc_to_choice: !function utils.doc_to_choice
 metric_list:
