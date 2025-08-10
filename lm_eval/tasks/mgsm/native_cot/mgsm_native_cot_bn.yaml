@@ -22,5 +22,6 @@ generation_kwargs:
   - <|im_end|>
   - "<SPECIAL_62>"
   - "[/INST]"
+  - "<SPECIAL_61>"
 include: cot_yaml
 task: mgsm_native_cot_bn

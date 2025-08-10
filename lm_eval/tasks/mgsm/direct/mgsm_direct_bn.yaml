@@ -9,6 +9,7 @@ generation_kwargs:
   - </s>
   - <|im_end|>
   - <SPECIAL_62>
+  - "<SPECIAL_61>"
   - "[/INST]"
 include: direct_yaml
 task: mgsm_direct_bn

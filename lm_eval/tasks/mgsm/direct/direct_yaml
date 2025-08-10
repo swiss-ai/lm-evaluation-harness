@@ -13,6 +13,7 @@ generation_kwargs:
     - "\n\n"
     - "\n"
     - "<SPECIAL_62>"
+    - "<SPECIAL_61>"
     - "[/INST]"
   do_sample: false
   temperature: 0.0
