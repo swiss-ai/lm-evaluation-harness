@@ -3,21 +3,20 @@ import ast
 import datasets
 
 
-def doc_to_choice(doc):
-    """Parse options string to list of choices."""
-    return [f"{chr(ord('A') + i)}. {x}" for i, x in enumerate(doc["options"])]
-
-
 def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
+    """Convert options from string representation to list."""
     return dataset.map(lambda x: {"options": ast.literal_eval(x["options"])})
 
 
+def doc_to_choice(doc):
+    """Parse options and format them as A, B, C, D choices. Only used for multiple choice evaluation mode."""
+    return [f"{chr(ord('A') + i)}. {x}" for i, x in enumerate(doc["options"])]
+
+
 def doc_to_text_mcq(doc):
-    """Parse options and render the text template."""
-    # # Parse the options string into a list
+    """Format prompt for multiple choice evaluation mode."""
     options = doc["options"]
 
-    # Build the text template
     text = f"Passage: {doc['context'].strip()}\n"
     text += f"Question: {doc['question'].strip()}\n"
     text += "Choices:\n"
@@ -31,11 +30,9 @@ def doc_to_text_mcq(doc):
 
 
 def doc_to_text_gen(doc):
-    """Parse options and render the text template."""
-    # Parse the options string into a list
-    options = ast.literal_eval(doc["options"])
+    """Format prompt for generation evaluation mode."""
+    options = doc["options"]
 
-    # Build the text template
     text = f"Passage: {doc['context'].strip()}\n"
     text += f"Question: {doc['question'].strip()}\n"
     text += "Choices:\n"
