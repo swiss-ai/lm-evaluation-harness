@@ -12,6 +12,8 @@ generation_kwargs:
   until:
     - "\n\n"
     - "\n"
+    - "<SPECIAL_62>"
+    - "[/INST]"
   do_sample: false
   temperature: 0.0
 filter_list:

@@ -8,5 +8,7 @@ generation_kwargs:
   - 問題：
   - </s>
   - <|im_end|>
+  - "<SPECIAL_62>"
+  - "[/INST]"
 include: cot_yaml
 task: mgsm_en_cot_ja

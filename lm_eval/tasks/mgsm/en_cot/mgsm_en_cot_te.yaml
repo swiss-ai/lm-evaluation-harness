@@ -8,5 +8,7 @@ generation_kwargs:
   - 'ప్రశ్న:'
   - </s>
   - <|im_end|>
+  - "<SPECIAL_62>"
+  - "[/INST]"
 include: cot_yaml
 task: mgsm_en_cot_te

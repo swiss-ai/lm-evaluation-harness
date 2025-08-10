@@ -8,5 +8,7 @@ generation_kwargs:
   - 问题：
   - </s>
   - <|im_end|>
+  - "<SPECIAL_62>"
+  - "[/INST]"
 include: direct_yaml
 task: mgsm_direct_zh
