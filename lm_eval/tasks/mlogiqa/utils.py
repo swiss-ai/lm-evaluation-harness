@@ -8,9 +8,20 @@ def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
     return dataset.map(lambda x: {"options": ast.literal_eval(x["options"])})
 
 
+def doc_to_target_mcq(doc):
+    """Get answer index (e.g. 0) for multiple choice evaluation mode."""
+    return int(doc["answer"])
+
+
+def doc_to_target_gen(doc):
+    """Convert answer (e.g. "0") into corresponding letter (e.g. "A") for generation evaluation mode."""
+    answer_idx = int(doc["answer"])
+    return chr(ord("A") + answer_idx)
+
+
 def doc_to_choice(doc):
-    """Parse options and format them as A, B, C, D choices. Only used for multiple choice evaluation mode."""
-    return [f"{chr(ord('A') + i)}. {x}" for i, x in enumerate(doc["options"])]
+    """Return raw options for multiple choice evaluation mode."""
+    return doc["options"]
 
 
 def doc_to_text_mcq(doc):
