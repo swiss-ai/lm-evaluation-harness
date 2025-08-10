@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Malay
 description: Berikut ialah soalan aneka pilihan (dengan jawapan) tentang Business
   & Commerce.

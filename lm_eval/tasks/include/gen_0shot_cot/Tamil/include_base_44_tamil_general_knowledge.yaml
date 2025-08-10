@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_cot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Tamil
 description: பின்வருபவை General knowledge பற்றிய பல தேர்வு கேள்விகள் (பதில்களுடன்)
   உள்ளன.

@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_cot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Hungarian
 description: 'Az alábbiak feleletválasztós kérdések (válaszokkal) a következővel kapcsolatban:
   STEM.'

@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Kazakh
 description: Төменде Arts & Humanities туралы бірнеше таңдаулы сұрақтар (жауаптары
   бар) берілген.

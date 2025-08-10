@@ -30,6 +30,7 @@ generation_kwargs:
     - "</s>"
     - "Q:"
     - "<|im_end|>"
+  max_gen_toks: 1024
   temperature: 0.0
 metric_list:
   - metric: exact_match

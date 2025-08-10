@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_cot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Korean
 description: 다음은 Professional certification에 대한 객관식 질문(답변 포함)입니다.
 process_docs: !function 'utils.process_professional_certification'

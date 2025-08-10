@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Finnish
 description: Seuraavat ovat monivalintakysymyksiä (vastauksineen) aiheesta Arts &
   Humanities.

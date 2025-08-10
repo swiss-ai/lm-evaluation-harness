@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Persian
 description: در زیر سؤالات چند گزینه ای (همراه با پاسخ) در مورد Arts & Humanities
   آمده است.

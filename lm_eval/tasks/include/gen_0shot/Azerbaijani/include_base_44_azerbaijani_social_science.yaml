@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Azerbaijani
 description: Aşağıdakılar Social Science haqqında çoxseçimli suallardır (cavabları
   ilə).

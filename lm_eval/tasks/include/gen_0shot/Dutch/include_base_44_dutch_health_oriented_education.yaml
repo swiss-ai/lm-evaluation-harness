@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Dutch
 description: Hieronder staan ​​meerkeuzevragen (met antwoorden) over Health oriented
   education.

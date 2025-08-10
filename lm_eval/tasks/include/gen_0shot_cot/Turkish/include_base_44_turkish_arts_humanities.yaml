@@ -1,4 +1,4 @@
-include: ../_base_gen_0shot_cot_template_yaml
+include: ../_base_template_yaml
 dataset_name: Turkish
 description: Aşağıda Arts & Humanities ile ilgili çoktan seçmeli sorular (cevaplarıyla
   birlikte) bulunmaktadır.
