@@ -1,0 +1,9 @@
+group: include_base_44_tamil_gen_0shot
+task:
+- include_base_44_tamil_gen_0shot_stem
+- include_base_44_tamil_gen_0shot_general_knowledge
+aggregate_metric_list:
+- metric: acc
+  weight_by_size: true
+metadata:
+  version: 0.0
