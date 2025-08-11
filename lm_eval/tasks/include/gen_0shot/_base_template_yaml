@@ -18,7 +18,7 @@ doc_to_target: "{{ 'ABCD'[answer] }}"
 
 # Post-process model generations to a single letter via your helper
 filter_list:
-  - name: "strict-match"
+  - name: "extract-answer"
     filter:
       - function: "regex"
         group_select: -1 # takes last match

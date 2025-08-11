@@ -4,7 +4,7 @@ task:
 - include_base_44_german_gen_0shot_cot_social_science
 - include_base_44_german_gen_0shot_cot_driving_license
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0

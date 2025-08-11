@@ -6,7 +6,7 @@ task:
 - include_base_44_estonian_gen_0shot_stem
 - include_base_44_estonian_gen_0shot_arts_humanities
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0

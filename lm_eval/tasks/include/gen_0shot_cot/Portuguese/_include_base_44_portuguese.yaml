@@ -7,7 +7,7 @@ task:
 - include_base_44_portuguese_gen_0shot_cot_business_commerce
 - include_base_44_portuguese_gen_0shot_cot_applied_science
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0

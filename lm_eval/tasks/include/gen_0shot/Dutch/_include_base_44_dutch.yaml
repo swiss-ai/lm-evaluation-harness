@@ -6,7 +6,7 @@ task:
 - include_base_44_dutch_gen_0shot_health_oriented_education
 - include_base_44_dutch_gen_0shot_applied_science
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0

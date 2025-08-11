@@ -45,7 +45,7 @@ task:
   - include_base_44_uzbek_gen_0shot_cot
   - include_base_44_vietnamese_gen_0shot_cot
 aggregate_metric_list:
-  - metric: acc
-    weight_by_size: True
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 1.0

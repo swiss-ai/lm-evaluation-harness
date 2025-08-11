@@ -5,7 +5,7 @@ task:
 - include_base_44_spanish_gen_0shot_cot_arts_humanities
 - include_base_44_spanish_gen_0shot_cot_health_oriented_education
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0

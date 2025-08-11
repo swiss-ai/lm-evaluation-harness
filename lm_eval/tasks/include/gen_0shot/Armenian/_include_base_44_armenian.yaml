@@ -5,7 +5,7 @@ task:
 - include_base_44_armenian_gen_0shot_arts_humanities
 - include_base_44_armenian_gen_0shot_stem
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 0.0
