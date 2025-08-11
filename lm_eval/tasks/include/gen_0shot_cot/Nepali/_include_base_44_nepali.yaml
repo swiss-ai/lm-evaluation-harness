@@ -1,4 +1,4 @@
-group: include_base_44_nepali_gen_
+group: include_base_44_nepali_gen_0shot_cot
 task:
 - include_base_44_nepali_gen_0shot_cot_driving_license
 - include_base_44_nepali_gen_0shot_cot_professional_certification
