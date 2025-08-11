@@ -33,7 +33,6 @@ task:
   - include_base_44_persian_gen_0shot_cot
   - include_base_44_polish_gen_0shot_cot
   - include_base_44_portuguese_gen_0shot_cot
-  - include_base_44_russian_gen_0shot_cot
   - include_base_44_serbian_gen_0shot_cot
   - include_base_44_spanish_gen_0shot_cot
   - include_base_44_tagalog_gen_0shot_cot

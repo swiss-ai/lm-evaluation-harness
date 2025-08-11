@@ -46,17 +46,7 @@ task:
   - include_base_new_45_tyap_gen_0shot_cot
   - include_base_new_45_yoruba_gen_0shot_cot
 aggregate_metric_list:
-  - metric: acc
-    aggregation: mean
-    weight_by_size: true 
-  - metric: acc_norm
-    aggregation: mean
-    weight_by_size: true
-  - metric: perplexity
-    aggregation: mean
-    weight_by_size: true
-  - metric: f1
-    aggregation: mean
-    weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: 1.0
