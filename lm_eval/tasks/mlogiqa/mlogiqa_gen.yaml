@@ -1,0 +1,21 @@
+group: mlogiqa_gen
+task:
+  - mlogiqa_gen_ar
+  - mlogiqa_gen_en
+  - mlogiqa_gen_es
+  - mlogiqa_gen_fr
+  - mlogiqa_gen_ja
+  - mlogiqa_gen_ko
+  - mlogiqa_gen_pt
+  - mlogiqa_gen_th
+  - mlogiqa_gen_vi
+  - mlogiqa_gen_zh
+aggregate_metric_list:
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: true
+    filter_list:
+      - strict-match
+      - flexible-extract
+metadata:
+  version: 1.0

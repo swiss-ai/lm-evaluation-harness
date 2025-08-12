@@ -1,0 +1,3 @@
+task: mlogiqa_mcq_fr
+include: _mlogiqa_mcq_yaml
+dataset_name: fr

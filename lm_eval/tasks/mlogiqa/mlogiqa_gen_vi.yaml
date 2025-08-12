@@ -1,0 +1,3 @@
+task: mlogiqa_gen_vi
+include: _mlogiqa_gen_yaml
+dataset_name: vi
