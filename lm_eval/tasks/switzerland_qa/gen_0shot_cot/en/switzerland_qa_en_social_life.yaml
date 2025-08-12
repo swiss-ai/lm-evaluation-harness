@@ -1,3 +1,4 @@
-include: _en_template_yaml
-process_docs: !function utils.process_social_life
-task: switzerland_qa_en_social_life
+include: ../_base_template_yaml
+dataset_name: English
+process_docs: !function ../utils.process_social_life
+task: switzerland_qa_en_social_life_0shot_cot

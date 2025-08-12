@@ -1,5 +1,4 @@
 dataset_path: swiss-ai/switzerland_qa
-dataset_name: French
 test_split: test
 output_type: generate_until
 
@@ -38,3 +37,4 @@ metric_list:
     higher_is_better: true
 metadata:
   version: 1.0
+

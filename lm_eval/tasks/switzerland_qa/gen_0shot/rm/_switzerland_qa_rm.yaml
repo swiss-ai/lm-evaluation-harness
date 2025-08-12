@@ -1,12 +1,12 @@
-group: switzerland_qa_rm
+group: switzerland_qa_rm_0shot
 task:
-- switzerland_qa_rm_geography
-- switzerland_qa_rm_history
-- switzerland_qa_rm_insurance
-- switzerland_qa_rm_political_life
-- switzerland_qa_rm_social_life
+- switzerland_qa_rm_geography_0shot
+- switzerland_qa_rm_history_0shot
+- switzerland_qa_rm_insurance_0shot
+- switzerland_qa_rm_political_life_0shot
+- switzerland_qa_rm_social_life_0shot
 aggregate_metric_list:
-- metric: acc
-  weight_by_size: true
+- metric: exact_match
+  filter_list: "extract-answer"
 metadata:
   version: '1.0'

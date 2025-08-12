@@ -1,3 +1,4 @@
-include: _de_template_yaml
-process_docs: !function utils.process_political_life
-task: switzerland_qa_de_political_life
+include: ../_base_template_yaml
+dataset_name: German
+process_docs: !function ../utils.process_political_life
+task: switzerland_qa_de_political_life_0shot_cot
