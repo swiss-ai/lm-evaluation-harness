@@ -1,4 +1,5 @@
 group: mgsm_en_cot
+group_alias: mgsm_en_cot
 task:
   - mgsm_en_cot_bn
   - mgsm_en_cot_de
@@ -11,7 +12,6 @@ task:
   - mgsm_en_cot_te
   - mgsm_en_cot_th
   - mgsm_en_cot_zh
-
 aggregate_metric_list:
   - metric: exact_match
     aggregation: mean
