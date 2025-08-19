@@ -1,0 +1,3 @@
+task: mlogiqa_gen_th
+include: _mlogiqa_gen_yaml
+dataset_name: th

@@ -15,20 +15,23 @@ def main():
     if not token:
         raise ValueError("HF_TOKEN not found in .env file")
 
-    languages = get_dataset_config_names("swiss-ai/mlogiqa", token=token)
+    # languages = get_dataset_config_names("swiss-ai/mlogiqa", token=token)
+    languages = ["ar", "en", "es", "fr", "ja", "ko", "pt", "th", "vi", "zh"]
+
     output_dir = Path(__file__).parent
 
-    for language in sorted(languages):
-        config = {
-            "task": f"mlogiqa_{language}",
-            "include": "_mlogiqa_yaml",
-            "dataset_name": language,
-        }
+    for mode in ["mcq", "gen"]:
+        for language in sorted(languages):
+            config = {
+                "task": f"mlogiqa_{mode}_{language}",
+                "include": f"_mlogiqa_{mode}_yaml",
+                "dataset_name": language,
+            }
 
-        output_file = output_dir / f"mlogiqa_{language}.yaml"
-        with open(output_file, "w") as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-        print(f"Created: {output_file}")
+            output_file = output_dir / f"mlogiqa_{mode}_{language}.yaml"
+            with open(output_file, "w") as f:
+                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            print(f"Created: {output_file}")
 
 
 if __name__ == "__main__":

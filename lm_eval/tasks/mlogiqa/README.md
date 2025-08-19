@@ -28,19 +28,23 @@ Figure 12 from the original paper shows the prompt used:
 
 > "Passage: {context}\nQuestion: {question}\nChoices:\nA. {option_a}\nB. {option_b}\nC. {option_c}\nD.{option_d}\nPlease choose the most suitable one among A, B, C and Das the answer to this question, and return it in the following JSON format:\n{'answer': '[choice]'}\nwhere [choice] must be one of A, B, C and D."
 
-In this MCQA implementation, we remove the last part of the original prompt:
+For the `generate_until` implementation (i.e. `mlogiqa_gen`), we use exactly the original prompt. For the `multiple_choie` implementation (i.e. `mlogiqa_mcq`), we remove the last part of the original prompt:
 
 > "Passage: {context}\nQuestion: {question}\nChoices:\nA. {option_a}\nB. {option_b}\nC. {option_c}\nD.{option_d}\nPlease choose the most suitable one among A, B, C and Das the answer to this question."
+
+The evaluation with prompts in the native language is not implemented.
 
 ### Groups, Tags, and Tasks
 
 #### Groups
 
-* `mlogiqa`: MLogiQA problems in all languages
+* `mlogiqa_mcq`: MLogiQA problems in all languages evaluated in multiple choice mode
+* `mlogiqa_gen`: MLogiQA problems in all languages evaluated in generation mode
 
 #### Tasks
 
-* `mlogiqa_<language>`: MLogiQA problems in `<language>`
+* `mlogiqa_mcq_<language>`: MLogiQA problems in `<language>` evaluated in multiple choice mode
+* `mlogiqa_gen_<language>`: MLogiQA problems in `<language>` evaluated in generation mode
 * Languages: ar, en, es, fr, ja, ko, pt, th, vi, zh
 
 ### Checklist
