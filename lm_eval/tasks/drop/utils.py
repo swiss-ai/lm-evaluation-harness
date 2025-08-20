@@ -188,7 +188,12 @@ def _remove_punc(text):
 
 
 def _fix_number(text):
-    return str(float(text)) if _is_number(text) else text
+    # Accepts pure numbers AND numbers with additional text such as a unit (e.g., '3 yards', '12km', '5.0kg').
+    match = re.match(r"^\s*([+-]?\d+(\.\d+)?)(\s*[a-zA-Z%]+)?\s*$", text)
+    if match:
+        num = match.group(1)  # just the numeric part
+        return str(float(num))
+    return text
 
 
 def _tokenize(text):
@@ -203,6 +208,7 @@ def _normalize(answer):
     tokens = [token for token in tokens if token.strip()]
     normalized = " ".join(tokens).strip()
     return normalized
+
 
 def doc_to_target(doc):
     return ", ".join(doc["answers"][0])
