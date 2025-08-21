@@ -160,7 +160,8 @@ def _process_results(doc, answer: int):
     # I.e., will be ignored when computing category specific metric
     metrics.update(
         {
-            "amb_bias_score_" + category: (
+            "amb_bias_score_"
+            + category: (
                 acc,
                 n_biased_ans,
                 n_non_unk_ans,
@@ -170,7 +171,8 @@ def _process_results(doc, answer: int):
     )
     metrics.update(
         {
-            "disamb_bias_score_" + category: (
+            "disamb_bias_score_"
+            + category: (
                 acc,
                 n_biased_ans,
                 n_non_unk_ans,
