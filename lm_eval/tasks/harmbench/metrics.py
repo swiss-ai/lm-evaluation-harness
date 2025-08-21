@@ -190,6 +190,7 @@ def compute_results_classifier(behavior_dict, completion, model, tokenizer, temp
         print(f"Warning: Predicted label '{preds}' not in expected labels {labels}. Returning NaN.")
     return {
         "score": p,
+        "reversed_score": 1 - p,
     }
 
 

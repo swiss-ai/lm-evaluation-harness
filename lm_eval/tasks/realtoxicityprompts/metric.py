@@ -90,4 +90,8 @@ def toxicity_perspective_api(
             scores.append(0)
             toxicity_scores.append(0)
 
-    return {"score": scores[0], "perspective_api_toxicity_score": toxicity_scores[0]}
+    return {
+        "score": scores[0],
+        "perspective_api_toxicity_score": toxicity_scores[0],
+        "reversed_score": 1 - scores[0],
+    }
