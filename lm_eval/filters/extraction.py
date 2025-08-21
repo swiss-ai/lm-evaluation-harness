@@ -239,3 +239,68 @@ class MultiChoiceRegexFilter(RegexFilter):
             filtered_resps.append(filtered)
 
         return filtered_resps
+    
+@register_filter("ordered_regex")
+class OrderedRegexFilter(Filter):
+    """A filter that applies multiple regex patterns in order with fallback behavior.
+
+    This filter tries each regex pattern sequentially. If a pattern matches, it returns
+    the match. If no pattern matches, it proceeds to the next pattern. Only if all
+    patterns fail does it return the fallback value.
+
+    Optionally applies cleanup to the matched string via strip_extracts.
+    """
+
+    def __init__(
+        self,
+        regex_patterns: list[str] = [r"#### (\-?[0-9\.\,]+)"],
+        group_select: int = 0,
+        fallback: str = "[invalid]",
+        strip_extracts: list[str] = None,
+    ) -> None:
+        """
+        Args:
+            regex_patterns: List of regex patterns to try in order.
+            group_select: Which group to select from the match.
+            fallback: Fallback value if no match is found.
+            strip_extracts: Regexes to remove from the extracted result.
+        """
+        self.regex_patterns = regex_patterns
+        self.regexes = [re.compile(pattern) for pattern in regex_patterns]
+        self.group_select = group_select
+        self.fallback = fallback
+        self.strip_extracts = [re.compile(p) for p in strip_extracts] if strip_extracts else []
+
+    def _clean_extracted(self, text: str) -> str:
+        for ignore_re in self.strip_extracts:
+            text = ignore_re.sub("", text)
+        return text.strip()
+
+    def apply(self, resps: list[list[str]], docs: list[dict]) -> list[list[str]]:
+        def filter_set(inst):
+            filtered = []
+            for resp in inst:
+                match = None
+
+                for regex in self.regexes:
+                    match = regex.findall(resp)
+                    if match:
+                        match = match[self.group_select]
+                        if isinstance(match, tuple):
+                            match = [m for m in match if m]
+                            if match:
+                                match = match[0]
+                            else:
+                                match = None
+                        if match:
+                            match = self._clean_extracted(match)
+                            break
+
+                if not match:
+                    match = self.fallback
+
+                filtered.append(match)
+            return filtered
+
+        filtered_resps = list(map(lambda x: filter_set(x), resps))
+        return filtered_resps

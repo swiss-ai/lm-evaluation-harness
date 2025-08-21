@@ -13,15 +13,26 @@ generation_kwargs:
   max_gen_toks: 1024
   until:
     - "</s>"
-    - "Q"
-#     - "\n\n"
+    - "Q:"
+  #     - "\n\n"
   do_sample: false
   temperature: 0.0
 filter_list:
   - name: "get-answer"
     filter:
-      - function: "regex"
-        regex_pattern: "(?<=the answer is )(.*)(?=.)"
+      - function: "ordered_regex"
+        regex_patterns:
+          - '(?<=[Tt]he answer is)\s*(.*?)(?=\s*\.)'
+          - '(?<=[Tt]he final answer is)\s*(.*?)(?=\s*\.)'
+          - '(?<=[Aa]nswer:)\s*(.*?)(?=\s*\?)'
+          - '(?<=[Tt]he result is)\s*(.*?)(?=\s*\?)'
+          - '(?<=[Tt]he final result is)\s*(.*?)(?=\s*\?)'
+        strip_extracts:
+          - "\\$"
+          - "\\*"
+          - "`"
+          - "´"
+        group_select: -1
       - function: "take_first"
 num_fewshot: 3
 metadata:
