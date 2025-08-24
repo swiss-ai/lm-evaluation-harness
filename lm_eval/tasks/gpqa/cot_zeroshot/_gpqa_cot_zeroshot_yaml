@@ -12,7 +12,7 @@ filter_list:
   - name: "strict-match"
     filter:
       - function: "regex"
-        regex_pattern: '(?i)^\s*[\(\[\{"]?\s*(?P<lead_letter>[ABCD])\s*[\)\]\}"]?(?=[\s:)\].,;!?-]|$)|(?:^|[^\w])(?:the\s+)?answer(?:\s+is)?\s*[:\-]?(?:(?P<answer_letter>[ABCD])\b|(?P<answer_fallback>[^\n\r]+?))\s*$'  # Prefer a leading, standalone letter like "B: ...", "(C) ...", etc., otherwise, look for the 'answer' token and take A–D if present, else capture whatever comes after it as a fallback.
+        regex_pattern: '(?i)^\s*[\(\[\{"]?\s*(?P<lead_letter>[ABCD])\s*[\)\]\}"]?(?=[\s:)\].,;!?-]|$)|(?:^|[^\w])(?:the\s+)?answer(?:\s+is)?\s*[:\-]?(?:(?P<answer_letter>[ABCD])\b|(?P<answer_fallback>[^\n\r]+?))\s*$' # Prefer a leading, standalone letter like "B: ...", "(C) ...", etc., otherwise, look for the 'answer' token and take A–D if present, else capture whatever comes after it as a fallback.
       - function: "take_first"
   - name: "flexible-extract"
     filter:
@@ -22,12 +22,25 @@ filter_list:
         ignore_punctuation: true
         regex_pattern: "(\\([A-Z]\\))"
       - function: "take_first"
+  - name: "ordered-extract"
+    filter:
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Aa]nswer:\s+(\(?[A-D]\)?)'
+          - '[Tt]he answer is\s+(\(?[A-D]\)?)'
+          - '[Tt]he answer is:\s+(\(?[A-D]\)?)'
+          - '[Tt]he final answer is\s+(\(?[A-D]\)?)'
+          - 'answer is\s+(\(?[A-D]\)?)'
+          - '[Tt]he final answer:\s+(\(?[A-D]\)?)'
+          - '(\(?[A-D]\)?)'
+        group_select: -1
+      - function: "take_first"
 generation_kwargs:
   until:
     - "</s>"
   do_sample: false
   temperature: 0.0
-  max_gen_toks: 1024
+  max_gen_toks: 2048
 num_fewshot: 0
 metric_list:
   - metric: exact_match
@@ -35,5 +48,6 @@ metric_list:
     higher_is_better: true
     ignore_case: true
     ignore_punctuation: true
+    #filter_list: ordered-extract
 metadata:
   version: 1.0

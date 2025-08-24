@@ -6,22 +6,24 @@ training_split: train
 # Because huggingface dataset only has train split
 validation_split: train
 test_split: null
+fewshot_split: train
+num_fewshot: 3
 description: "Here are some example questions from experts. Answer the final question yourself, following the format of the previous questions exactly.\n"
 doc_to_text: "Question: {{Question}}\nChoices:\n(A) {{choice1}}\n(B) {{choice2}}\n(C) {{choice3}}\n(D) {{choice4}}\nAnswer:"
 doc_to_target: answer
 filter_list:
-  - name: "strict-match"
+  - name: "ordered-extract"
     filter:
-      - function: "regex"
-        regex_pattern: '(?i)^\s*[\(\[\{"]?\s*(?P<lead_letter>[ABCD])\s*[\)\]\}"]?(?=[\s:)\].,;!?-]|$)|(?:^|[^\w])(?:the\s+)?answer(?:\s+is)?\s*[:\-]?(?:(?P<answer_letter>[ABCD])\b|(?P<answer_fallback>[^\n\r]+?))\s*$'  # Prefer a leading, standalone letter like "B: ...", "(C) ...", etc., otherwise, look for the 'answer' token and take A–D if present, else capture whatever comes after it as a fallback.
-      - function: "take_first"
-  - name: "flexible-extract"
-    filter:
-      - function: "multi_choice_regex"
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Aa]nswer:\s+(\(?[A-D]\)?)'
+          - '[Tt]he answer is\s+(\(?[A-D]\)?)'
+          - '[Tt]he answer is:\s+(\(?[A-D]\)?)'
+          - '[Tt]he final answer is\s+(\(?[A-D]\)?)'
+          - 'answer is\s+(\(?[A-D]\)?)'
+          - '[Tt]he final answer:\s+(\(?[A-D]\)?)'
+          - '(\(?[A-D]\)?)'
         group_select: -1
-        ignore_case: true
-        ignore_punctuation: true
-        regex_pattern: "(\\([A-Z]\\))"
       - function: "take_first"
 generation_kwargs:
   until:
@@ -29,6 +31,7 @@ generation_kwargs:
     - "Question:"
     - "<|im_end|>"
   temperature: 0.0
+  max_gen_toks: 2048
 metric_list:
   - metric: exact_match
     aggregation: mean

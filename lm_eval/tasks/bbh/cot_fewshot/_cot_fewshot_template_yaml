@@ -24,9 +24,16 @@ filter_list:
         regex_patterns:
           - '(?<=[Tt]he answer is)\s*(.*?)(?=\s*\.)'
           - '(?<=[Tt]he final answer is)\s*(.*?)(?=\s*\.)'
+          - '(?<=[Aa]nswer:)\s*(.*?)(?=\s*\?\.)'
+          - '(?<=[Tt]he result is)\s*(.*?)(?=\s*\?\.)'
+          - '(?<=[Tt]he final result is)\s*(.*?)(?=\s*\?\.)'
+          # without dot
+          - '(?<=[Tt]he answer is)\s*(.*?)(?=\s*)'
+          - '(?<=[Tt]he final answer is)\s*(.*?)(?=\s*)'
           - '(?<=[Aa]nswer:)\s*(.*?)(?=\s*\?)'
           - '(?<=[Tt]he result is)\s*(.*?)(?=\s*\?)'
           - '(?<=[Tt]he final result is)\s*(.*?)(?=\s*\?)'
+
         strip_extracts:
           - "\\$"
           - "\\*"

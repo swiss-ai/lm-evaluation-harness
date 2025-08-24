@@ -26,11 +26,14 @@ def pass_at_1(
         references=references,
         predictions=predictions,
         k=[1],
-    )[0]["pass@1"]
+    )[
+        0
+    ]["pass@1"]
 
 
 def clean_text(text: str) -> str:
-    return re.sub(r'\n(▁+)', lambda m: '\n' + ' ' * len(m.group(1)), text)
+    return re.sub(r"\n(▁+)", lambda m: "\n" + " " * len(m.group(1)), text)
+
 
 def extract_code_blocks(text: str) -> str:
     # Pattern to match ```...``` blocks
@@ -56,7 +59,7 @@ def list_fewshot_samples():
         {
             "task_id": 2,
             "text": "Write a function to find the similar elements from the given two tuple lists.",
-            "code": "def similar_elements(test_tup1, test_tup2):\r\n  res = tuple(set(test_tup1) & set(test_tup2))\r\n  return (res) ",
+            "code": "def similar_elements(test_tup1, test_tup2):\r\n    res = tuple(set(test_tup1) & set(test_tup2))\r\n    return (res) ",
             "test_list": [
                 "assert similar_elements((3, 4, 5, 6),(5, 7, 4, 10)) == (4, 5)",
                 "assert similar_elements((1, 2, 3, 4),(5, 4, 3, 7)) == (3, 4)",
@@ -78,7 +81,7 @@ def list_fewshot_samples():
         {
             "task_id": 4,
             "text": "Write a function to find the largest integers from a given list of numbers using heap queue algorithm.",
-            "code": "import heapq as hq\r\ndef heap_queue_largest(nums,n):\r\n  largest_nums = hq.nlargest(n, nums)\r\n  return largest_nums",
+            "code": "import heapq as hq\r\ndef heap_queue_largest(nums,n):\r\n    largest_nums = hq.nlargest(n, nums)\r\n    return largest_nums",
             "test_list": [
                 "assert heap_queue_largest( [25, 35, 22, 85, 14, 65, 75, 22, 58],3)==[85, 75, 65] ",
                 "assert heap_queue_largest( [25, 35, 22, 85, 14, 65, 75, 22, 58],2)==[85, 75] ",
