@@ -24,7 +24,8 @@ filter_list:
     filter:
       - function: ordered_regex
         regex_patterns:
-          - (-?[$0-9.,\s]{2,})|(-?[0-9]+)
+          - -?[0-9][0-9.,\s]*
+          - (-?[0-9]+)
         group_select: -1
         strip_extracts:
           - "\\$"
