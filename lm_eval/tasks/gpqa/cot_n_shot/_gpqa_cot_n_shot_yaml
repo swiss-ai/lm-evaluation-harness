@@ -35,7 +35,7 @@ filter_list:
           - '[Tt]he final answer is\s+(\(?[A-D]\)?)'
           - 'answer is\s+(\(?[A-D]\)?)'
           - '[Tt]he final answer:\s+(\(?[A-D]\)?)'
-          - '(\([A-D]\))'
+          - '(\(?[A-D]\)?)'
         group_select: -1
       - function: "take_first"
 generation_kwargs:
