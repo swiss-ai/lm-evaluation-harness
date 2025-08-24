@@ -2,7 +2,7 @@
 # It doesn't have a yaml file extension as it is not meant to be imported directly
 # by the harness.
 dataset_path: jbross-ibm-research/mgsm
-dataset_name: null  # Overridden by language-specific config.
+dataset_name: null # Overridden by language-specific config.
 output_type: generate_until
 training_split: train
 test_split: test
@@ -14,12 +14,17 @@ generation_kwargs:
   do_sample: false
   temperature: 0.0
 filter_list:
-  - filter:
-      - function: regex
+  - name: "ordered-extract"
+    filter:
+      - function: ordered_regex
+        regex_patterns:
+          - (-?[$0-9.,]{2,})|(-?[0-9]+)
         group_select: -1
-        regex_pattern: (-?[$0-9.,]{2,})|(-?[0-9]+)
+        strip_extracts:
+          - "\\$"
+          - "€"
+          - "%"
       - function: take_first
-    name: flexible-extract
 metric_list:
   - metric: exact_match
     aggregation: mean
