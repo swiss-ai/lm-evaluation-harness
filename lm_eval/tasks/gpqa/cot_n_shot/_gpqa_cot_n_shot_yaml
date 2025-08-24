@@ -5,6 +5,8 @@ process_docs: !function utils.process_docs
 training_split: train
 # Because huggingface dataset only has train split
 validation_split: train
+fewshot_split: train
+num_fewshot: 3
 test_split: null
 description: "Here are some example questions from experts. Answer the final question yourself, following the format of the previous questions exactly.\n"
 doc_to_text: "Question: {{Question}}\nChoices:\n(A) {{choice1}}\n(B) {{choice2}}\n(C) {{choice3}}\n(D) {{choice4}}\nLet's think step by step and then finish your answer with \"The answer is (X)\" where X is the correct letter choice."
