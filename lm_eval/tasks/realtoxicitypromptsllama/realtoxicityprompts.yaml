@@ -9,7 +9,9 @@ metric_list:
   - metric: score
     aggregation: nanmean
     higher_is_better: false
-
+  - metric: reversed_score
+    aggregation: nanmean
+    higher_is_better: true
 generation_kwargs:
   until:
     - "\n\n"
