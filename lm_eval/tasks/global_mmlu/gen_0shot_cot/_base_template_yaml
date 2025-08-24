@@ -28,6 +28,7 @@ filter_list:
           - '[Tt]he final answer is\s+\(?([A-D])\)?\b'
           - 'answer is\s+\(?([A-D])\)?\b'
           - '[Tt]he final answer:\s+\(?([A-D])\)?\b'
+          - '[Aa]nswer:\s+\(?([A-D])\)?\b'
           - '\(([A-D])\)'
           - "([A-D])"
         group_select: -1

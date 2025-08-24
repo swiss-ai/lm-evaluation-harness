@@ -27,6 +27,7 @@ filter_list:
     filter:
       - function: "ordered_regex"
         regex_patterns:
+          - '[Aa]nswer:\s+\(?([A-D])\)?\b'
           - '[Tt]he answer is\s+\(?([A-D])\)?\b'
           - '[Tt]he answer is:\s+\(?([A-D])\)?\b'
           - '[Tt]he final answer is\s+\(?([A-D])\)?\b'
