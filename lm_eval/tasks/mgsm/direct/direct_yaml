@@ -1,7 +1,6 @@
 # This file will be included in the generated language-specific task configs.
 # It doesn't have a yaml file extension as it is not meant to be imported directly
 # by the harness.
-tag: mgsm_direct
 dataset_path: jbross-ibm-research/mgsm
 dataset_name: null  # Overridden by language-specific config.
 output_type: generate_until
@@ -15,15 +14,11 @@ generation_kwargs:
   do_sample: false
   temperature: 0.0
 filter_list:
-  - name: remove_whitespace
-    filter:
-      - function: remove_whitespace
-      - function: take_first
   - filter:
-    - function: regex
-      group_select: -1
-      regex_pattern: (-?[$0-9.,]{2,})|(-?[0-9]+)
-    - function: take_first
+      - function: regex
+        group_select: -1
+        regex_pattern: (-?[$0-9.,]{2,})|(-?[0-9]+)
+      - function: take_first
     name: flexible-extract
 metric_list:
   - metric: exact_match
