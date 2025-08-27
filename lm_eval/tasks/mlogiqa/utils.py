@@ -51,8 +51,6 @@ def doc_to_text_gen(doc):
     text += f"B. {options[1]}\n"
     text += f"C. {options[2]}\n"
     text += f"D. {options[3]}\n"
-    text += "Please choose the most suitable one among A, B, C and D as the answer to this question, and return it in the following JSON format:\n"
-    text += "{'answer': '[choice]'}\n"
-    text += "where [choice] must be one of A, B, C and D."
+    text += "Please choose the most suitable one among A, B, C and D as the answer to this question."
 
     return text
