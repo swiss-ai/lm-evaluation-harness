@@ -3,6 +3,7 @@ from typing import Union
 
 import evaluate as hf_evaluate
 
+import re
 
 try:
     pass_at_k = hf_evaluate.load("code_eval")
@@ -32,7 +33,13 @@ def pass_at_1(
 
 
 def clean_text(text: str) -> str:
-    return re.sub(r"\n(▁+)", lambda m: "\n" + " " * len(m.group(1)), text)
+    text = re.sub(r"\n(▁+)", lambda m: "\n" + " " * len(m.group(1)), text)
+
+    # strip leading/trailing whitespace
+    text = text.strip()
+    # remove stray leading space before def
+    text = re.sub(r"^\s*def", "def", text, flags=re.MULTILINE)
+    return text
 
 
 def extract_code_blocks(text: str) -> str:
