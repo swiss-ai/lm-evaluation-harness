@@ -1,0 +1,36 @@
+dataset_path: swiss-ai/mlogiqa
+test_split: test
+output_type: generate_until
+process_docs: !function utils.process_docs
+doc_to_text: !function utils.doc_to_text_gen
+doc_to_target: !function utils.doc_to_target_gen
+description: 'Your response should be concise, and you should end with "The answer is X", where X is the correct letter choice.'
+generation_kwargs:
+  until:
+    - "</s>"
+    - "Question:"
+    - "<|im_end|>"
+  do_sample: false
+  temperature: 0.0
+target_delimiter: " "
+filter_list:
+  - name: "ordered-extract"
+    filter:
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Tt]he answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he answer is:\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer is\s+\(?([A-D])\)?\b'
+          - 'answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer:\s+\(?([A-D])\)?\b'
+          - '\(([A-D])\)'
+          - "([A-D])"
+        group_select: -1
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+    ignore_case: false
+    ignore_punctuation: true
+metadata:
+  version: 1.0
