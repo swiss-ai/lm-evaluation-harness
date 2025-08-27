@@ -28,8 +28,7 @@ def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
                 ]
                 if option
             ],
-            # "gold": ["A", "B", "C", "D", "E"].index(doc["answer"]),
-            "answer": doc["answer"]
+            "gold": ["A", "B", "C", "D", "E"].index(doc["answer"]),
         }
         return out_doc
 
