@@ -8,7 +8,6 @@ description: 'Your response should be concise, and you should end with "The answ
 generation_kwargs:
   until:
     - "\n\n"
-    - "\n"
   do_sample: false
   temperature: 0.0
 target_delimiter: " "
