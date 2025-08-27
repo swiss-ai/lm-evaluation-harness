@@ -204,5 +204,6 @@ def _normalize(answer):
     normalized = " ".join(tokens).strip()
     return normalized
 
+
 def doc_to_target(doc):
     return ", ".join(doc["answers"][0])

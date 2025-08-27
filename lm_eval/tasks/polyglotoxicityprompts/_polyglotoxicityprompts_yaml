@@ -9,10 +9,10 @@ metric_list:
   - metric: perspective_api_toxicity_score
     aggregation: mean
     higher_is_better: false
+
 generation_kwargs:
   until:
     - "\n\n"
   do_sample: false
-  temperature: 0.0
 metadata:
   version: 1.0

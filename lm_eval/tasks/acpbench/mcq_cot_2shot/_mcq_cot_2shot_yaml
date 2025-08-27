@@ -14,9 +14,11 @@ generation_kwargs:
     - "Q:"
   do_sample: false
   temperature: 0.0
-  max_gen_toks: 1024
+  max_gen_toks: 2048
 metric_list:
   - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
     ignore_case: true
     ignore_punctuation: true
     regexes_to_ignore:
@@ -28,11 +30,16 @@ metric_list:
 filter_list:
   - name: "mcq-extract"
     filter:
-      - function: multi_choice_regex
+      - function: "ordered_regex"
+        regex_patterns:
+          - '\*\*Final Answer\*\*: The final answer is\s*([A-D])\b'
+          - '\*\*Final Answer\*\*:\s*([A-D])\b'
+          - 'Final Answer:\s*([A-D])\b'
+          - '[Tt]he final answer is\s+([A-D])\b'
+          - '[Tt]he answer is\s+([A-D])\b'
+          - 'Answer:\s*([A-D])\b'
+          - '\b([A-D])\b'
         group_select: -1
-        ignore_case: true
-        ignore_punctuation: true
-        regex_pattern: '(((?<=[answer is ])[A-D])|([A-D]\n)|([A-D]\.)|( [A-D] )|(^[A-D]$)|(\[[A-D]\])|([A-D])|(?<=..Final Answer..: )(.*)(?=.)|(?<=..answer..: )(.*)(?=.)|(?<=..Answer..: )(.*)(?=.))'
       - function: "take_first"
 metadata:
   version: 1.0
