@@ -15,7 +15,7 @@ doc_to_text: |-
 
 # Ground-truth letter
 doc_to_target: answer
-description: 'Your response should be concise, and you should end with "The answer is X", where X is the correct letter choice.'
+description: 'Your response should be concise, and you should end with "The answer is (X)", where X is the correct letter choice.'
 
 # Post-process model generations to a single letter via your helper
 filter_list:
