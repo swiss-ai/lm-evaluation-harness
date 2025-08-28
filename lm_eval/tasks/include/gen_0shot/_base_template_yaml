@@ -33,10 +33,10 @@ filter_list:
       - function: "take_first"
 
 generation_kwargs:
-  until:
-    - "</s>"
-    - "Question:"
-    - "<|im_end|>"
+  # until:
+  #   - "</s>"
+  #   - "Question:"
+  #   - "<|im_end|>"
   temperature: 0.0
 metric_list:
   - metric: exact_match
