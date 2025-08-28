@@ -15,14 +15,22 @@ doc_to_text: |-
 
 # Ground-truth letter
 doc_to_target: answer
+description: 'Your response should be concise, and you should end with "The answer is (X)", where X is the correct letter choice.'
 
 # Post-process model generations to a single letter via your helper
 filter_list:
   - name: "extract-answer"
     filter:
-      - function: "regex"
-        group_select: -1 # takes last match
-        regex_pattern: '(?i)^\s*[\(\[\{"]?\s*(?P<lead_letter>[ABCD])\s*[\)\]\}"]?(?=[\s:)\].,;!?-]|$)|(?:^|[^\w])(?:the\s+)?answer(?:\s+is)?\s*[:\-]?(?:(?P<answer_letter>[ABCD])\b|(?P<answer_fallback>[^\n\r]+?))\s*$'  # Prefer a leading, standalone letter like "B: ...", "(C) ...", etc., otherwise, look for the 'answer' token and take A–D if present, else capture whatever comes after it as a fallback.
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Tt]he answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he answer is:\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer is\s+\(?([A-D])\)?\b'
+          - 'answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer:\s+\(?([A-D])\)?\b'
+          - '\(([A-D])\)'
+          - "([A-D])"
+        group_select: -1
       - function: "take_first"
 
 generation_kwargs:
@@ -37,4 +45,3 @@ metric_list:
     higher_is_better: true
 metadata:
   version: 1.0
-
