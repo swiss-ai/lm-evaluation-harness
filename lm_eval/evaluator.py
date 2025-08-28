@@ -259,18 +259,14 @@ def simple_evaluate(
             use_cache
             # each rank receives a different cache db.
             # necessary to avoid multiple writes to cache at once
-            + "_rank"
-            + str(lm.rank)
-            + ".db",
+            + "_rank" + str(lm.rank) + ".db",
         )
 
     if task_manager is None:
         metadata = (
             simple_parse_args_string(model_args)
             if isinstance(model_args, str)
-            else model_args
-            if isinstance(model_args, dict)
-            else {}
+            else model_args if isinstance(model_args, dict) else {}
         ) | (metadata or {})
         task_manager = TaskManager(metadata=metadata)
 
@@ -342,9 +338,9 @@ def simple_evaluate(
             model_source=model,
             model_args=model_args,
             system_instruction=system_instruction,
-            chat_template=lm.chat_template(apply_chat_template)
-            if apply_chat_template
-            else None,
+            chat_template=(
+                lm.chat_template(apply_chat_template) if apply_chat_template else None
+            ),
             fewshot_as_multiturn=fewshot_as_multiturn,
         )
 
@@ -519,9 +515,11 @@ def evaluate(
         limits.append(limit)
         task.build_all_requests(
             limit=limit,
-            samples=samples.get(task_output.task_name, None)
-            if samples is not None
-            else samples,
+            samples=(
+                samples.get(task_output.task_name, None)
+                if samples is not None
+                else samples
+            ),
             rank=lm.rank,
             world_size=lm.world_size,
             cache_requests=cache_requests,
@@ -529,12 +527,12 @@ def evaluate(
             system_instruction=system_instruction,
             apply_chat_template=bool(apply_chat_template),
             fewshot_as_multiturn=fewshot_as_multiturn,
-            chat_template=getattr(lm, "apply_chat_template")
-            if apply_chat_template
-            else None,
-            tokenizer_name=getattr(lm, "tokenizer_name", "")
-            if apply_chat_template
-            else "",
+            chat_template=(
+                getattr(lm, "apply_chat_template") if apply_chat_template else None
+            ),
+            tokenizer_name=(
+                getattr(lm, "tokenizer_name", "") if apply_chat_template else ""
+            ),
         )
         eval_logger.debug(
             f"Task: {task_output.task_name}; number of requests on this rank: {len(task.instances)}"
@@ -637,7 +635,9 @@ def evaluate(
                             req.filtered_resps[filter_key] for req in requests
                         ],
                         "filter": filter_key,
-                        "metrics": list(metrics.keys()),
+                        "metrics": (
+                            list(metrics.keys()) if isinstance(metrics, dict) else []
+                        ),
                         "doc_hash": hash_string(
                             json.dumps(
                                 requests[0].doc,
