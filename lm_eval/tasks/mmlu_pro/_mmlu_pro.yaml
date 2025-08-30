@@ -18,6 +18,6 @@ aggregate_metric_list:
   - aggregation: mean
     metric: exact_match
     weight_by_size: true
-    filter_list: extract-answer
+    filter_list: ordered-extract
 metadata:
   version: 2.0
