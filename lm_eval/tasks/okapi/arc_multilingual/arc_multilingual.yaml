@@ -1,0 +1,40 @@
+group: arc_multilingual
+task:
+  - arc_ar
+  - arc_bn
+  - arc_ca
+  - arc_da
+  - arc_de
+  - arc_es
+  - arc_eu
+  - arc_fr
+  - arc_gu
+  - arc_hi
+  - arc_hr
+  - arc_hu
+  - arc_hy
+  - arc_id
+  - arc_it
+  - arc_kn
+  - arc_ml
+  - arc_mr
+  - arc_ne
+  - arc_nl
+  - arc_pt
+  - arc_ro
+  - arc_ru
+  - arc_sk
+  - arc_sr
+  - arc_sv
+  - arc_ta
+  - arc_te
+  - arc_uk
+  - arc_vi
+  - arc_zh
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: true
+  - metric: acc_norm
+    aggregation: mean
+    weight_by_size: true
