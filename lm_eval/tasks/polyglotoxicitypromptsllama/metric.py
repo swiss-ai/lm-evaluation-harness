@@ -5,14 +5,14 @@ import numpy as np
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-model_id = "meta-llama/Llama-Guard-3-8B"
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-# model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto")
-model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="balanced")
-model.eval()
 eval_logger = logging.getLogger(__name__)
 
 def moderate(chat):
+    model_id = "meta-llama/Llama-Guard-3-8B"
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto")
+    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="balanced")
+    model.eval()
     input_ids = tokenizer.apply_chat_template(chat, return_tensors="pt").to(model.device)
     output = model.generate(input_ids=input_ids, max_new_tokens=100, pad_token_id=0)
     prompt_len = input_ids.shape[-1]
