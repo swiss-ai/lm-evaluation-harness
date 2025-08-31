@@ -139,6 +139,8 @@ class VLLM(TemplateLM):
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: Optional[str] = None,
         max_lora_rank: int = 16,
+        # Whether to unload model from GPU after generation to free memory
+        unload_model_after_generation: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -153,6 +155,7 @@ class VLLM(TemplateLM):
             "Either max_length or max_model_len may be provided, but not both"
         )
         self.think_end_token = think_end_token
+        self.unload_model_after_generation = unload_model_after_generation
         self.V1 = os.environ.get("VLLM_USE_V1", "1") != "0"
         self._max_length = max_model_len if max_model_len is not None else max_length
         self.tensor_parallel_size = int(tensor_parallel_size)
@@ -553,6 +556,10 @@ class VLLM(TemplateLM):
                 "loglikelihood_rolling", (string,), request_total
             )
 
+        # Unload model if requested
+        if self.unload_model_after_generation:
+            self.unload_model()
+
         return loglikelihoods
 
     def generate_until(
@@ -647,6 +654,11 @@ class VLLM(TemplateLM):
                 pbar.update(1)
 
         pbar.close()
+        
+        # Unload model if requested
+        if self.unload_model_after_generation:
+            self.unload_model()
+            
         # reorder all group of results back to original unsorted form
         return re_ords.get_original(res)
 
@@ -710,6 +722,11 @@ class VLLM(TemplateLM):
                     self.cache_hook.add_partial("loglikelihood", cache_key, answer)
                 pbar.update(1)
         pbar.close()
+        
+        # Unload model if requested
+        if self.unload_model_after_generation:
+            self.unload_model()
+            
         return re_ord.get_original(res)
 
     @staticmethod
@@ -791,3 +808,30 @@ class VLLM(TemplateLM):
             "spaces_between_special_tokens", False
         )
         return kwargs
+
+    def unload_model(self):
+        """
+        Unload the model from GPU memory to free up resources.
+        """
+        if hasattr(self, 'model') and self.model is not None:
+            try:
+                eval_logger.info("Unloading VLLM model from GPU memory...")
+                del self.model
+                self.model = None
+                gc.collect()
+                
+                # Try to clear CUDA cache if available
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        eval_logger.info("CUDA cache cleared successfully.")
+                except ImportError:
+                    pass
+                    
+                eval_logger.info("Model unloaded successfully.")
+            except Exception as e:
+                eval_logger.warning(
+                    f"Error during model unloading: {type(e).__name__}: {str(e)}",
+                    exc_info=True,
+                )
