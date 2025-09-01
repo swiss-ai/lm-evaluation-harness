@@ -11,7 +11,7 @@ def moderate(chat):
     model_id = "meta-llama/Llama-Guard-3-8B"
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     # model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="auto")
-    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map="balanced")
+    model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.float16, device_map={"": 3})
     model.eval()
     input_ids = tokenizer.apply_chat_template(chat, return_tensors="pt").to(model.device)
     output = model.generate(input_ids=input_ids, max_new_tokens=100, pad_token_id=0)
