@@ -9,8 +9,6 @@ aggregate_metric_list:
     aggregation: mean
     weight_by_size: true
     filter_list:
-    - no-filter
-    - flexible-extract
-    - strict-match
+      - numeric-fallback
 metadata:
   version: 1.0
