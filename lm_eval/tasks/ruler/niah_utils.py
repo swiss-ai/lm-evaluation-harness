@@ -125,6 +125,7 @@ def niah_multikey_3(**kwargs):
 
 def niah_multivalue(**kwargs):
     seq_lengths = kwargs.pop("max_seq_lengths", DEFAULT_SEQ_LENGTHS)
+    print("This are the kwargs:", kwargs)
     return download_dataset(
         generate_samples(
             get_haystack(type_haystack="essay"),
