@@ -1,0 +1,11 @@
+group: reward_bench
+task:
+- reward_bench_chat
+- reward_bench_chat_hard
+- reward_bench_safety
+- reward_bench_reasoning 
+aggregate_metric_list:
+- metric: exact_match
+  filter_list: "extract-answer"
+metadata:
+  version: 0.1.0
