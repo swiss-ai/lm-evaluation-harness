@@ -15,6 +15,7 @@ import hashlib
 from typing import Optional, Dict
 from pathlib import Path
 
+
 class Cache:
     def __init__(self, db_path):
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -58,7 +59,9 @@ class Cache:
     def get_item(self, key: str) -> Optional[Dict]:
         hashed_key = self.hash_key(key)
         with self.lock:
-            cursor = self.conn.execute("SELECT value FROM cache WHERE key = ?", (hashed_key,))
+            cursor = self.conn.execute(
+                "SELECT value FROM cache WHERE key = ?", (hashed_key,)
+            )
             item = cursor.fetchone()
             if item:
                 self.cache_hits += 1
@@ -75,7 +78,7 @@ class Cache:
         print(f"Cache hits: {self.cache_hits}")
         print(f"Cache misses: {self.cache_misses}")
         print(
-            f'Cache file size: {f"{os.path.getsize(cache_file) / (1024 * 1024 * 1024):.2f} GB"}'
+            f"Cache file size: {f'{os.path.getsize(cache_file) / (1024 * 1024 * 1024):.2f} GB'}"
         )
         total, used, free = shutil.disk_usage(os.getcwd())
         print(f"Free: {free / (1024 * 1024 * 1024):.2f} GB")

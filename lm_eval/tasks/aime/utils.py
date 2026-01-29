@@ -1,5 +1,4 @@
 import re
-<<<<<<< HEAD
 from datasets import Dataset
 
 
@@ -9,6 +8,7 @@ def extract_year_from_url(url: str) -> str:
     if not match:
         raise ValueError(f"Could not extract year from URL: {{url}}")
     return match.group(1)
+
 
 def process_2022(dataset: Dataset) -> Dataset:
     """Filter dataset to only include problems from 2022."""
@@ -22,6 +22,7 @@ def process_2022(dataset: Dataset) -> Dataset:
 
     return dataset.filter(filter_by_year)
 
+
 def process_2023(dataset: Dataset) -> Dataset:
     """Filter dataset to only include problems from 2023."""
 
@@ -33,6 +34,7 @@ def process_2023(dataset: Dataset) -> Dataset:
             return False
 
     return dataset.filter(filter_by_year)
+
 
 def process_2024(dataset: Dataset) -> Dataset:
     """Filter dataset to only include problems from 2024."""
@@ -46,7 +48,7 @@ def process_2024(dataset: Dataset) -> Dataset:
 
     return dataset.filter(filter_by_year)
 
-=======
+
 from typing import Dict, List
 
 
@@ -277,4 +279,3 @@ def strip_string(string):
     string = fix_a_slash_b(string)
 
     return string
->>>>>>> upstream-main

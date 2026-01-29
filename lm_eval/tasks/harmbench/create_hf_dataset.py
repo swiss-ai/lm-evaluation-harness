@@ -46,7 +46,7 @@ def load_local_json_as_df(json_path):
         # Each key contains an array of 5 behaviors
         for i, behavior in enumerate(behaviors):
             # Create a unique ID for each behavior: original_id + index
-            unique_id = f"{behavior_id}_{i+1}"
+            unique_id = f"{behavior_id}_{i + 1}"
             expanded_data.append({"BehaviorID": unique_id, "Behavior": behavior})
 
     return pd.DataFrame(expanded_data)
