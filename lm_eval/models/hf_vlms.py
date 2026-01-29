@@ -32,7 +32,7 @@ class HFMultimodalLM(HFLM):
     An abstracted Hugging Face model class for multimodal LMs like Llava and Idefics.
     """
 
-    AUTO_MODEL_CLASS = transformers.AutoModelForVision2Seq
+    AUTO_MODEL_CLASS = transformers.AutoModelForImageTextToText
     MULTIMODAL = True  # flag to indicate, for now, that this model type can run multimodal requests
 
     def __init__(
@@ -76,7 +76,7 @@ class HFMultimodalLM(HFLM):
         self.chat_applied: bool = False
         # TODO: phi-3.5 "image placeholders" are <image_1>, <image_2>, ... in order. how to handle this case
 
-        # HF AutoModelForVision2Seq models have an `image_token_id` value in their configs
+        # HF AutoModelForImageTextToText models have an `image_token_id` value in their configs
         # denoting the token which indicates a location where an image will be substituted in.
         # This can take different string values across models, e.g. <image> for Idefics2 and <|image_pad|> for Qwen2-VL
         self.interleave = interleave
@@ -93,7 +93,7 @@ class HFMultimodalLM(HFLM):
                 )
             )
             assert self.image_token_id is not None, (
-                "Must have a non-None image_token_id to evaluate a Hugging Face AutoModelForVision2Seq model. Please pass `image_token_id` in `--model_args` if model's config does not already specify one."
+                "Must have a non-None image_token_id to evaluate a Hugging Face AutoModelForImageTextToText model. Please pass `image_token_id` in `--model_args` if model's config does not already specify one."
             )
             # get the string this token ID corresponds to
             self.image_token = self.tok_decode(

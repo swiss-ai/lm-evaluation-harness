@@ -963,7 +963,7 @@ class HFLM(TemplateLM):
 
             assert self.AUTO_MODEL_CLASS in (
                 transformers.AutoModelForCausalLM,
-                transformers.AutoModelForVision2Seq,
+                transformers.AutoModelForImageTextToText,
             )
             return self.model(inps).logits
 
