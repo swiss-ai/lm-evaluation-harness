@@ -608,6 +608,11 @@ def evaluate(
         task = task_output.task
         task.apply_filters()
 
+        # Skip post-processing for ranks with no instances (data parallel with small datasets)
+        # The gather will collect empty results from this rank
+        if len(task.instances) == 0:
+            continue
+
         ### Collect values of metrics on all datapoints ###
         # # unpack results and sort back in order and return control to Task
         # TODO: make it possible to use a different metric per filter

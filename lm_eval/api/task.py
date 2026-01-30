@@ -373,7 +373,13 @@ class Task(abc.ABC):
         self._instances = flattened_instances
 
         if len(self._instances) == 0:
-            raise ValueError("task.build_requests() did not find any docs!")
+            # In data parallel mode, some ranks may have no docs for small datasets.
+            # This is expected and not an error - the gather will collect empty results.
+            eval_logger.warning(
+                "task.build_requests() did not find any docs on this rank. "
+                "This is expected in data parallel mode with small datasets."
+            )
+            return
 
         if cache_requests and (not cached_instances or rewrite_requests_cache):
             save_to_cache(file_name=cache_key, obj=instances)
