@@ -82,7 +82,7 @@ multilingual = ["nagisa>=0.2.7", "jieba>=0.42.1", "pycountry"]
 ruler = ["nltk", "wonderwords", "scipy"]
 sentencepiece = ["sentencepiece>=0.1.98"]
 discrim_eval = ["statsmodels==0.14.4"]
-unitxt = ["unitxt==1.22.0"]
+unitxt = ["unitxt==1.26.9"]
 wandb = ["wandb>=0.16.3", "pandas", "numpy"]
 zeno = ["pandas", "zeno-client"]
 tasks = [
