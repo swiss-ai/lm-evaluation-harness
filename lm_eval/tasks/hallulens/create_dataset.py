@@ -40,10 +40,19 @@ def load_local_json_as_df(json_path):
 
     return df
 
-precise_wiki = load_local_json_as_df("/cluster/raid/home/stea/HalluLens/data/precise_qa/prompts_precise_wiki.jsonl")
-longwiki = load_local_json_as_df("/cluster/raid/home/stea/HalluLens/data/longwiki/prompts_longwiki.jsonl")
-generated_entities = load_local_json_as_df("/cluster/raid/home/stea/data/auto_non_existing/save/prompts_generated_entities.jsonl")
-mixed_entities = load_local_json_as_df("/cluster/raid/home/stea/data/nonsense_all/save/prompts_mixed_entities.jsonl")
+
+precise_wiki = load_local_json_as_df(
+    "/cluster/raid/home/stea/HalluLens/data/precise_qa/prompts_precise_wiki.jsonl"
+)
+longwiki = load_local_json_as_df(
+    "/cluster/raid/home/stea/HalluLens/data/longwiki/prompts_longwiki.jsonl"
+)
+generated_entities = load_local_json_as_df(
+    "/cluster/raid/home/stea/data/auto_non_existing/save/prompts_generated_entities.jsonl"
+)
+mixed_entities = load_local_json_as_df(
+    "/cluster/raid/home/stea/data/nonsense_all/save/prompts_mixed_entities.jsonl"
+)
 
 
 # --- Create DatasetDicts ---
@@ -52,10 +61,12 @@ longwiki = Dataset.from_pandas(longwiki)
 generated_entities = Dataset.from_pandas(generated_entities)
 mixed_entities = Dataset.from_pandas(mixed_entities)
 
+
 # --- Push datasets ---
 def push_dataset(dataset, name):
     dataset = DatasetDict({"test": dataset})
     dataset.push_to_hub(repo_id, config_name=name, private=True)
+
 
 # if any of the datasets already exist, they will be overwritten
 push_dataset(precise_wiki, "precise_wiki")
@@ -69,4 +80,3 @@ for dataset_name in [precise_wiki, longwiki, generated_entities, mixed_entities]
         del dataset_name["train"]
 
 print("Datasets pushed successfully!")
-

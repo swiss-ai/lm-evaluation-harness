@@ -27,9 +27,7 @@ def pass_at_1(
         references=references,
         predictions=predictions,
         k=[1],
-    )[
-        0
-    ]["pass@1"]
+    )[0]["pass@1"]
 
 
 def clean_text(text: str) -> str:

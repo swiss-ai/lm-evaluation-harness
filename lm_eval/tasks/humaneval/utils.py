@@ -24,17 +24,23 @@ def pass_at_k(references: list[str], predictions: list[list[str]], k: list[int] 
 
 
 def build_predictions(resps: list[list[str]], docs: list[dict]) -> list[list[str]]:
-    return [[doc["prompt"] + clean_text(r.replace("```python\n", "")) for r in resp] for resp, doc in zip(resps, docs)]
+    return [
+        [doc["prompt"] + clean_text(r.replace("```python\n", "")) for r in resp]
+        for resp, doc in zip(resps, docs)
+    ]
+
 
 def clean_text(text: str) -> str:
-    return re.sub(r'\n(▁+)', lambda m: '\n' + ' ' * len(m.group(1)), text)
+    return re.sub(r"\n(▁+)", lambda m: "\n" + " " * len(m.group(1)), text)
+
 
 def build_predictions_instruct(
     resps: list[list[str]], docs: list[dict]
 ) -> list[list[str]]:
     return [
         [
-            doc["prompt"] + (clean_text(r) if r.find("```") == -1 else clean_text(r[: r.find("```")]))
+            doc["prompt"]
+            + (clean_text(r) if r.find("```") == -1 else clean_text(r[: r.find("```")]))
             for r in resp
         ]
         for resp, doc in zip(resps, docs)

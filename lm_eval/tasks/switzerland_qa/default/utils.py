@@ -1,6 +1,7 @@
 from functools import partial
 
-CATEGORIES = ['geography', 'history', 'political_life', 'social_life', 'insurance']
+CATEGORIES = ["geography", "history", "political_life", "social_life", "insurance"]
+
 
 def process_docs(dataset, category):
     return dataset.filter(lambda x: x["topic"] == category)

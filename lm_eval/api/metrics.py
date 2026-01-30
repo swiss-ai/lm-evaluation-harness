@@ -178,6 +178,16 @@ def acc_mutual_info_fn(items):  # This is a passthrough function
     return items
 
 
+@register_metric(
+    metric="acc_bytes",
+    higher_is_better=True,
+    output_type=["loglikelihood", "multiple_choice"],
+    aggregation="mean",
+)
+def acc_bytes_fn(items):  # This is a passthrough function
+    return items
+
+
 ### the code used in the `exact_match_hf_evaluate` function is ported from
 ### https://github.com/huggingface/evaluate/blob/main/metrics/exact_match/exact_match.py
 ### which is under the apache license.
@@ -251,6 +261,16 @@ def exact_match_fn(**kwargs):
     aggregation="perplexity",
 )
 def perplexity_fn(items):  # This is a passthrough function
+    return items
+
+
+@register_metric(
+    metric="likelihood",
+    higher_is_better=True,
+    output_type="multiple_choice",
+    aggregation="mean",
+)
+def likelihood_fn(items):  # This is a passthrough function
     return items
 
 
@@ -585,9 +605,9 @@ def pooled_sample_stderr(stderrs: List[float], sizes: List[int]):
 
 
 def combined_sample_stderr(stderrs: List[float], sizes: List[int], metrics=None):
-    assert (
-        metrics is not None
-    ), "Need to pass a list of each subtask's metric for this stderr aggregation"
+    assert metrics is not None, (
+        "Need to pass a list of each subtask's metric for this stderr aggregation"
+    )
     assert len(stderrs) == len(sizes) and len(sizes) == len(metrics)
 
     # See https://github.com/EleutherAI/lm-evaluation-harness/pull/1390 for more documentation.

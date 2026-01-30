@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict
 
 import pandas as pd
-from tqdm import tqdm   
+from tqdm import tqdm
 
 import lm_eval.tasks.hallulens.prompt_templates as prompt_templates
 from segtok.segmenter import split_single
@@ -24,16 +24,18 @@ import lm_eval.tasks.hallulens.utils as base_utils
 from lm_eval.tasks.hallulens.longwiki_retrieval import LongWikiRetrieval, LongWikiDB
 import lm_eval.tasks.hallulens.longwiki_utils as utils
 
+
 @dataclass
 class Claim:
     claim: str
     sentence: object
     refernce: Optional[str] = None
-    topic: Optional[str] =  None
+    topic: Optional[str] = None
     search_results: Optional[List[Dict[str, str]]] = None
     prompt: Optional[str] = None
     is_supported: Optional[bool] = None
-    question: Optional[str] = None # same as generation.prompt
+    question: Optional[str] = None  # same as generation.prompt
+
 
 @dataclass
 class Sentence:
@@ -51,29 +53,30 @@ class Generation:
     abstain: Optional[bool] = None
     reference: Optional[str] = None
     topic: Optional[str] = None
+
     def __hash__(self) -> int:
         return hash(self.generation + self.prompt)
+
     def __eq__(self, other) -> bool:
         return self.generation == other.generation and self.prompt == other.prompt
 
+
 class FactHalu:
     def __init__(
-            self,
-            abstention_model,
-            abstention_tokenizer,
-            claim_extractor,
-            claim_extractor_tokenizer,
-            claim_verifier,
-            claim_verifier_tokenizer,
-
-            k: int = 32,
-            db_path=None,
-            args=None
-        ):
-        
+        self,
+        abstention_model,
+        abstention_tokenizer,
+        claim_extractor,
+        claim_extractor_tokenizer,
+        claim_verifier,
+        claim_verifier_tokenizer,
+        k: int = 32,
+        db_path=None,
+        args=None,
+    ):
         if db_path is None:
             raise ValueError("db_path must be provided")
-        
+
         self.k = k
         self.db_path = db_path
         self.db = LongWikiDB(db_path=db_path)
@@ -86,7 +89,6 @@ class FactHalu:
 
         self.verifier = claim_verifier
         self.verifier_tokenizer = claim_verifier_tokenizer
-    
 
     def run(self, prompt, generation, title, reference=None):
         """
@@ -99,11 +101,8 @@ class FactHalu:
             "recall": np.nan,
             "f1": np.nan,
         }
-        #initiate generation object
-        _generation = Generation(
-            generation=generation,
-            prompt=prompt
-        )
+        # initiate generation object
+        _generation = Generation(generation=generation, prompt=prompt)
         if reference is not None:
             _generation.reference = reference
         _generation.topic = title
@@ -125,10 +124,7 @@ class FactHalu:
 
         ### [[STEP #2]] Extract claims
         print("\n[[Step 2]] Extracting Claims starts")
-        all_claims = self.extract_claims(
-            generation=_generation,
-            prompt=prompt
-        )
+        all_claims = self.extract_claims(generation=_generation, prompt=prompt)
 
         if _generation.abstain is not None:
             if _generation.abstain:
@@ -140,10 +136,10 @@ class FactHalu:
         all_verification_responses = self.verify_claims(all_claims)
 
         for claim, verification_response in zip(all_claims, all_verification_responses):
-            claim.is_supported = verification_response["is_supported"]                
+            claim.is_supported = verification_response["is_supported"]
 
         ### [[[ STEP #4]]] Calculate metrics: precision, recall@k, f1, response ratio
-        
+
         print(f"[[Step 4]] Calculating metrics")
         final_results = []
         for sentence in generation.sentences:
@@ -154,7 +150,7 @@ class FactHalu:
                         "is_supported": None,
                         "claim": "no claims",
                         "sentence": sentence.sentence,
-                        "title": generation.topic
+                        "title": generation.topic,
                     }
                 )
             else:
@@ -165,8 +161,7 @@ class FactHalu:
                             "is_supported": claim.is_supported,
                             "claim": claim.claim,
                             "sentence": sentence.sentence,
-                            "title": generation.topic
-
+                            "title": generation.topic,
                         }
                     )
         final_results_df = pd.DataFrame(final_results)
@@ -179,11 +174,8 @@ class FactHalu:
         final_result["f1"] = overall_f1
         return final_result
 
-        
-
-##########################################################################################
-##########################################################################################
-
+    ##########################################################################################
+    ##########################################################################################
 
     def eval_abstention(self, prompt, generation):
         abstain_prompt = prompt_templates.ABSTAIN_PROMPT.format(
@@ -203,14 +195,13 @@ class FactHalu:
             eval_prompts=[abstain_prompt],
             model=self.abstention_model,
             tokenizer=self.abstention_tokenizer,
-            key="is_knowledgeable"
+            key="is_knowledgeable",
         )
 
         if len(abstains_eval) == 0:
             return None
         else:
-           return not abstains_eval[0]["is_knowledgeable"]
-        
+            return not abstains_eval[0]["is_knowledgeable"]
 
     def extract_claims(self, generation, prompt):
         all_claim_extractions = []
@@ -218,46 +209,52 @@ class FactHalu:
         all_sentences = make_claim_extraction_prompts(
             generation=generation,
             prompt=prompt,
-            tokenizer=self.claim_extractor_tokenizer
+            tokenizer=self.claim_extractor_tokenizer,
         )
 
         to_extract_prompts = [a.prompt for a in all_sentences]
 
         for prompt in to_extract_prompts:
-            results = base_utils.generate(prompt, self.claim_extractor, tokenizer=self.claim_extractor_tokenizer, max_tokens=512)
+            results = base_utils.generate(
+                prompt,
+                self.claim_extractor,
+                tokenizer=self.claim_extractor_tokenizer,
+                max_tokens=512,
+            )
             all_claim_extractions.append(results)
-        
+
         print("***** [2-2] Parsing extracted claims")
         # print(f"length of all_sentences: {len(all_sentences)}, all_sentences: {all_sentences}")
         # print(f"length of all_claim_extractions: {len(all_claim_extractions)}, all_claim_extractions: {all_claim_extractions}")
         all_claims = []
         deduplicate = set()
-        assert len(all_claim_extractions) == len(all_sentences), \
+        assert len(all_claim_extractions) == len(all_sentences), (
             f"Length of all_claim_extractions ({len(all_claim_extractions)}) and all_sentences ({len(all_sentences)}) do not match."
+        )
 
         for claim_extraction, sentence in zip(all_claim_extractions, all_sentences):
-            if (not claim_extraction) or \
-                claim_extraction.strip() == "No verifiable claim." or\
-                claim_extraction.strip() == "No available facts" or \
-                claim_extraction.strip() == "No available facts.":
+            if (
+                (not claim_extraction)
+                or claim_extraction.strip() == "No verifiable claim."
+                or claim_extraction.strip() == "No available facts"
+                or claim_extraction.strip() == "No available facts."
+            ):
                 sentence.claims = []
                 continue
 
             parsed_claim_extraction = utils.parse_claim_extraction(claim_extraction)
-            
+
             sentence_claims = []
             for claim_text in parsed_claim_extraction:
-                if (
-                    claim_text.strip() != ""
-                    and claim_text not in deduplicate
-                ):
+                if claim_text.strip() != "" and claim_text not in deduplicate:
                     deduplicate.add(claim_text)
-                    claim = Claim(claim=claim_text, \
-                                  sentence=sentence, \
-                                    refernce=sentence.generation.reference,\
-                                    topic=sentence.generation.topic,\
-                                    question=sentence.generation.prompt
-                                ) 
+                    claim = Claim(
+                        claim=claim_text,
+                        sentence=sentence,
+                        refernce=sentence.generation.reference,
+                        topic=sentence.generation.topic,
+                        question=sentence.generation.prompt,
+                    )
                     sentence_claims.append(claim)
                     all_claims.append(claim)
 
@@ -270,20 +267,31 @@ class FactHalu:
         return all_claims
 
     def verify_claims(self, all_claims: List[Claim]):
-
-
         print("***** [3] Ref Src: ", self.ref_src)
         # 1. Prepare the prompt for verification
-        retrieval = LongWikiRetrieval(self.db, cache_base_path=self.CACHE_BASE_PATH, embed_cache_path=self.embedded_cache_path, \
-                            retrieval_type="gtr-t5-large", batch_size=64)
+        retrieval = LongWikiRetrieval(
+            self.db,
+            cache_base_path=self.CACHE_BASE_PATH,
+            embed_cache_path=self.embedded_cache_path,
+            retrieval_type="gtr-t5-large",
+            batch_size=64,
+        )
         questions = list(set([claim.question for claim in all_claims]))
         retrieval.make_ner_cache(questions)
         for claim in tqdm(all_claims):
-            passages = retrieval.get_topk_related_passages(topic=claim.topic, claim=claim.claim, question=claim.question, k=5)
+            passages = retrieval.get_topk_related_passages(
+                topic=claim.topic, claim=claim.claim, question=claim.question, k=5
+            )
             context = ""
             for _, psg in enumerate(reversed(passages)):
-                context += "Title: {}\nText: {}\n\n".format(psg["title"], psg["text"].replace("<s>", "").replace("</s>", ""))
-            claim.prompt = prompt_templates.VERIFICATION_TEMPLATE_W_REFERENCE_RETRIEVAL.format(claim=claim.claim, reference=context)
+                context += "Title: {}\nText: {}\n\n".format(
+                    psg["title"], psg["text"].replace("<s>", "").replace("</s>", "")
+                )
+            claim.prompt = (
+                prompt_templates.VERIFICATION_TEMPLATE_W_REFERENCE_RETRIEVAL.format(
+                    claim=claim.claim, reference=context
+                )
+            )
         print("***** Prepared all verification prompts")
 
         # 2. Verify the claims
@@ -291,20 +299,27 @@ class FactHalu:
 
         claim_verification_res = []
         for i in range(0, len(verification_prompts), 100):
-            batch_prompts = verification_prompts[i:i+100]
-            batch_results = utils.generate_batch(batch_prompts, self.verifier, tokenizer=self.verifier_tokenizer, max_tokens=512)
+            batch_prompts = verification_prompts[i : i + 100]
+            batch_results = utils.generate_batch(
+                batch_prompts,
+                self.verifier,
+                tokenizer=self.verifier_tokenizer,
+                max_tokens=512,
+            )
             claim_verification_res.extend(batch_results)
-
 
         assert len(claim_verification_res) == len(all_claims)
         # 3. post process the verification result
-        claim_verification_results = base_utils.jsonify_ans_longwiki(raw_responses=claim_verification_res, \
-                                                            eval_prompts=verification_prompts, 
-                                                            evaluator=self.verification_model,
-                                                            tokenizer=self.verifier_tokenizer,
-                                                            key="is_supported")
+        claim_verification_results = base_utils.jsonify_ans_longwiki(
+            raw_responses=claim_verification_res,
+            eval_prompts=verification_prompts,
+            evaluator=self.verification_model,
+            tokenizer=self.verifier_tokenizer,
+            key="is_supported",
+        )
 
         return claim_verification_results
+
 
 def make_claim_extraction_prompts(generation, prompt, tokenizer):
     """
@@ -331,28 +346,31 @@ def make_claim_extraction_prompts(generation, prompt, tokenizer):
         prompt_text = prompt_templates.EXTRACT_CLAIMS_TEMPLATE.format(
             snippet=snippet, sentence=sentence
         )
-        # check token 
+        # check token
         prompt_len = len(tokenizer.encode(prompt_text))
         MAX_PROMPT_LENGTH = 2000
         if prompt_len > MAX_PROMPT_LENGTH:
             context1 = " ".join(sentences_text[max(0, i - 2) : i])
-            snippet = f"{context1.strip()} {sentence.strip()} {context2.strip()}".strip()
-            
+            snippet = (
+                f"{context1.strip()} {sentence.strip()} {context2.strip()}".strip()
+            )
+
             prompt_text = prompt_templates.EXTRACT_CLAIMS_SHORT_TEMPLATE.format(
-            snippet=snippet, sentence=sentence
-            )   
-            
+                snippet=snippet, sentence=sentence
+            )
+
             if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
-                
-                prompt_text = prompt_templates.EXTRACT_CLAIMS_EXTREME_SHORT_TEMPLATE.format(
-                    snippet=snippet, sentence=sentence
-                ) 
-                
+                prompt_text = (
+                    prompt_templates.EXTRACT_CLAIMS_EXTREME_SHORT_TEMPLATE.format(
+                        snippet=snippet, sentence=sentence
+                    )
+                )
+
                 if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
                     prompt_text = prompt_templates.EXTRACT_CLAIMS_EXTREME_EXTREME_SHORT_TEMPLATE.format(
                         snippet=snippet, sentence=sentence
                     )
-                
+
             assert len(tokenizer.encode(prompt_text)) <= MAX_PROMPT_LENGTH
 
         sentences.append(

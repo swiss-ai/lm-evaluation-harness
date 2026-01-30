@@ -169,11 +169,16 @@ class WandbLogger:
 
         # log the complete eval result to W&B Table
         table = make_table(["Tasks"] + columns, "results")
-        self.run.log({"evaluation/eval_results": table, **self.step_metrics}, commit=True)
+        self.run.log(
+            {"evaluation/eval_results": table, **self.step_metrics}, commit=True
+        )
 
         if "groups" in self.results.keys():
             table = make_table(["Groups"] + columns, "groups")
-            self.run.log({"evaluation/group_eval_results": table, **self.step_metrics}, commit=True)
+            self.run.log(
+                {"evaluation/group_eval_results": table, **self.step_metrics},
+                commit=True,
+            )
 
     def _log_results_as_artifact(self) -> None:
         """Log results as JSON artifact to W&B."""
@@ -346,7 +351,9 @@ class WandbLogger:
 
             # log the samples as a W&B Table
             df = self._generate_dataset(eval_preds, self.task_configs.get(task_name))
-            self.run.log({f"{task_name}_eval_results": df, **self.step_metrics}, commit=True)
+            self.run.log(
+                {f"{task_name}_eval_results": df, **self.step_metrics}, commit=True
+            )
 
             # log the samples as a json file as W&B Artifact
             self._log_samples_as_artifact(eval_preds, task_name)
@@ -365,4 +372,6 @@ class WandbLogger:
                 # log the samples as a json file as W&B Artifact
                 self._log_samples_as_artifact(eval_preds, task_name)
 
-            self.run.log({f"{group}_eval_results": grouped_df, **self.step_metrics}, commit=True)
+            self.run.log(
+                {f"{group}_eval_results": grouped_df, **self.step_metrics}, commit=True
+            )

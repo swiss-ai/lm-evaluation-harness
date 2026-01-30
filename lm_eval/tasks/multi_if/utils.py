@@ -109,6 +109,7 @@ def test_instruction_following_loose(
         follow_instruction_list=is_following_list,
     )
 
+
 def process_docs(dataset):
     processed_dataset = []
     for doc in dataset:
@@ -126,6 +127,7 @@ def process_docs(dataset):
         }
         processed_dataset.append(processed_doc)
     return Dataset.from_generator(lambda: (doc for doc in processed_dataset))
+
 
 def process_results(doc, results):
     inp = InputExample(
