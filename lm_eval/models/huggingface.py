@@ -999,7 +999,7 @@ class HFLM(TemplateLM):
         ):
             return self.model.generate(
                 input_ids=context,
-                max_length=max_length,
+                max_new_tokens=max_length - context.shape[1],
                 stopping_criteria=stopping_criteria,
                 pad_token_id=self.tokenizer.pad_token_id,
                 use_cache=True,
