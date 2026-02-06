@@ -997,9 +997,10 @@ class HFLM(TemplateLM):
             dtype=self.mixed_precision_dtype,
             enabled=self.mixed_precision_dtype is not None,
         ):
+            max_new_tokens = generation_kwargs.pop("max_new_tokens", max_length - context.shape[1])
             return self.model.generate(
                 input_ids=context,
-                max_new_tokens=max_length - context.shape[1],
+                max_new_tokens=max_new_tokens,
                 stopping_criteria=stopping_criteria,
                 pad_token_id=self.tokenizer.pad_token_id,
                 use_cache=True,
@@ -1462,6 +1463,10 @@ class HFLM(TemplateLM):
                     "`max_length` in generation kwargs. Please use `max_gen_toks` instead."
                 )
             max_length = kwargs.pop("max_length", context_enc.shape[1] + max_gen_toks)  # type: ignore
+
+            # Pass max_gen_toks directly so _model_generate can use it as max_new_tokens,
+            # overriding any max_new_tokens in the model's generation_config.
+            kwargs["max_new_tokens"] = max_gen_toks
 
             # perform batched generation
             cont = self._model_generate(
