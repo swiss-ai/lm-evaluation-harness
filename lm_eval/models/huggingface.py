@@ -997,7 +997,9 @@ class HFLM(TemplateLM):
             dtype=self.mixed_precision_dtype,
             enabled=self.mixed_precision_dtype is not None,
         ):
-            max_new_tokens = generation_kwargs.pop("max_new_tokens", max_length - context.shape[1])
+            max_new_tokens = generation_kwargs.pop(
+                "max_new_tokens", max_length - context.shape[1]
+            )
             return self.model.generate(
                 input_ids=context,
                 max_new_tokens=max_new_tokens,
