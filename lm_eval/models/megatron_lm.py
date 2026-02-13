@@ -163,6 +163,10 @@ class MegatronLMEval(LM):
         tensor_model_parallel_size: int = 1,
         pipeline_model_parallel_size: int = 1,
         expert_model_parallel_size: int = 1,
+        # Short aliases (override the full names if provided)
+        TP: int | None = None,
+        PP: int | None = None,
+        EP: int | None = None,
         seq_length: int = 4096,
         micro_batch_size: int = 1,
         max_gen_toks: int = 256,
@@ -177,6 +181,18 @@ class MegatronLMEval(LM):
         **kwargs,
     ):
         super().__init__()
+
+        # Apply short aliases (TP/PP/EP override full names)
+        if TP is not None:
+            tensor_model_parallel_size = TP
+        if PP is not None:
+            pipeline_model_parallel_size = PP
+        if EP is not None:
+            expert_model_parallel_size = EP
+        # Auto-set devices to match TP if not explicitly overridden
+        if (TP is not None or tensor_model_parallel_size > 1) and devices == 1:
+            devices = tensor_model_parallel_size
+            eval_logger.info(f"Auto-setting devices={devices} to match TP={tensor_model_parallel_size}")
 
         self._max_length = seq_length
         self._batch_size = micro_batch_size if micro_batch_size is not None else 1
