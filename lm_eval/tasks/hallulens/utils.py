@@ -7,7 +7,7 @@ import requests
 import os
 
 API_URL = "https://api.swissai.cscs.ch/v1"
-API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("CSCS_SERVING_API")
 
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
