@@ -17,7 +17,7 @@ local_titles = os.path.join(home_dir, "wiki_data/enwiki-2024.titles.txt")
 # check if the file exists
 if not os.path.exists(local_db):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-20230401.db",
         local_dir=home_dir,
         repo_type="dataset",
@@ -25,7 +25,7 @@ if not os.path.exists(local_db):
 
 if not os.path.exists(local_titles):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-2024.titles.txt",
         local_dir=home_dir,
         repo_type="dataset",
