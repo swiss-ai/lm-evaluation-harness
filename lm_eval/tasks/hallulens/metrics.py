@@ -12,25 +12,24 @@ from huggingface_hub import HfApi, hf_hub_download
 home_dir = os.path.expanduser("~")
 local_db = os.path.join(home_dir, "wiki_data/enwiki-20230401.db")
 local_titles = os.path.join(home_dir, "wiki_data/enwiki-2024.titles.txt")
-# Check whether "/data/wiki_data/.cache/enwiki-20230401.db" and  "/data/wiki_data/enwiki-2024.titles.txt", 
+# Check whether "/data/wiki_data/.cache/enwiki-20230401.db" and  "/data/wiki_data/enwiki-2024.titles.txt",
 # if not load it from huggingface repo 'swiss-ai/hallulens', in the folder 'wiki_data'
 # check if the file exists
 if not os.path.exists(local_db):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-20230401.db",
         local_dir=home_dir,
-        repo_type="dataset"
+        repo_type="dataset",
     )
 
 if not os.path.exists(local_titles):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-2024.titles.txt",
         local_dir=home_dir,
-        repo_type="dataset"
+        repo_type="dataset",
     )
-
 
 
 IS_HALLUCINATION_RESPONSE = """You are given a question, a response, and a correct answer to the prompt.\
@@ -128,23 +127,27 @@ Result:
 
 # tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.1-70B-Instruct")
 # model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.1-70B-Instruct", device_map="auto")
-test = try_remote_generate('hello there')
+test = try_remote_generate("hello there")
 
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
 if test is None:
-    print('WARNING: Remote generation failed, using local model instead.')
-    model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-3.3-70B-Instruct", device_map="auto")
+    print("WARNING: Remote generation failed, using local model instead.")
+    model = AutoModelForCausalLM.from_pretrained(
+        "meta-llama/Llama-3.3-70B-Instruct", device_map="auto"
+    )
     model.eval()
 else:
-    print('Remote generation successful, using remote model.')
+    print("Remote generation successful, using remote model.")
     model = None
-    
+
+
 def replace_none_with_nan(scores):
     """Replace None values in the scores dictionary with NaN."""
     for key, value in scores.items():
         if value is None:
             scores[key] = np.nan
     return scores
+
 
 def get_score(doc, predictions, **kwargs):
     completion = predictions[0]
@@ -155,10 +158,9 @@ def get_score(doc, predictions, **kwargs):
         golden_answer = doc["answer"]
         title = doc["title"]
         reference = doc["reference"]
-    
+
     if category in ["mixed_entities", "generated_entities"]:
         name = doc["name"]
-    
 
     # ----------Precise wiki
     if category == "precise_wiki":
@@ -167,60 +169,58 @@ def get_score(doc, predictions, **kwargs):
 
     if category == "longwiki":
         evaluator = FactHalu(
-        abstention_model=model,
-        abstention_tokenizer=tokenizer,
-        claim_extractor=model,
-        claim_extractor_tokenizer=tokenizer,
-        claim_verifier=model,
-        claim_verifier_tokenizer=tokenizer,
-        k=32,
-        db_path=local_db,
+            abstention_model=model,
+            abstention_tokenizer=tokenizer,
+            claim_extractor=model,
+            claim_extractor_tokenizer=tokenizer,
+            claim_verifier=model,
+            claim_verifier_tokenizer=tokenizer,
+            k=32,
+            db_path=local_db,
         )
 
-        return replace_none_with_nan(evaluator.run(original_prompt, completion, title, reference))
+        return replace_none_with_nan(
+            evaluator.run(original_prompt, completion, title, reference)
+        )
 
     if category == "mixed_entities":
         _type = doc["type"]
-        mixed_eval = NonsenseMixedEval(
-            eval_model=model,
-            eval_tokenizer=tokenizer
+        mixed_eval = NonsenseMixedEval(eval_model=model, eval_tokenizer=tokenizer)
+
+        return replace_none_with_nan(
+            mixed_eval.run_eval_mixed(completion, original_prompt, _type, name)
         )
 
-        return replace_none_with_nan(mixed_eval.run_eval_mixed(completion, original_prompt, _type, name))
-        
     if category == "generated_entities":
         _type = doc["type_"]
         place = doc["place"]
         generated_eval = NonsenseNameEval(
-            evaluator_model=model,
-            evaluator_tokenizer=tokenizer
+            evaluator_model=model, evaluator_tokenizer=tokenizer
         )
-        return replace_none_with_nan(generated_eval.run_eval_generated(completion, name, _type, place))
+        return replace_none_with_nan(
+            generated_eval.run_eval_generated(completion, name, _type, place)
+        )
 
 
 ############################################# SHORTFORM ########################################################################
 
 
-
 def eval_abstention(original_prompt, generated_answer, model, tokenizer):
     print("Start abstantion evaluation")
-    abstain_prompt =ABSTAIN_PROMPT_UPDATED.format(
-                prompt=original_prompt, generation=generated_answer
-            )
+    abstain_prompt = ABSTAIN_PROMPT_UPDATED.format(
+        prompt=original_prompt, generation=generated_answer
+    )
     generated_evaluation = generate(
-        prompt=abstain_prompt,
-        model=model,
-        tokenizer=tokenizer,
-        temperature=0.0)
-        
-    
-    ABSTAIN_JSON_KEY = 'is_abstaining'
+        prompt=abstain_prompt, model=model, tokenizer=tokenizer, temperature=0.0
+    )
+
+    ABSTAIN_JSON_KEY = "is_abstaining"
     abstains_eval = jsonify_ans(
         raw_response=generated_evaluation,
         eval_prompt=abstain_prompt,
         key=ABSTAIN_JSON_KEY,
         model=model,
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
     )
     refusal_res = []
     for o in abstains_eval:
@@ -231,73 +231,92 @@ def eval_abstention(original_prompt, generated_answer, model, tokenizer):
 
     return refusal_res, generated_evaluation
 
-def judge_hallucination(original_prompt, generated_answer, gold_answer):
 
+def judge_hallucination(original_prompt, generated_answer, gold_answer):
     halu_prompt = IS_HALLUCINATION_RESPONSE.format(
         prompt=original_prompt, generation=generated_answer, gold_answer=gold_answer
     )
 
     generated_evaluation = generate(
-        prompt=halu_prompt,
-        model=model,
-        tokenizer=tokenizer
+        prompt=halu_prompt, model=model, tokenizer=tokenizer
     )
     return generated_evaluation
 
+
 def process_res(abstantion_res_raw, halu_eval_raw):
     try:
-        abstantion_res = json.loads(abstantion_res_raw)['is_abstaining']
+        abstantion_res = json.loads(abstantion_res_raw)["is_abstaining"]
     except json.JSONDecodeError:
         print(f"Error decoding JSON from abstantion response: {abstantion_res_raw}")
         return None, None
-    if halu_eval_raw.lower() not in ['correct', 'incorrect', 'unverifiable']: print(halu_eval_raw)
-    hallucinated_judge = False if halu_eval_raw.lower() == 'correct' or halu_eval_raw.lower() ==  'yes' else True
+    if halu_eval_raw.lower() not in ["correct", "incorrect", "unverifiable"]:
+        print(halu_eval_raw)
+    hallucinated_judge = (
+        False
+        if halu_eval_raw.lower() == "correct" or halu_eval_raw.lower() == "yes"
+        else True
+    )
     return abstantion_res, hallucinated_judge
 
+
 def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
-    abstantion_res, abstantion_raw_gen = eval_abstention(original_prompt, generated_answer, model, tokenizer)
-    halu_test_raw_gen = judge_hallucination(original_prompt, generated_answer, gold_answer)
+    abstantion_res, abstantion_raw_gen = eval_abstention(
+        original_prompt, generated_answer, model, tokenizer
+    )
+    halu_test_raw_gen = judge_hallucination(
+        original_prompt, generated_answer, gold_answer
+    )
     abstantion_res, halu_test_res = process_res(abstantion_raw_gen, halu_test_raw_gen)
     if abstantion_res is None or halu_test_res is None:
         return {"hallu_rate": np.nan, "refusal_rate": np.nan, "correct_rate": np.nan}
-    not_abstained = 0 if abstantion_res else 1 # if 0, then the sample abstained, if 1 then it did not abstain
+    not_abstained = (
+        0 if abstantion_res else 1
+    )  # if 0, then the sample abstained, if 1 then it did not abstain
     if not_abstained == 0:
         hallu_rate_not_abstain = 0
         refusal_rate = 1
     else:
         refusal_rate = 0
-        if halu_test_res: # if it is hallucinated
+        if halu_test_res:  # if it is hallucinated
             hallu_rate_not_abstain = 1
         else:
             hallu_rate_not_abstain = 0
-    if halu_test_res: # if it is hallucinated
+    if halu_test_res:  # if it is hallucinated
         correct_rate = 0
     else:
         correct_rate = 1
-    return {"hallu_rate": hallu_rate_not_abstain, "refusal_rate": refusal_rate, "correct_rate": correct_rate}
-
+    return {
+        "hallu_rate": hallu_rate_not_abstain,
+        "refusal_rate": refusal_rate,
+        "correct_rate": correct_rate,
+    }
 
 
 ###############################################################################################################################################
 
 ############################################# LONG FORM ########################################################################
 
-def run_eval_longform(original_prompt, generated_answer, gold_answer, args):
 
+def run_eval_longform(original_prompt, generated_answer, gold_answer, args):
     generations_file_path = output_folder / "generation.jsonl"
     base_path = os.path.dirname(os.path.abspath(__name__))
-    eval_cache_path = f"{base_path}/data/longwiki/.cache" if args.eval_cache_path is None else args.eval_cache_path
+    eval_cache_path = (
+        f"{base_path}/data/longwiki/.cache"
+        if args.eval_cache_path is None
+        else args.eval_cache_path
+    )
 
-    facthalu = FactHalu(generations_file_path,
+    facthalu = FactHalu(
+        generations_file_path,
         output_csv,
         abstain_evaluator=args.abstain_evaluator,
         claim_extractor=args.claim_extractor,
         verifier=args.verifier,
         k=args.k,
         eval_cache_path=eval_cache_path,
-        db_path = args.db_path,
-        args=args
-        )
+        db_path=args.db_path,
+        args=args,
+    )
 
     # save all evalaution details
     eval_details = {
@@ -307,11 +326,11 @@ def run_eval_longform(original_prompt, generated_answer, gold_answer, args):
         "verifier": args.verifier,
         "k": args.k,
         "evalauted_model": model_name,
-        "exp_mode" : args.exp_mode,
-        "eval_time" : str(pd.Timestamp.now())
+        "exp_mode": args.exp_mode,
+        "eval_time": str(pd.Timestamp.now()),
     }
 
-    with open (output_folder / "eval_details.json", 'w') as f:
+    with open(output_folder / "eval_details.json", "w") as f:
         json.dump(eval_details, f)
 
     facthalu.run()

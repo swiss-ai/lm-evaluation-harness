@@ -1,4 +1,4 @@
-group: polyglotoxicitypromptsllama_full
+group: polyglotoxicitypromptsllama
 task:
   - polyglotoxicitypromptsllama_full_german
   - polyglotoxicitypromptsllama_full_english

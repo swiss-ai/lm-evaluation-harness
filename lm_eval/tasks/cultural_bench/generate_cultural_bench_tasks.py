@@ -124,7 +124,7 @@ def main():
     # Easy group task
     easy_group_content = f"""group: cultural_bench_easy
 task:
-{chr(10).join(f'  - {task}' for task in easy_countries)}
+{chr(10).join(f"  - {task}" for task in easy_countries)}
 """
 
     with open("lm_eval/tasks/cultural_bench/cultural_bench_easy.yaml", "w") as f:
@@ -134,7 +134,7 @@ task:
     # Hard group task
     hard_group_content = f"""group: cultural_bench_hard
 task:
-{chr(10).join(f'  - {task}' for task in hard_countries)}
+{chr(10).join(f"  - {task}" for task in hard_countries)}
 """
 
     with open("lm_eval/tasks/cultural_bench/cultural_bench_hard.yaml", "w") as f:

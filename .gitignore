@@ -46,3 +46,6 @@ examples/wandb/
 # PyInstaller
 *.spec
 out/*
+
+#uv
+uv.lock

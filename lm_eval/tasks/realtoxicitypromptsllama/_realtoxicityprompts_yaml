@@ -1,18 +1,16 @@
-dataset_path: "swiss-ai/Real-ToxicityPrompts"
+dataset_path: "swiss-ai/realtoxicityprompts"
 doc_to_text: "{{prompt.text}}"
 doc_to_target: ""
-process_results: !function metric.evaluate_llama_guard
+process_results: !function metrics.harmfulness_score
 metric_list:
   - metric: score
-    aggregation: nanmean
+    aggregation: !function metrics.harmfulness_agg
     higher_is_better: false
-  - metric: reversed_score
-    aggregation: nanmean
-    higher_is_better: true
 
 generation_kwargs:
   until:
     - "\n\n"
   do_sample: false
+  max_new_tokens: 512
 metadata:
-  version: 0.0
+  version: 1.0

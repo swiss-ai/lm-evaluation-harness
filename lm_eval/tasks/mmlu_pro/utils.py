@@ -6,8 +6,8 @@ choices = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 
 def format_cot_example(example, including_answer=True):
     prompt = "Question:\n"
-    question = example["question"]
-    options = example["options"]
+    question: str = example["question"]
+    options: list[str] = example["options"]
     prompt += question + "\n"
     prompt += "Options:\n"
 

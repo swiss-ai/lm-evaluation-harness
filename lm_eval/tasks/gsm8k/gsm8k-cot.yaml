@@ -2,8 +2,8 @@ tag:
   - math_word_problems
   - chain_of_thought
 task: gsm8k_cot
-dataset_path: gsm8k
 dataset_name: main
+dataset_path: openai/gsm8k
 output_type: generate_until
 test_split: test
 # OLMES-style prompting with CoT

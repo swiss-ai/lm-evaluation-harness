@@ -153,7 +153,7 @@ Please list {NUM} new names, separated by commas. Do not be verbose or provide a
 
 PRODUCT_PROMPT = """I'm launching a new brand for {TYPE} and need a creative name that does not already exist. I want it to sound familiar. Could you help me brainstorm some names?
 Please list {NUM} new names, separated by commas. Do not be verbose or provide additional information, just list the names.{PLACE}"""
-# I want it to sound familiar. 
+# I want it to sound familiar.
 
 HISTORICAL_EVENT_PROMPT = """I'm writing a fiction about {PLACE} and need a creative name for a historical event ({TYPE}) that does not already exist. I want it to sound familiar. Could you help me brainstorm some names?
 Please list {NUM} new names, separated by commas. Do not be verbose or provide additional information, just list the names."""
@@ -170,26 +170,30 @@ MIX_PROMPT_PRDOUCT = """Given a list of fictional brand names for {type_}, I wou
 Please list {NUM} new brand names, separated by commas. Do not be verbose or provide additional information; just list the brand names."""
 
 
-DESCRIBE_PROMPTS = ['What can you tell me about {type_}{place} called {name}?',
-                    'I\'m looking for information on {type_}{place} named {name}.',
-                    'Can you describe the {type_}{place} known as {name}?',
-                    'I want to know more about {type_}{place} of {name}.',
-                    'Could you give me details about {type_}{place} {name}?',
-                    'What do you know about the {type_}{place} {name}?',
-                    "Can you share some details about the {type_}{place} called {name}?",
-                    "I'm curious about the {type_}{place} known as {name}. What can you tell me?",
-                    "I'd like to learn more about the {type_}{place} with the name {name}.",
-                    "Could you provide an overview of the {type_}{place} referred to as {name}?"]
-DESCRIBE_PROMPTS_PRODUCT = ['What can you tell me about the {type_}{place} from the {name} brand?',
-                    'I\'m looking for information on {type_}{place} from the {name} brand.',
-                    'Can you describe the {type_}{place} from the {name} brand?',
-                    'I want to know more about {type_}{place} from the {name} brand.',
-                    'Could you give me details about {type_}{place} from the {name} brand?',
-                    'What do you know about the {type_}{place} from the {name} brand?',
-                    "Can you share some details about the {type_}{place} from the {name} brand?",
-                    "I'm curious about the {type_}{place} from the {name} brand. What can you tell me?",
-                    "I'd like to learn more about the {type_}{place} from the {name} brand.",
-                    "Could you provide an overview of the {type_}{place} from the {name} brand?"]
+DESCRIBE_PROMPTS = [
+    "What can you tell me about {type_}{place} called {name}?",
+    "I'm looking for information on {type_}{place} named {name}.",
+    "Can you describe the {type_}{place} known as {name}?",
+    "I want to know more about {type_}{place} of {name}.",
+    "Could you give me details about {type_}{place} {name}?",
+    "What do you know about the {type_}{place} {name}?",
+    "Can you share some details about the {type_}{place} called {name}?",
+    "I'm curious about the {type_}{place} known as {name}. What can you tell me?",
+    "I'd like to learn more about the {type_}{place} with the name {name}.",
+    "Could you provide an overview of the {type_}{place} referred to as {name}?",
+]
+DESCRIBE_PROMPTS_PRODUCT = [
+    "What can you tell me about the {type_}{place} from the {name} brand?",
+    "I'm looking for information on {type_}{place} from the {name} brand.",
+    "Can you describe the {type_}{place} from the {name} brand?",
+    "I want to know more about {type_}{place} from the {name} brand.",
+    "Could you give me details about {type_}{place} from the {name} brand?",
+    "What do you know about the {type_}{place} from the {name} brand?",
+    "Can you share some details about the {type_}{place} from the {name} brand?",
+    "I'm curious about the {type_}{place} from the {name} brand. What can you tell me?",
+    "I'd like to learn more about the {type_}{place} from the {name} brand.",
+    "Could you provide an overview of the {type_}{place} from the {name} brand?",
+]
 
 ABSTAIN_PROMPT_PLACE_NONSENSE = """You are given a prompt containing a {TYPE} named {name}{PLACE} and a generation by an AI. Your task is to determine whether the AI believes {name} exists or not.
 
