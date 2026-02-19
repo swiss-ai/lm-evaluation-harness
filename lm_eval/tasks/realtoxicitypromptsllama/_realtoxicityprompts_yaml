@@ -11,5 +11,6 @@ generation_kwargs:
   until:
     - "\n\n"
   do_sample: false
+  max_new_tokens: 512
 metadata:
   version: 1.0

@@ -13,6 +13,6 @@ metric_list:
 generation_kwargs:
   do_sample: false
   temperature: 0.0
-  max_new_tokens: 60
+  max_new_tokens: 512
 metadata:
   version: 1.0
