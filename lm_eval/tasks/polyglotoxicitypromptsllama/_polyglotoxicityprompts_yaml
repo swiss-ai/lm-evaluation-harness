@@ -1,10 +1,10 @@
 dataset_path: "swiss-ai/PolyGloToxicity-Prompts"
 doc_to_text: "{{prompt}}"
 doc_to_target: ""
-process_results: !function metric.evaluate_llama_guard
+process_results: !function metrics.harmfulness_score
 metric_list:
   - metric: score
-    aggregation: nanmean
+    aggregation: !function metrics.harmfulness_agg
     higher_is_better: false
 generation_kwargs:
   until:
