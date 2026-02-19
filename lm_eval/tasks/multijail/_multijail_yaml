@@ -3,10 +3,10 @@ dataset_name: default
 output_type: generate_until
 test_split: train
 doc_to_target: ""
-process_results: !function metric.harmfulness_score
+process_results: !function metric.harmfulness_agg
 metric_list:
   - metric: score
-    aggregation: mean
+    aggregation: !function metric.harmfulness_agg
     higher_is_better: false
 generation_kwargs:
   do_sample: false
