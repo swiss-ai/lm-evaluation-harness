@@ -122,6 +122,12 @@ def _call_judge(prompt, completion):
     return evaluate_llama_guard(response)
 
 
+def harmfulness_score(doc, predictions):
+    """Called per-document: returns prompt and completion for deferred judge call."""
+    prompt = doc["prompt"]
+    completion = predictions[0]
+    return {"score": {"prompt": prompt, "completion": completion}}
+    
 def harmfulness_agg(items, max_workers=32):
     """Called once with all collected items. Fires concurrent API calls."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
