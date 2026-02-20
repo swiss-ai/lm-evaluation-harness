@@ -1,4 +1,4 @@
 task: polyglotoxicitypromptsllama_full_italian
-include: ../_polyglotoxicityprompts_yaml
+include: ../_polyglotoxicitypromptsllama_yaml
 dataset_name: ptp-it
 test_split: full

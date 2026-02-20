@@ -1,4 +1,4 @@
 task: polyglotoxicitypromptsllama_wildchat_german
-include: ../_polyglotoxicityprompts_yaml
+include: ../_polyglotoxicitypromptsllama_yaml
 dataset_name: wildchat-de
 test_split: wildchat

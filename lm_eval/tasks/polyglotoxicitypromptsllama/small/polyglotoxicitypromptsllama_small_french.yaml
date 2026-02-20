@@ -1,4 +1,4 @@
 task: polyglotoxicitypromptsllama_small_french
-include: ../_polyglotoxicityprompts_yaml
+include: ../_polyglotoxicitypromptsllama_yaml
 dataset_name: ptp-fr
 test_split: small
