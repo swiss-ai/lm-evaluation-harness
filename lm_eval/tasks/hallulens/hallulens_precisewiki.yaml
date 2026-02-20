@@ -3,11 +3,11 @@ include: _hallulens_yaml
 dataset_name: precise_wiki
 metric_list:
   - metric: hallu_rate
-    aggregation: nanmean
+    aggregation: !function metrics.hallu_rate_agg
     higher_is_better: false
   - metric: refusal_rate
-    aggregation: nanmean
+    aggregation: !function metrics.refusal_rate_agg
     higher_is_better: false
   - metric: correct_rate
-    aggregation: nanmean
+    aggregation: !function metrics.correct_rate_agg
     higher_is_better: true

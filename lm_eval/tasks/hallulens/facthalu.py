@@ -19,7 +19,6 @@ from tqdm import tqdm
 import lm_eval.tasks.hallulens.prompt_templates as prompt_templates
 from segtok.segmenter import split_single
 
-from transformers import AutoTokenizer
 import lm_eval.tasks.hallulens.utils as base_utils
 from lm_eval.tasks.hallulens.longwiki_retrieval import LongWikiRetrieval, LongWikiDB
 import lm_eval.tasks.hallulens.longwiki_utils as utils

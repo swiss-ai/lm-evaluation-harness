@@ -1,4 +1,4 @@
-dataset_path: alexanderstern/hallulens
+dataset_path: swiss-ai/hallulens
 output_type: generate_until
 test_split: test
 doc_to_text: "{{prompt}}"

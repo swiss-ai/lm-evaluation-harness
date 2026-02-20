@@ -1,3 +1,5 @@
+"""We recommend using the `VLLM_WORKER_MULTIPROC_METHOD=spawn` environment variable when running the HarmBench task."""
+
 from lm_eval.tasks.hallulens.facthalu import FactHalu
 from lm_eval.tasks.hallulens.utils import jsonify_ans, generate, try_remote_generate
 from lm_eval.tasks.hallulens.nonsensename import NonsenseNameEval, NonsenseMixedEval
@@ -5,28 +7,16 @@ import json
 import os
 import numpy as np
 from huggingface_hub import HfApi, hf_hub_download
-from transformers import AutoTokenizer
-import concurrent.futures
-import threading
-
-
-# Verify remote API connection
-test = try_remote_generate("hello there")
-
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
-if test is None:
-    raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
-else:
-    print("Remote generation successful, using remote model.")
-    model = None
 
 home_dir = os.path.expanduser("~")
 local_db = os.path.join(home_dir, "wiki_data/enwiki-20230401.db")
 local_titles = os.path.join(home_dir, "wiki_data/enwiki-2024.titles.txt")
-
+# Check whether "/data/wiki_data/.cache/enwiki-20230401.db" and  "/data/wiki_data/enwiki-2024.titles.txt",
+# if not load it from huggingface repo 'swiss-ai/hallulens', in the folder 'wiki_data'
+# check if the file exists
 if not os.path.exists(local_db):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-20230401.db",
         local_dir=home_dir,
         repo_type="dataset",
@@ -34,7 +24,7 @@ if not os.path.exists(local_db):
 
 if not os.path.exists(local_titles):
     hf_hub_download(
-        repo_id="swiss-ai/hallulens",
+        repo_id="alexanderstern/hallulens",
         filename="wiki_data/enwiki-2024.titles.txt",
         local_dir=home_dir,
         repo_type="dataset",
@@ -134,12 +124,14 @@ Chatbot: {generation}
 Result:
 """
 
-# ============================================================================
-# Caching and aggregation infrastructure
-# ============================================================================
+test = try_remote_generate("hello there")
 
-_eval_cache = {}
-_eval_cache_lock = concurrent.futures.thread.threading.Lock()
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
+if test is None:
+    raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
+else:
+    print("Remote generation successful, using remote model.")
+
 
 def replace_none_with_nan(scores):
     """Replace None values in the scores dictionary with NaN."""
@@ -148,27 +140,26 @@ def replace_none_with_nan(scores):
             scores[key] = np.nan
     return scores
 
-def _evaluate_single(item):
-    """Run the full evaluation for a single doc — with caching."""
-    doc = item["doc"]
-    completion = item["completion"]
 
-    cache_key = (doc["prompt"], completion)
-
-    with _eval_cache_lock:
-        if cache_key in _eval_cache:
-            return _eval_cache[cache_key]
-
+def get_score(doc, predictions, **kwargs):
+    completion = predictions[0]
     category = doc["category"]
     original_prompt = doc["prompt"]
 
-    if category == "precise_wiki":
+    if category in ["precise_wiki", "longwiki"]:
         golden_answer = doc["answer"]
-        result = run_eval_precise_wiki(original_prompt, completion, golden_answer)
-
-    elif category == "longwiki":
         title = doc["title"]
         reference = doc["reference"]
+
+    if category in ["mixed_entities", "generated_entities"]:
+        name = doc["name"]
+
+    # ----------Precise wiki
+    if category == "precise_wiki":
+        halu_rate = run_eval_precise_wiki(original_prompt, completion, golden_answer)
+        return replace_none_with_nan(halu_rate)
+
+    if category == "longwiki":
         evaluator = FactHalu(
             abstention_model=model,
             abstention_tokenizer=tokenizer,
@@ -179,131 +170,35 @@ def _evaluate_single(item):
             k=32,
             db_path=local_db,
         )
-        result = replace_none_with_nan(
+
+        return replace_none_with_nan(
             evaluator.run(original_prompt, completion, title, reference)
         )
 
-    elif category == "mixed_entities":
-        name = doc["name"]
+    if category == "mixed_entities":
         _type = doc["type"]
         mixed_eval = NonsenseMixedEval(eval_model=model, eval_tokenizer=tokenizer)
-        result = replace_none_with_nan(
+
+        return replace_none_with_nan(
             mixed_eval.run_eval_mixed(completion, original_prompt, _type, name)
         )
 
-    elif category == "generated_entities":
-        name = doc["name"]
+    if category == "generated_entities":
         _type = doc["type_"]
         place = doc["place"]
         generated_eval = NonsenseNameEval(
             evaluator_model=model, evaluator_tokenizer=tokenizer
         )
-        result = replace_none_with_nan(
+        return replace_none_with_nan(
             generated_eval.run_eval_generated(completion, name, _type, place)
         )
 
-    else:
-        result = {}
 
-    with _eval_cache_lock:
-        _eval_cache[cache_key] = result
+############################################# SHORTFORM ########################################################################
 
-    return result
-
-
-def _run_all(items, max_workers=32):
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        return list(executor.map(_evaluate_single, items))
-
-# ============================================================================
-# Per-document score function (defers to aggregation)
-# ============================================================================
-
-def get_score(doc, predictions, **kwargs):
-    """Called per-document: defer evaluation to aggregation."""
-    payload = {"doc": doc, "completion": predictions[0]}
-    result = {}
-
-    category = doc["category"]
-    if category == "precise_wiki":
-        result["hallu_rate"] = payload
-        result["refusal_rate"] = payload
-        result["correct_rate"] = payload
-    elif category == "longwiki":
-        result["abstained"] = payload
-        result["precision"] = payload
-        result["recall"] = payload
-        result["f1"] = payload
-    elif category in ("mixed_entities", "generated_entities"):
-        result["abstention"] = payload
-
-    return result
-
-
-# ============================================================================
-# Aggregation functions
-# ============================================================================
-
-# --- precise_wiki ---
-
-def hallu_rate_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["hallu_rate"] for r in results if not np.isnan(r.get("hallu_rate", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-def refusal_rate_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["refusal_rate"] for r in results if not np.isnan(r.get("refusal_rate", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-def correct_rate_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["correct_rate"] for r in results if not np.isnan(r.get("correct_rate", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-# --- longwiki ---
-
-def abstained_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["abstained"] for r in results if not np.isnan(r.get("abstained", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-def precision_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["precision"] for r in results if not np.isnan(r.get("precision", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-def recall_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["recall"] for r in results if not np.isnan(r.get("recall", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-def f1_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["f1"] for r in results if not np.isnan(r.get("f1", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-# --- nonsense entities ---
-
-def abstention_agg(items, max_workers=32):
-    results = _run_all(items, max_workers)
-    scores = [r["abstention"] for r in results if not np.isnan(r.get("abstention", np.nan))]
-    return sum(scores) / len(scores) if scores else np.nan
-
-
-# ============================================================================
-# Shortform evaluation helpers
-# ============================================================================
 
 def eval_abstention(original_prompt, generated_answer, model, tokenizer):
-    print("Start abstention evaluation")
+    print("Start abstantion evaluation")
     abstain_prompt = ABSTAIN_PROMPT_UPDATED.format(
         prompt=original_prompt, generation=generated_answer
     )
@@ -344,7 +239,7 @@ def process_res(abstantion_res_raw, halu_eval_raw):
     try:
         abstantion_res = json.loads(abstantion_res_raw)["is_abstaining"]
     except json.JSONDecodeError:
-        print(f"Error decoding JSON from abstention response: {abstantion_res_raw}")
+        print(f"Error decoding JSON from abstantion response: {abstantion_res_raw}")
         return None, None
     if halu_eval_raw.lower() not in ["correct", "incorrect", "unverifiable"]:
         print(halu_eval_raw)
@@ -368,17 +263,17 @@ def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
         return {"hallu_rate": np.nan, "refusal_rate": np.nan, "correct_rate": np.nan}
     not_abstained = (
         0 if abstantion_res else 1
-    )
+    )  # if 0, then the sample abstained, if 1 then it did not abstain
     if not_abstained == 0:
         hallu_rate_not_abstain = 0
         refusal_rate = 1
     else:
         refusal_rate = 0
-        if halu_test_res:
+        if halu_test_res:  # if it is hallucinated
             hallu_rate_not_abstain = 1
         else:
             hallu_rate_not_abstain = 0
-    if halu_test_res:
+    if halu_test_res:  # if it is hallucinated
         correct_rate = 0
     else:
         correct_rate = 1
@@ -389,5 +284,45 @@ def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
     }
 
 
+###############################################################################################################################################
+
+############################################# LONG FORM ########################################################################
 
 
+def run_eval_longform(original_prompt, generated_answer, gold_answer, args):
+    generations_file_path = output_folder / "generation.jsonl"
+    base_path = os.path.dirname(os.path.abspath(__name__))
+    eval_cache_path = (
+        f"{base_path}/data/longwiki/.cache"
+        if args.eval_cache_path is None
+        else args.eval_cache_path
+    )
+
+    facthalu = FactHalu(
+        generations_file_path,
+        output_csv,
+        abstain_evaluator=args.abstain_evaluator,
+        claim_extractor=args.claim_extractor,
+        verifier=args.verifier,
+        k=args.k,
+        eval_cache_path=eval_cache_path,
+        db_path=args.db_path,
+        args=args,
+    )
+
+    # save all evalaution details
+    eval_details = {
+        "output_csv": str(output_csv),
+        "abstain_evaluator": args.abstain_evaluator,
+        "claim_extractor": args.claim_extractor,
+        "verifier": args.verifier,
+        "k": args.k,
+        "evalauted_model": model_name,
+        "exp_mode": args.exp_mode,
+        "eval_time": str(pd.Timestamp.now()),
+    }
+
+    with open(output_folder / "eval_details.json", "w") as f:
+        json.dump(eval_details, f)
+
+    facthalu.run()
