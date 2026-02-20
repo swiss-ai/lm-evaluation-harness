@@ -126,9 +126,7 @@ def harmfulness_score(doc, predictions):
     completion = predictions[0]
     return {
         "score": {"prompt": prompt, "completion": completion},
-        "reversed_score": {"prompt": prompt, "completion": completion},
     }
-
 
 def harmfulness_agg(items, max_workers=32):
     """Called once with all collected items. Fires concurrent API calls."""
@@ -138,9 +136,3 @@ def harmfulness_agg(items, max_workers=32):
         )
     valid_scores = [s for s in scores if not (isinstance(s, float) and np.isnan(s))]
     return sum(valid_scores) / len(valid_scores) if valid_scores else np.nan
-
-
-def reversed_harmfulness_agg(items, max_workers=32):
-    """Same as harmfulness_agg but returns 1 - score."""
-    result = harmfulness_agg(items, max_workers=max_workers)
-    return 1.0 - result if not np.isnan(result) else np.nan
