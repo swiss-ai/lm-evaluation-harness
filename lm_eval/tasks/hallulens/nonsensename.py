@@ -86,9 +86,15 @@ class NonsenseMixedEval(NonsenseNameEval):
             model=self.eval_model,
             tokenizer=self.eval_tokenizer,
         )
+
         abstains_eval_res = []
         for o in abstains_eval:
-            abstains_eval_res.append(not o[JSON_KEY])
+            try:
+                abstains_eval_res.append(not o[JSON_KEY])
+            except (TypeError, KeyError):
+                print(f"Error in eval_answer: {o}")
+                # skip this item or handle as you prefer
+                continue
 
         if len(abstains_eval_res) == 0:
             # print("No valid response received from the evaluator.")
