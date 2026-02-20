@@ -28,7 +28,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
         }
 
         resp = requests.post(
-            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=10
+            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=60
         )
 
         if resp.status_code != 200:
@@ -62,11 +62,16 @@ def clear_memory():
 
 def generate(prompt, model=None, tokenizer=None, temperature=0.0, max_tokens=512):
     if model is None or tokenizer is None:
-        # remote generation
-        result = try_remote_generate(
-            prompt, temperature=temperature, max_tokens=max_tokens
-        )
-        assert result != None, (
+        number_of_retries = 0
+        while number_of_retries < 3:
+            # remote generation
+            result = try_remote_generate(
+                prompt, temperature=temperature, max_tokens=max_tokens
+            )            
+            if result is not None:
+                break
+            number_of_retries += 1
+        assert result is not None, (
             "If no model or tokenizer is given, remote generation should be functional."
         )
         return result
