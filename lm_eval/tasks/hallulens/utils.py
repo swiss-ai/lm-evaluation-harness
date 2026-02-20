@@ -28,7 +28,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
         }
 
         resp = requests.post(
-            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=60
+            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=300
         )
 
         if resp.status_code != 200:
