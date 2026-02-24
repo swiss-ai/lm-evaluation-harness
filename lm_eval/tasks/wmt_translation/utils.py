@@ -160,14 +160,19 @@ def _make_prompt(src, src_lang, tgt_lang):
 
 @lru_cache(maxsize=1)
 def _download_wmt_data():
-    """Download all WMT data via subset2evaluate (cached after first call)."""
+    """Download all WMT data via subset2evaluate (cached after first call).
+
+    Returns None if subset2evaluate is not installed (allows graceful
+    task registration in environments without the optional dependency).
+    """
     try:
         import subset2evaluate.utils
-    except ImportError as e:
-        raise ImportError(
-            "subset2evaluate is required for WMT translation tasks. "
-            "Install it with: pip install subset2evaluate"
-        ) from e
+    except ImportError:
+        eval_logger.warning(
+            "subset2evaluate is not installed — WMT translation data "
+            "unavailable. Install with: pip install subset2evaluate"
+        )
+        return None
 
     eval_logger.info(
         "Downloading WMT data via subset2evaluate (first run may be slow)..."
@@ -195,6 +200,13 @@ def load_wmt_data(**kwargs):
     src_lang, tgt_lang = lang_pair.split("-", 1)
 
     all_data = _download_wmt_data()
+
+    if all_data is None:
+        eval_logger.warning(
+            f"Returning placeholder dataset for {dataset_key} "
+            f"(subset2evaluate not installed)"
+        )
+        return {"test": datasets.Dataset.from_list([{"prompt": "", "src": ""}])}
 
     items = [
         {
