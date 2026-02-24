@@ -13,6 +13,7 @@ eval_logger = logging.getLogger(__name__)
 # Transformers 5.x compatibility patches for unbabel-comet
 # ---------------------------------------------------------------------------
 
+
 def _patch_comet_for_transformers5():
     _patch_tokenizer()
     _patch_encoder_forward()
@@ -66,6 +67,7 @@ def _patch_encoder_forward():
 # ---------------------------------------------------------------------------
 # GPU memory management
 # ---------------------------------------------------------------------------
+
 
 def _free_vllm_memory():
     """Free GPU memory held by vLLM.  Called once before CometKiwi22 scoring.
@@ -166,6 +168,7 @@ def _get_gpu_config():
 # COMET model
 # ---------------------------------------------------------------------------
 
+
 def _get_comet_model():
     global _comet_model
     if _comet_model is None:
@@ -180,6 +183,7 @@ def _get_comet_model():
 # ---------------------------------------------------------------------------
 # lm-eval-harness interface
 # ---------------------------------------------------------------------------
+
 
 def translation_score(doc, predictions):
     """Per-document: collect src and translation for batch CometKiwi22 scoring."""

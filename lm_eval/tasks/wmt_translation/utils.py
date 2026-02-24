@@ -9,6 +9,7 @@ from functools import lru_cache
 
 import datasets
 
+
 eval_logger = logging.getLogger(__name__)
 
 LANG_NAMES = {
@@ -175,11 +176,7 @@ def _download_wmt_data():
         require_human=False,
         name_filter=lambda k: k[0] in {"wmt25", "wmt24", "wmt24pp"},
     )
-    data = [
-        line | {"dataset": f"{k[0]}/{k[1]}"}
-        for k, v in raw.items()
-        for line in v
-    ]
+    data = [line | {"dataset": f"{k[0]}/{k[1]}"} for k, v in raw.items() for line in v]
     eval_logger.info(f"Loaded {len(data):,} items across {len(raw)} language pairs")
     return data
 

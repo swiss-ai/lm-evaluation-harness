@@ -104,7 +104,7 @@ tasks = [
 
 [dependency-groups]
 dev = [
-    "lm_eval[api]", "lm_eval[dev]", "lm_eval[hf]","sentencepiece"
+    "lm_eval[api]", "lm_eval[dev]", "lm_eval[hf]", "sentencepiece", "subset2evaluate", "unbabel-comet"
 ]
 
 [tool.uv]
