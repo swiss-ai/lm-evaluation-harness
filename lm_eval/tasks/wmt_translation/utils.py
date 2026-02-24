@@ -12,6 +12,8 @@ import datasets
 
 eval_logger = logging.getLogger(__name__)
 
+_MIN_PLACEHOLDER_ITEMS = 20
+
 LANG_NAMES = {
     "en": "English",
     "cs": "Czech",
@@ -170,7 +172,7 @@ def _download_wmt_data():
     except ImportError:
         eval_logger.warning(
             "subset2evaluate is not installed — WMT translation data "
-            "unavailable. Install with: pip install subset2evaluate"
+            "unavailable.  Install with: pip install subset2evaluate"
         )
         return None
 
@@ -206,7 +208,8 @@ def load_wmt_data(**kwargs):
             f"Returning placeholder dataset for {dataset_key} "
             f"(subset2evaluate not installed)"
         )
-        return {"test": datasets.Dataset.from_list([{"prompt": "", "src": ""}])}
+        placeholder = [{"prompt": "", "src": ""}] * _MIN_PLACEHOLDER_ITEMS
+        return {"test": datasets.Dataset.from_list(placeholder)}
 
     items = [
         {
