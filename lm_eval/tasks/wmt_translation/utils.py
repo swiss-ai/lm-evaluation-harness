@@ -162,11 +162,11 @@ def _download_wmt_data():
     """Download all WMT data via subset2evaluate (cached after first call)."""
     try:
         import subset2evaluate.utils
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "subset2evaluate is required for WMT translation tasks. "
             "Install it with: pip install subset2evaluate"
-        )
+        ) from e
 
     eval_logger.info(
         "Downloading WMT data via subset2evaluate (first run may be slow)..."

@@ -1,6 +1,6 @@
 import gc
 import logging
-import os
+
 
 COMETKIWI_MODEL_NAME = "Unbabel/wmt22-cometkiwi-da"
 
@@ -92,8 +92,8 @@ def _free_vllm_memory():
                 try:
                     if hasattr(obj.model, "llm_engine"):
                         obj.model.llm_engine.shutdown()
-                except Exception:
-                    pass
+                except Exception as e:
+                    eval_logger.debug(f"Could not shutdown vLLM engine: {e}")
                 del obj.model
                 break
     except Exception as e:
@@ -105,8 +105,8 @@ def _free_vllm_memory():
 
         destroy_model_parallel()
         eval_logger.info("Destroyed vLLM model parallel state")
-    except Exception:
-        pass
+    except Exception as e:
+        eval_logger.debug(f"Could not destroy model parallel: {e}")
 
     # 3. Garbage-collect and release CUDA caches
     gc.collect()
