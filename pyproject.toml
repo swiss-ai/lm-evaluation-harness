@@ -33,7 +33,9 @@ dependencies = [
     "dill",
     "word2number",
     "more_itertools",
-    "typing_extensions"
+    "typing_extensions",
+    "unbabel-comet",
+    "subset2evaluate"
 ]
 
 [tool.setuptools.packages.find]
@@ -84,7 +86,6 @@ multilingual = ["nagisa>=0.2.7", "jieba>=0.42.1", "pycountry"]
 #  "promptsource>=0.2.3 ; python_version <= '3.12'",
 #]
 ruler = ["nltk", "wonderwords", "scipy"]
-wmt_translation = ["subset2evaluate", "unbabel-comet"]
 sentencepiece = ["sentencepiece>=0.1.98"]
 discrim_eval = ["statsmodels==0.14.4"]
 unitxt = ["unitxt==1.26.9"]
@@ -99,12 +100,11 @@ tasks = [
     "lm_eval[math]",
     "lm_eval[multilingual]",
     "lm_eval[ruler]",
-    "lm_eval[wmt_translation]",
 ]
 
 [dependency-groups]
 dev = [
-    "lm_eval[api]", "lm_eval[dev]", "lm_eval[hf]", "sentencepiece", "subset2evaluate", "unbabel-comet"
+    "lm_eval[api]", "lm_eval[dev]", "lm_eval[hf]", "sentencepiece"
 ]
 
 [tool.uv]
