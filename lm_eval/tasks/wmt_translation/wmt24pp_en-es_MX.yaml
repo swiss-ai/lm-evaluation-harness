@@ -1,0 +1,7 @@
+include: _wmt_translation_yaml
+task: wmt24pp_en-es_MX
+tag:
+- wmt_translation
+- wmt24pp_translation
+dataset_kwargs:
+  dataset_key: wmt24pp/en-es_MX
