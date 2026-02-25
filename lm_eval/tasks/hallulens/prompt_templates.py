@@ -378,6 +378,36 @@ Sentence to be focused on: {sentence}
 Facts:
 """
 
+EXTRACT_CLAIMS_MINIMAL_TEMPLATE = """Extract verifiable atomic facts from the sentence between <SOS> and <EOS>. Focus on named entities and numbers. Each fact must be self-contained (no pronouns), with temporal/location context when needed. Exclude stories, opinions, hypotheticals, subjective statements, advice, and instructions. Extract quotations verbatim. Return "No available facts." if none exist, else list facts starting with '- '.
+
+Examples:
+
+Text: The sweet potato (Ipomoea batatas) is a dicotyledonous plant that belongs to the Convolvulaceae. <SOS>Its large, starchy, sweet-tasting tuberous roots are used as a root vegetable.<EOS>
+Facts:
+- Sweet potatoes' roots are large.
+- Sweet potatoes' roots are starchy.
+- Sweet potatoes' roots are sweet-tasting.
+- Sweet potatoes' roots are tuberous.
+- Sweet potatoes' roots are used as a root vegetable.
+
+Text: <SOS>After the success of the David in 1504, Michelangelo's work consisted almost entirely of vast projects.<EOS>
+Facts:
+- Michelangelo achieved the success of the David in 1504.
+- After 1504, Michelangelo's work consisted almost entirely of vast projects.
+
+Text: <SOS>However, when I came home from work to see Leo yelling at Maya, the box the samples came in wide open on the living room table, and Maya arguing with him.<EOS>
+Facts:
+No available facts
+
+Text: Unity. Unity. In another January in Washington, on New Year's Day 1863, Abraham Lincoln signed the Emancipation Proclamation. <SOS>When he put pen to paper, the President said, "If my name ever goes down into history it will be for this act and my whole soul is in it."<EOS>
+Facts:
+- On New Year's Day 1863, Abraham Lincoln said, "If my name ever goes down into history it will be for this act and my whole soul is in it."
+
+Text: {snippet}
+Sentence to be focused on: {sentence}
+Facts:
+"""
+
 
 VERIFICATION_JSON_SCHEMA = {
     "type": "object",

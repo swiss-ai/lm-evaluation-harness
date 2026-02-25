@@ -370,7 +370,13 @@ def make_claim_extraction_prompts(generation, prompt, tokenizer):
                         snippet=snippet, sentence=sentence
                     )
 
-            assert len(tokenizer.encode(prompt_text)) <= MAX_PROMPT_LENGTH
+                    if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
+                        prompt_text = prompt_templates.EXTRACT_CLAIMS_MINIMAL_TEMPLATE.format(snippet=snippet, sentence=sentence)
+                    
+                        if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
+                            print(f"WARNING: Skipping sentence that exceeds MAX_PROMPT_LENGTH even with minimal template: {target_sentence[:80]}... Prompt length: {len(tokenizer.encode(prompt_text))}")
+                            continue
+        
 
         sentences.append(
             Sentence(
