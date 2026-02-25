@@ -188,7 +188,6 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
             try:
                 jsonifyed_res.append(json.loads(r))
             except:
-                print(f"Error in eval_answer: {r}")
                 error = True
                 error_count = 0
 
@@ -202,7 +201,6 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                     )
 
                     try:
-                        print("\n** RETRY:", re_eval)
                         if check_validity(re_eval) != -1:
                             json_res = json.loads(check_validity(re_eval))
                         else:
@@ -211,23 +209,20 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                         error = False
 
                     except:
-                        print("*** trying again** \n")
                         error = True
                     error_count += 1
 
                     if error_count > 3:
-                        print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response.".format(key, key))
+                        print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
                         jsonifyed_res.append(
                             {"error": "Error count exceeded 3. Skipping this prompt."}
                         )
                         return []
                 jsonifyed_res.append(json_res)
-                print("<<< PASS >>>")
     
     # print percentage of valid responses
     valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
     total_count = len(jsonifyed_res)
-    print(f"Valid responses: {valid_count}/{total_count} ({100*valid_count/total_count if total_count > 0 else 0:.2f}%)")
     return jsonifyed_res
 
 
@@ -321,7 +316,6 @@ def jsonify_ans(
         try:
             jsonifyed_res.append(json.loads(raw_response))
         except:
-            # print(f"Error in eval_answer: {raw_response}")
             error = True
             error_count = 0
 
@@ -329,7 +323,6 @@ def jsonify_ans(
                 re_eval = generate(eval_prompt, model, tokenizer)
 
                 try:
-                    # print("\n** RETRY, prompt is:", eval_prompt)
                     if check_validity(re_eval) != -1:
                         json_res = json.loads(check_validity(re_eval))
                     else:
@@ -337,20 +330,17 @@ def jsonify_ans(
                     error = False
 
                 except:
-                    # print("*** trying again** \n")
                     error = True
                 error_count += 1
 
                 if error_count > 3:
-                    # print("Error count exceeded 3. Skipping this prompt.")
+                    print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
                     jsonifyed_res.append(
                         {"error": "Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response.".format(key, key)}
                     )
                     return []
             jsonifyed_res.append(json_res)
-            print("<<< PASS >>>")
     # print percentage of valid responses
     valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
     total_count = len(jsonifyed_res)
-    print(f"Valid responses: {valid_count}/{total_count} ({100*valid_count/total_count if total_count > 0 else 0:.2f}%)")
     return jsonifyed_res

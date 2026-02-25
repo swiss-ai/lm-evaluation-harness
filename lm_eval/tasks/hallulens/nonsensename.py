@@ -46,7 +46,8 @@ class NonsenseNameEval:
                 abstains_eval_res.append(not o["does_believe"])
             except:
                 print(f"Error in eval_answer: {o}")
-                exit()
+                # skip this item or handle as you prefer
+                continue
 
         if len(abstains_eval_res) == 0:
             # print("No valid response received from the evaluator.")

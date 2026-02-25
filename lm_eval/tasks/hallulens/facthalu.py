@@ -122,7 +122,6 @@ class FactHalu:
                 final_result["abstained"] = 0
 
         ### [[STEP #2]] Extract claims
-        print("\n[[Step 2]] Extracting Claims starts")
         all_claims = self.extract_claims(generation=_generation, prompt=prompt)
 
         if _generation.abstain is not None:
@@ -131,7 +130,6 @@ class FactHalu:
                 return final_result
 
         ### [[STEP #3]] Verify claims
-        print(f"\n[[Step 3]] Verifying Claims starts. Len: {len(all_claims)}")
         all_verification_responses = self.verify_claims(all_claims)
 
         for claim, verification_response in zip(all_claims, all_verification_responses):
@@ -139,7 +137,6 @@ class FactHalu:
 
         ### [[[ STEP #4]]] Calculate metrics: precision, recall@k, f1, response ratio
 
-        print(f"[[Step 4]] Calculating metrics")
         final_results = []
         for sentence in generation.sentences:
             if not sentence.claims:
@@ -222,9 +219,6 @@ class FactHalu:
             )
             all_claim_extractions.append(results)
 
-        print("***** [2-2] Parsing extracted claims")
-        # print(f"length of all_sentences: {len(all_sentences)}, all_sentences: {all_sentences}")
-        # print(f"length of all_claim_extractions: {len(all_claim_extractions)}, all_claim_extractions: {all_claim_extractions}")
         all_claims = []
         deduplicate = set()
         assert len(all_claim_extractions) == len(all_sentences), (
@@ -266,7 +260,6 @@ class FactHalu:
         return all_claims
 
     def verify_claims(self, all_claims: List[Claim]):
-        print("***** [3] Ref Src: ", self.ref_src)
         # 1. Prepare the prompt for verification
         retrieval = LongWikiRetrieval(
             self.db,
@@ -291,7 +284,6 @@ class FactHalu:
                     claim=claim.claim, reference=context
                 )
             )
-        print("***** Prepared all verification prompts")
 
         # 2. Verify the claims
         verification_prompts = [c.prompt for c in all_claims]
