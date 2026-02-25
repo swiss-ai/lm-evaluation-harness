@@ -223,7 +223,11 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                         return []
                 jsonifyed_res.append(json_res)
                 print("<<< PASS >>>")
-
+    
+    # print percentage of valid responses
+    valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
+    total_count = len(jsonifyed_res)
+    print(f"Valid responses: {valid_count}/{total_count} ({100*valid_count/total_count if total_count > 0 else 0:.2f}%)")
     return jsonifyed_res
 
 
@@ -345,4 +349,8 @@ def jsonify_ans(
                     return []
             jsonifyed_res.append(json_res)
             print("<<< PASS >>>")
+    # print percentage of valid responses
+    valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
+    total_count = len(jsonifyed_res)
+    print(f"Valid responses: {valid_count}/{total_count} ({100*valid_count/total_count if total_count > 0 else 0:.2f}%)")
     return jsonifyed_res
