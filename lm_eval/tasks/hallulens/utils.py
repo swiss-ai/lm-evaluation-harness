@@ -344,7 +344,7 @@ def jsonify_ans(
                 if error_count > 3:
                     # print("Error count exceeded 3. Skipping this prompt.")
                     jsonifyed_res.append(
-                        {"error": "Error count exceeded 3. Skipping this prompt."}
+                        {"error": "Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response.".format(key, key)}
                     )
                     return []
             jsonifyed_res.append(json_res)
