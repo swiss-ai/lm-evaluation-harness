@@ -20,7 +20,6 @@ import logging
 import os
 import re
 import tempfile
-from pathlib import Path
 
 import yaml
 
@@ -167,7 +166,7 @@ def alpaca_eval_agg(items):
     """
     api_key = os.getenv("CSCS_SERVING_API")
     if not api_key:
-        raise EnvironmentError(
+        raise OSError(
             "CSCS_SERVING_API environment variable must be set for AlpacaEval "
             "annotation. Get your key from the CSCS SwissAI platform."
         )
@@ -207,8 +206,8 @@ def alpaca_eval_agg(items):
     logger.info(
         f"Output length stats (chars): "
         f"min={min(output_lengths)}, max={max(output_lengths)}, "
-        f"mean={sum(output_lengths)/len(output_lengths):.0f}, "
-        f"median={sorted(output_lengths)[len(output_lengths)//2]}"
+        f"mean={sum(output_lengths) / len(output_lengths):.0f}, "
+        f"median={sorted(output_lengths)[len(output_lengths) // 2]}"
     )
 
     logger.info(
@@ -240,7 +239,8 @@ def alpaca_eval_agg(items):
 
     # Log standard error if available in the leaderboard
     se_candidates = [
-        c for c in df_leaderboard.columns
+        c
+        for c in df_leaderboard.columns
         if "standard_error" in c.lower() or "_se" in c.lower() or c == "se"
     ]
     for col in se_candidates:

@@ -14,7 +14,7 @@ Homepage: `https://github.com/tatsu-lab/alpaca_eval`
 
 ```
 @misc{dubois2023alpacafarm,
-  title={AlpacaFarm: A Simulation Framework for Methods that Learn from Human Feedback}, 
+  title={AlpacaFarm: A Simulation Framework for Methods that Learn from Human Feedback},
   author={Yann Dubois and Xuechen Li and Rohan Taori and Tianyi Zhang and Ishaan Gulrajani and Jimmy Ba and Carlos Guestrin and Percy Liang and Tatsunori B. Hashimoto},
   year={2023},
   eprint={2305.14387},
@@ -33,13 +33,13 @@ Homepage: `https://github.com/tatsu-lab/alpaca_eval`
 }
 
 @misc{dubois2025lengthcontrolledalpacaevalsimpleway,
-      title={Length-Controlled AlpacaEval: A Simple Way to Debias Automatic Evaluators}, 
+      title={Length-Controlled AlpacaEval: A Simple Way to Debias Automatic Evaluators},
       author={Yann Dubois and Balázs Galambosi and Percy Liang and Tatsunori B. Hashimoto},
       year={2025},
       eprint={2404.04475},
       archivePrefix={arXiv},
       primaryClass={cs.LG},
-      url={https://arxiv.org/abs/2404.04475}, 
+      url={https://arxiv.org/abs/2404.04475},
 }
 ```
 
@@ -79,3 +79,4 @@ If other tasks on this dataset are already supported:
 * [ ] Have you noted which, if any, published evaluation setups are matched by this variant?
 
 ### Changelog
+
