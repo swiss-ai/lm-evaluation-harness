@@ -1,0 +1,11 @@
+aggregate_metric_list:
+- metric: exact_match
+  filter_list: "extract-answer"
+group: reward_bench_arb_Arab
+metadata:
+  version: 0.1.0
+task:
+- reward_bench_arb_Arab_chat
+- reward_bench_arb_Arab_chat_hard
+- reward_bench_arb_Arab_safety
+- reward_bench_arb_Arab_reasoning
