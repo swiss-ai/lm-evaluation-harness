@@ -79,4 +79,3 @@ If other tasks on this dataset are already supported:
 * [ ] Have you noted which, if any, published evaluation setups are matched by this variant?
 
 ### Changelog
-
