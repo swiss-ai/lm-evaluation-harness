@@ -5,4 +5,3 @@ task:
 aggregate_metric_list:
   - metric: abstention
     aggregation: mean
-    higher_is_better: true
