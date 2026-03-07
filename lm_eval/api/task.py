@@ -37,7 +37,6 @@ from lm_eval.api.utils import (
     ends_with_whitespace,
     maybe_delimit,
     multiturn_to_singleturn,
-    random_task_id,
     requires_delimiter,
 )
 from lm_eval.caching.cache import load_from_cache, save_to_cache
@@ -475,7 +474,7 @@ class Task(abc.ABC):
                     "A `random.Random` generator argument must be provided to `rnd`"
                 )
 
-        description = description or ""
+        description = description if description else ""
 
         if num_fewshot == 0:
             labeled_examples = ""
@@ -616,10 +615,6 @@ class Task(abc.ABC):
     def resolve_field(doc: dict[str, Any], field: str | None = None):
         if field:
             return doc[field] if field in doc else utils.apply_template(field, doc)
-
-    @property
-    def task_name(self) -> str:
-        return getattr(self.config, "task", None) or random_task_id()
 
 
 class ConfigurableTask(Task):
@@ -893,10 +888,8 @@ class ConfigurableTask(Task):
                 is_rate_limit = "429" in str(type(e).__name__ + str(e))
                 if not is_rate_limit or attempt == max_retries - 1:
                     raise
-                # Parse "Retry after N seconds" from the HF error message
                 match = re.search(r"[Rr]etry after (\d+) second", str(e))
                 wait = int(match.group(1)) if match else 300
-                # Add a small per-attempt extra so parallel jobs don't all retry simultaneously
                 wait += attempt * 10
                 eval_logger.warning(
                     f"HuggingFace API rate limit hit while loading dataset for task "
@@ -1167,7 +1160,7 @@ class ConfigurableTask(Task):
         """
         # for multiple inputs, q is list[str]
         res_ = []
-        prev_context = prev_context or []
+        prev_context = prev_context if prev_context else []
         contexts = [
             prev_context
             + self.build_qa_turn(
@@ -1697,8 +1690,8 @@ class ConfigurableTask(Task):
         return getattr(self._config, key, None)
 
     @property
-    def task_name(self) -> str:
-        return getattr(self.config, "task", random_task_id())
+    def task_name(self) -> Any:
+        return getattr(self.config, "task", None)
 
     def __repr__(self):
         return (
