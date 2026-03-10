@@ -16,8 +16,6 @@ generation_kwargs:
     - "\nclass"
     - "\nif"
     - "\nprint"
-    - "\n```"
-    - "\n```\n\n"
     - "<|eot_id|>"
     - "</s>"
   max_gen_toks: 2048
