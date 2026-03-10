@@ -3,7 +3,8 @@ dataset_path: openai/openai_humaneval
 unsafe_code: true
 output_type: generate_until
 test_split: test
-doc_to_text: "{{prompt}}\nHere is the completed function:\n\n```python\n"
+doc_to_text: "{{prompt}}\n"
+gen_prefix: "Here is the completed function:\n\n```python\n"
 doc_to_target: "{{test}}\ncheck({{entry_point}})"
 metric_list:
   - metric: !function utils.pass_at_k
