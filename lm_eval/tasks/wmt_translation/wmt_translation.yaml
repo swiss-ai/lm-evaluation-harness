@@ -1,0 +1,11 @@
+group: wmt_translation
+task:
+- wmt24_translation
+- wmt24pp_translation
+- wmt25_translation
+aggregate_metric_list:
+- metric: cometkiwi22
+  aggregation: mean
+  weight_by_size: true
+metadata:
+  version: 1.0

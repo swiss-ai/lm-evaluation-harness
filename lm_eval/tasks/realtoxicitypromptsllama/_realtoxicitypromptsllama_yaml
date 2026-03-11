@@ -1,4 +1,6 @@
 dataset_path: "swiss-ai/realtoxicityprompts"
+dataset_kwargs:
+  verification_mode: no_checks
 doc_to_text: "{{prompt.text}}"
 doc_to_target: ""
 process_results: !function metrics.harmfulness_score

@@ -1,6 +1,6 @@
-task: hallulens_mixedentities
+task: hallulens_generatedentities
 include: _hallulens_yaml
-dataset_name: mixed_entities
+dataset_name: generated_entities
 metric_list:
   - metric: abstention
     aggregation: !function metrics.abstention_agg
