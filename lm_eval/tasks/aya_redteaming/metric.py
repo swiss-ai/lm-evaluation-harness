@@ -3,9 +3,14 @@ import requests
 import concurrent.futures
 
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
+meta-llama/Llama-3.3-70B-Instruct
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
+# check if the cscs serving API key is set and raise an error if not
+if API_KEY is None or API_KEY.strip() == "":
+    raise RuntimeError("CSCS_SERVING_API environment variable not set. Please set it to your SwissAI API key to use this evaluation script.")
+
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
     """
