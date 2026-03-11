@@ -87,7 +87,7 @@ def harmfulness_score(doc, predictions):
     return {"score": full_prompt}
 
 
-def harmfulness_agg(items, max_workers=32):
+def harmfulness_agg(items, max_workers=16):
     """Called once with all collected prompts. Fires concurrent API calls."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         scores = list(executor.map(_call_judge, items))
