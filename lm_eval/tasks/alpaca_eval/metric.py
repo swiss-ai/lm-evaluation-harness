@@ -23,6 +23,7 @@ import tempfile
 
 import yaml
 
+
 logger = logging.getLogger(__name__)
 
 # CSCS SwissAI serving endpoint
