@@ -9,6 +9,7 @@ import time
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
+MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
