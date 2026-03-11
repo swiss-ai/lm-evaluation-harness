@@ -5,6 +5,7 @@ import torch
 import gc
 import requests
 import os
+import time
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")

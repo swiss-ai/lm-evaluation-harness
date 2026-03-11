@@ -9,7 +9,6 @@ from transformers import AutoTokenizer
 import concurrent.futures
 import threading
 
-
 # Verify remote API connection
 test = try_remote_generate("hello there")
 
