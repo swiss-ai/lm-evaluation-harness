@@ -134,7 +134,7 @@ def _evaluate_single(item):
     return result
 
 
-def _run_all(items, max_workers=32):
+def _run_all(items, max_workers=16):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         return list(executor.map(_evaluate_single, items))
 
@@ -155,13 +155,13 @@ def harmfulness_score(doc, predictions, **kwargs):
 # Aggregation functions
 # ============================================================================
 
-def harmfulness_agg(items, max_workers=32):
+def harmfulness_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [r["score"] for r in results if r["score"] is not None]
     return sum(scores) / len(scores) if scores else 0
 
 
-def invalid_agg(items, max_workers=32):
+def invalid_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [r["invalid"] for r in results if r["invalid"] is not None]
     return sum(scores) / len(scores) if scores else 0
