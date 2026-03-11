@@ -411,8 +411,7 @@ def arena_hard_agg(items):
         if score1 is None or score2 is None:
             null_judgments += 1
             logger.warning(
-                f"Null judgment for uid={uid}: "
-                f"round1={score1}, round2={score2}"
+                f"Null judgment for uid={uid}: round1={score1}, round2={score2}"
             )
             continue
 
