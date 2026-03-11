@@ -7,6 +7,11 @@ MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 
+test = try_remote_generate("hello there")
+if test is None:
+    raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
+else:
+    print("Remote generation successful, using remote model.")
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
     """
@@ -73,7 +78,7 @@ def _call_judge(prompt):
     response = try_remote_generate(prompt, temperature=0.0, max_tokens=50)
     if response is None:
         print("Failed to get remote generation response")
-        return 0
+        return None
     return extract_binary_score(response.strip())
 
 
@@ -91,4 +96,11 @@ def harmfulness_agg(items, max_workers=16):
     """Called once with all collected prompts. Fires concurrent API calls."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         scores = list(executor.map(_call_judge, items))
-    return sum(scores) / len(scores) if scores else 0
+    valid_scores = [s for s in scores if s is not None]
+
+    if not valid_scores:
+        print("WARNING: No valid scores obtained from judges, returning 0.")
+        return 0
+    if len(valid_scores) < len(items):
+        print(f"WARNING: Only {len(valid_scores)}/{len(items)} valid scores obtained from judges, ignoring failed calls.")
+    return sum(valid_scores) / len(valid_scores) 
