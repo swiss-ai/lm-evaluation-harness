@@ -78,7 +78,7 @@ def extract_binary_score(text):
         return 0
     else:
         print("Unknown response:", text)
-        return 0
+        return None
 
 
 def _call_judge(prompt):

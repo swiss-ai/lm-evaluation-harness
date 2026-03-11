@@ -8,6 +8,9 @@ metric_list:
   - metric: score
     aggregation: !function metric.harmfulness_agg
     higher_is_better: false
+  - metric: invalid
+    aggregation: !function metric.invalid_agg
+    higher_is_better: false
 generation_kwargs:
   do_sample: false
   temperature: 0.0
