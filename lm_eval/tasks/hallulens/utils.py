@@ -9,42 +9,44 @@ import os
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 
-
-def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
+def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
     Attempt to generate text from the SwissAI API.
     Returns the text if successful, raises an exception otherwise.
     """
-    try:
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "meta-llama/Llama-3.3-70B-Instruct",  # adjust if you want a specific SwissAI model
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
+    for attempt in range(max_retries):
+        try:
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": MODEL_NAME,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
 
-        resp = requests.post(
-            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=300
-        )
-
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"SwissAI API returned status {resp.status_code}: {resp.text}"
+            resp = requests.post(
+                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
             )
 
-        data = resp.json()
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
 
-        return data["choices"][0]["message"]["content"]
+            print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
 
-    # if there is any error, return None
-    except Exception as e:
-        print(f"Error in remote generation: {e}")
-        return None
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
+        if attempt < max_retries - 1:
+            wait = min(2 ** attempt, 60)
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+
+    print(f"Failed after {max_retries} attempts")
+    return None
 
 def clear_memory():
     """
