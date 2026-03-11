@@ -21,6 +21,7 @@ Prerequisites:
     CSCS_SERVING_API environment variable (with access to Llama-3.3-70B-Instruct)
 """
 
+import concurrent.futures
 import json
 import logging
 import os
@@ -35,7 +36,6 @@ logger = logging.getLogger(__name__)
 # ── CSCS SwissAI serving endpoint ────────────────────────────────────
 API_URL = "https://api.swissai.cscs.ch/v1"
 JUDGE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
-
 # ── Judge system prompt (from arena-hard-auto/utils/judge_utils.py) ──
 SYSTEM_PROMPT = (
     "Please act as an impartial judge and evaluate the quality of the "
@@ -221,9 +221,56 @@ def arena_hard_process(doc, predictions, **kwargs):
     }
 
 
+# ── Single judge API call (used by the thread pool) ──────────────────
+def _judge_call(client, uid, round_num, user_prompt):
+    """Execute a single judge API call. Designed to run inside a thread pool.
+
+    Each call sends the pairwise comparison prompt to the judge model and
+    returns the raw judgment text.  Exceptions are caught and logged so that
+    one failed request does not crash the entire batch.
+
+    Args:
+        client: An openai.OpenAI client instance (thread-safe for I/O calls).
+        uid: Unique identifier for the question being judged.
+        round_num: 1 or 2, indicating the position-swap round.
+        user_prompt: The fully formatted pairwise comparison prompt string.
+
+    Returns:
+        Tuple of (uid, round_num, judgment_text_or_None).
+    """
+    try:
+        resp = client.chat.completions.create(
+            model=JUDGE_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.0,
+            max_tokens=4096,
+        )
+        return (uid, round_num, resp.choices[0].message.content)
+    except Exception as e:
+        logger.warning(f"Judge API error uid={uid} round={round_num}: {e}")
+        return (uid, round_num, None)
+
+
 # ── Aggregation (judge calls + scoring) ──────────────────────────────
+
+# Number of concurrent threads hitting the judge API.
+# vLLM with continuous batching on GH200s can handle high concurrency;
+_JUDGE_MAX_WORKERS = 128
+
+
 def arena_hard_agg(items):
     """Run Arena-Hard pairwise judging and compute bootstrap win rate.
+
+    **Concurrency strategy (Fully Flat ThreadPoolExecutor)**:
+    All 2*N judge API calls (round 1 + round 2 for every item) are
+    completely independent of each other — no call needs the result of
+    any other call.  We therefore flatten them into a single list and
+    fire them all at once through a ThreadPoolExecutor.  The vLLM server
+    uses continuous batching, so it can serve many requests in parallel
+    efficiently.
 
     For each item:
       1. Round 1: baseline=A, model=B -> judge produces verdict
@@ -254,143 +301,139 @@ def arena_hard_agg(items):
 
     client = OpenAI(base_url=API_URL, api_key=api_key)
 
-    # Filter items without baseline
+    # ── Filter items that have no baseline answer ─────────────────
     valid_items = [item for item in items if item["baseline_output"] is not None]
     if len(valid_items) < len(items):
         logger.warning(
             f"Skipping {len(items) - len(valid_items)} items without baseline answers"
         )
 
-    # Output length statistics and truncation detection.
-    # We do not have the tokenizer here, so we use a character-based heuristic:
-    # average English token ≈ 4 chars, so max_new_tokens=4096 ≈ 16384 chars.
-    # Outputs near this threshold were likely truncated by the generation limit.
-    MAX_NEW_TOKENS = 4096  # must match generation_kwargs in arena_hard_v01.yaml
-    APPROX_CHARS_PER_TOKEN = 4
-    truncation_char_threshold = MAX_NEW_TOKENS * APPROX_CHARS_PER_TOKEN
-
-    output_lengths = [len(item["model_output"]) for item in valid_items]
-    likely_truncated = sum(
-        1 for length in output_lengths if length >= truncation_char_threshold * 0.95
-    )
-    logger.info(
-        f"Output length stats (chars): "
-        f"min={min(output_lengths)}, max={max(output_lengths)}, "
-        f"mean={sum(output_lengths) / len(output_lengths):.0f}, "
-        f"median={sorted(output_lengths)[len(output_lengths) // 2]}"
-    )
-    if likely_truncated > 0:
-        logger.info(
-            f"Likely truncated outputs: {likely_truncated}/{len(valid_items)} "
-            f"(>= {truncation_char_threshold * 0.95:.0f} chars, "
-            f"approx {MAX_NEW_TOKENS} tokens). Consider increasing "
-            f"max_new_tokens in arena_hard_v01.yaml."
-        )
-
+    total_calls = 2 * len(valid_items)
     logger.info(
         f"Running Arena-Hard v0.1 judging on {len(valid_items)} items "
         f"using {JUDGE_MODEL} as judge via CSCS API "
-        f"(2 rounds per item = {2 * len(valid_items)} judge calls)..."
+        f"({total_calls} judge calls with {_JUDGE_MAX_WORKERS} concurrent workers)..."
     )
 
-    all_scores = []
-    null_judgments = 0
-    judging_start = time.time()
+    # ── Build the flat list of all 2*N judge tasks ────────────────
+    # Each task is a tuple: (uid, round_number, formatted_user_prompt).
+    # Round 1: baseline is position A, model is position B.
+    # Round 2: model is position A, baseline is position B (swap).
+    # Both rounds for the same item are independent — neither needs
+    # the other's result — so we can fire them all at once.
+    tasks = []
+    for item in valid_items:
+        uid = item["uid"]
 
-    for i, item in enumerate(valid_items):
-        item_start = time.time()
-        elapsed = item_start - judging_start
-        if i > 0:
-            avg_per_item = elapsed / i
-            remaining = avg_per_item * (len(valid_items) - i)
-            logger.info(
-                f"  Judging item {i + 1}/{len(valid_items)} "
-                f"(elapsed: {elapsed:.0f}s, ~{remaining:.0f}s remaining)..."
-            )
-        else:
-            logger.info(f"  Judging item {i + 1}/{len(valid_items)}...")
-
-        # ── Round 1: baseline=A, model=B ─────────────────────────
-        user_prompt_r1 = PROMPT_TEMPLATE.format(
+        # Round 1 prompt: baseline=A, model=B
+        prompt_r1 = PROMPT_TEMPLATE.format(
             QUESTION=item["prompt"],
             ANSWER_A=item["baseline_output"],
             ANSWER_B=item["model_output"],
         )
-        try:
-            t0 = time.time()
-            resp1 = client.chat.completions.create(
-                model=JUDGE_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt_r1},
-                ],
-                temperature=0.0,
-                max_tokens=4096,
-            )
-            judgment1 = resp1.choices[0].message.content
-            logger.info(f"    Round 1 done ({time.time() - t0:.1f}s)")
-        except Exception as e:
-            logger.warning(f"Judge API error on item {item['uid']} round 1: {e}")
-            judgment1 = None
+        tasks.append((uid, 1, prompt_r1))
 
-        # ── Round 2: model=A, baseline=B (position swap) ─────────
-        user_prompt_r2 = PROMPT_TEMPLATE.format(
+        # Round 2 prompt: model=A, baseline=B (position swap)
+        prompt_r2 = PROMPT_TEMPLATE.format(
             QUESTION=item["prompt"],
             ANSWER_A=item["model_output"],
             ANSWER_B=item["baseline_output"],
         )
-        try:
-            t0 = time.time()
-            resp2 = client.chat.completions.create(
-                model=JUDGE_MODEL,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": user_prompt_r2},
-                ],
-                temperature=0.0,
-                max_tokens=4096,
-            )
-            judgment2 = resp2.choices[0].message.content
-            logger.info(f"    Round 2 done ({time.time() - t0:.1f}s)")
-        except Exception as e:
-            logger.warning(f"Judge API error on item {item['uid']} round 2: {e}")
-            judgment2 = None
+        tasks.append((uid, 2, prompt_r2))
 
-        # ── Extract scores ────────────────────────────────────────
+    # ── Fire all judge calls concurrently ─────────────────────────
+    # We use concurrent.futures.ThreadPoolExecutor because the workload
+    # is I/O-bound (waiting on HTTP responses from the vLLM server).
+    # Threads release the GIL during I/O, so Python threads are ideal
+    # here — no need for multiprocessing or async.
+    #
+    # results_map collects judgments keyed by (uid, round_num) so we
+    # can pair them back up after all calls finish.
+    results_map = {}  # uid -> {round_num: judgment_text_or_None}
+    completed = 0  # counter for progress logging
+    judging_start = time.time()
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=_JUDGE_MAX_WORKERS
+    ) as executor:
+        # Submit all tasks to the pool.  executor.submit() returns a Future.
+        # We store a mapping from Future -> (uid, round) so we can identify
+        # which task completed when we iterate over as_completed().
+        future_to_task = {
+            executor.submit(_judge_call, client, uid, rnd, prompt): (uid, rnd)
+            for uid, rnd, prompt in tasks
+        }
+
+        # as_completed() yields futures in the order they finish (not
+        # submission order).  This lets us log progress as results arrive
+        # rather than blocking on the slowest call first.
+        for future in concurrent.futures.as_completed(future_to_task):
+            uid, rnd, judgment = future.result()
+            # Store the judgment text in our results map
+            results_map.setdefault(uid, {})[rnd] = judgment
+            completed += 1
+
+            # Log progress every 50 completed calls so we can monitor
+            # throughput without flooding the logs.
+            if completed % 50 == 0 or completed == total_calls:
+                elapsed = time.time() - judging_start
+                rate = completed / elapsed if elapsed > 0 else 0
+                logger.info(
+                    f"  Judge progress: {completed}/{total_calls} calls done "
+                    f"({elapsed:.0f}s elapsed, {rate:.1f} calls/s)"
+                )
+
+    total_judging_time = time.time() - judging_start
+    logger.info(
+        f"All {total_calls} judge calls completed in {total_judging_time:.0f}s "
+        f"({total_calls / total_judging_time:.1f} calls/s)"
+    )
+
+    # ── Pair up round 1 + round 2 results and compute scores ─────
+    all_scores = []
+    null_judgments = 0
+
+    for item in valid_items:
+        uid = item["uid"]
+        judgments = results_map.get(uid, {})
+
+        # Retrieve the raw judgment text for each round
+        judgment1 = judgments.get(1)
+        judgment2 = judgments.get(2)
+
+        # Extract the verdict label (e.g. "A>>B", "B>A") from the text
         score1 = _get_score(judgment1) if judgment1 else None
         score2 = _get_score(judgment2) if judgment2 else None
 
-        logger.info(
-            f"    Verdicts: round1={score1}, round2={score2} "
-            f"(item took {time.time() - item_start:.1f}s)"
-        )
+        logger.debug(f"  uid={uid}: round1={score1}, round2={score2}")
 
+        # Both rounds must succeed for this item to contribute to the score
         if score1 is None or score2 is None:
             null_judgments += 1
             logger.warning(
-                f"Null judgment for uid={item['uid']}: "
+                f"Null judgment for uid={uid}: "
                 f"round1={score1}, round2={score2}"
             )
             continue
 
+        # Map verdict labels to numeric score lists
         r1_scores = LABEL_TO_SCORE.get(score1)
         r2_scores = LABEL_TO_SCORE.get(score2)
 
         if r1_scores is None or r2_scores is None:
             null_judgments += 1
             logger.warning(
-                f"Unknown score label for uid={item['uid']}: "
+                f"Unknown score label for uid={uid}: "
                 f"round1={score1}, round2={score2}"
             )
             continue
 
-        # games[1] (round 2, model=A): scores used directly
-        # games[0] (round 1, baseline=A): scores flipped (1 - s)
+        # Scoring convention from arena-hard-auto/show_result.py:
+        #   - Round 2 (model=A): use label_to_score directly.
+        #   - Round 1 (baseline=A): flip scores (1 - s) so that
+        #     higher score always = better for the model under test.
         item_scores = r2_scores + [1 - s for s in r1_scores]
         all_scores.extend(item_scores)
-
-    total_judging_time = time.time() - judging_start
-    logger.info(f"Judging completed in {total_judging_time:.0f}s")
 
     if null_judgments > 0:
         logger.warning(f"Number of null/invalid judgments: {null_judgments}")
@@ -400,6 +443,16 @@ def arena_hard_agg(items):
         return 0.0
 
     # ── Bootstrap win rate ────────────────────────────────────────
+    # NOTE: Currently this is not used/passed on. But also not a real
+    # bottleneck compared with the judge calls.
+    # So it is left for now and can be obtained from the logs if needed.
+    # Resample the score array 100 times to estimate mean win rate
+    # and a 90% confidence interval, following the arena-hard-auto
+    # methodology.
+    # In future we might also want to implement this with style control and
+    # BT model,
+    # but as we always compare against same baseline BT is not really needed...
+
     scores_arr = np.array(all_scores)
     rng = np.random.default_rng(seed=42)
 

@@ -7,10 +7,25 @@
 - Abstract: arXiv preprint arXiv:2406.11939
 - Homepage: https://lmsys.org/blog/2024-04-19-arena-hard/
 
-`The rapid evolution of Large Language Models (LLMs) has outpaced the development of model evaluation, highlighting the need for continuous curation of new, challenging benchmarks. However, manual curation of high-quality, human-aligned benchmarks is expensive and time-consuming. To address this, we introduce BenchBuilder, an automated pipeline that leverages LLMs to curate high-quality, open-ended prompts from large, crowd-sourced datasets, enabling continuous benchmark updates without human in the loop. We apply BenchBuilder to datasets such as Chatbot Arena and WildChat-1M, extracting challenging prompts and utilizing LLM-as-a-Judge for automatic model evaluation. To validate benchmark quality, we propose new metrics to measure a benchmark's alignment with human preferences and ability to separate models. We release Arena-Hard-Auto, a benchmark consisting 500 challenging prompts curated by BenchBuilder. Arena-Hard-Auto provides 3x higher separation of model performances compared to MT-Bench and achieves 98.6% correlation with human preference rankings, all at a cost of $20. Our work sets a new framework for the scalable curation of automated benchmarks from extensive data.`
+The rapid evolution of Large Language Models (LLMs) has outpaced the
+development of model evaluation, highlighting the need for continuous curation
+of new, challenging benchmarks. However, manual curation of high-quality,
+human-aligned benchmarks is expensive and time-consuming. To address this, we
+introduce BenchBuilder, an automated pipeline that leverages LLMs to curate
+high-quality, open-ended prompts from large, crowd-sourced datasets, enabling
+continuous benchmark updates without human in the loop. We apply BenchBuilder
+to datasets such as Chatbot Arena and WildChat-1M, extracting challenging
+prompts and utilizing LLM-as-a-Judge for automatic model evaluation. To
+validate benchmark quality, we propose new metrics to measure a benchmark's
+alignment with human preferences and ability to separate models. We release
+Arena-Hard-Auto, a benchmark consisting of 500 challenging prompts curated by
+BenchBuilder. Arena-Hard-Auto provides 3x higher separation of model
+performances compared to MT-Bench and achieves 98.6% correlation with human
+preference rankings, all at a cost of $20. Our work sets a new framework for
+the scalable curation of automated benchmarks from extensive data.
 
 ### Citation
-```
+```bibtex
 @article{li2024crowdsourced,
   title={From Crowdsourced Data to High-Quality Benchmarks: Arena-Hard and BenchBuilder Pipeline},
   author={Li, Tianle and Chiang, Wei-Lin and Frick, Evan and Dunlap, Lisa and Wu, Tianhao and Zhu, Banghua and Gonzalez, Joseph E and Stoica, Ion},
@@ -49,9 +64,9 @@ CSCS SwissAI API (same endpoint as the AlpacaEval task).
 ### Dataset
 
 Loaded directly from HuggingFace:
+
 - Questions: [`lmarena-ai/arena-hard-auto`](https://huggingface.co/datasets/lmarena-ai/arena-hard-auto) (`data/arena-hard-v0.1/question.jsonl`)
 - GPT-4-0314 baseline answers: same repo (`data/arena-hard-v0.1/model_answer/gpt-4-0314.jsonl`)
-
 
 ### Groups, Tags, and Tasks
 
