@@ -79,4 +79,4 @@ If other tasks on this dataset are already supported:
 * [ ] Have you noted which, if any, published evaluation setups are matched by this variant?
 
 ### Changelog
-
+- Increased OpenAI retries to 15 to mitigate internal server errors (HTTP 500) during evaluation.

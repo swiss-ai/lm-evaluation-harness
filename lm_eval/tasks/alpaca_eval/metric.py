@@ -23,6 +23,7 @@ import tempfile
 
 import yaml
 
+
 logger = logging.getLogger(__name__)
 
 # CSCS SwissAI serving endpoint
@@ -216,6 +217,11 @@ def alpaca_eval_agg(items):
     )
 
     from alpaca_eval import evaluate
+     
+    annotation_kwargs={
+    "n_retries": 10,
+    "client_kwargs": {"max_retries": 15},
+    }
 
     with tempfile.TemporaryDirectory() as tmpdir:
         df_leaderboard, annotations = evaluate(
@@ -228,6 +234,7 @@ def alpaca_eval_agg(items):
             precomputed_leaderboard=None,
             is_cache_leaderboard=False,
             caching_path=os.path.join(tmpdir, "cache.json"),
+            annotation_kwargs=annotation_kwargs,
         )
 
     # ── Log the full leaderboard (includes SE computed by alpaca_eval) ─
