@@ -1,0 +1,7 @@
+include: _wmt_translation_yaml
+task: wmt25_en-ru_RU
+tag:
+- wmt_translation
+- wmt25_translation
+dataset_kwargs:
+  dataset_key: wmt25/en-ru_RU

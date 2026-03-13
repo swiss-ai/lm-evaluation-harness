@@ -178,14 +178,15 @@ def compute_results_classifier(
         max_new_tokens=max_new_tokens,
         do_sample=False,
     )
-    outputs_new_tokens = outputs[:, inputs["input_ids"].shape[1] :]
+    outputs_new_tokens = outputs[:, inputs["input_ids"].shape[1]:]
     preds = tokenizer.decode(outputs_new_tokens[0], skip_special_tokens=True)
 
     labels = ["yes", "no"]
     p = int(preds.lower() == "yes") if preds.lower() in labels else np.nan
     if np.isnan(p):
+        full_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         print(
-            f"Warning: Predicted label '{preds}' not in expected labels {labels}. Returning NaN."
+            f"Warning: Predicted label '{preds}' not in expected labels {labels}. The full response was: {full_response}"
         )
     return {
         "score": p,

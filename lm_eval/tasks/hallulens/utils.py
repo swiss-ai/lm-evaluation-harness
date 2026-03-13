@@ -5,46 +5,50 @@ import torch
 import gc
 import requests
 import os
+import time
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
+MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
 
-
-def try_remote_generate(prompt, temperature=0.0, max_tokens=512):
+def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
     Attempt to generate text from the SwissAI API.
     Returns the text if successful, raises an exception otherwise.
     """
-    try:
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": "meta-llama/Llama-3.3-70B-Instruct",  # adjust if you want a specific SwissAI model
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
+    for attempt in range(max_retries):
+        try:
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": MODEL_NAME,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
 
-        resp = requests.post(
-            f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=300
-        )
-
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"SwissAI API returned status {resp.status_code}: {resp.text}"
+            resp = requests.post(
+                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
             )
 
-        data = resp.json()
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
 
-        return data["choices"][0]["message"]["content"]
+            print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
 
-    # if there is any error, return None
-    except Exception as e:
-        print(f"Error in remote generation: {e}")
-        return None
+        except Exception as e:
+            print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
+        if attempt < max_retries - 1:
+            wait = min(2 ** attempt, 60)
+            print(f"Retrying in {wait}s...")
+            time.sleep(wait)
+
+    print(f"Failed after {max_retries} attempts")
+    return None
 
 def clear_memory():
     """
@@ -188,7 +192,6 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
             try:
                 jsonifyed_res.append(json.loads(r))
             except:
-                print(f"Error in eval_answer: {r}")
                 error = True
                 error_count = 0
 
@@ -202,7 +205,6 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                     )
 
                     try:
-                        print("\n** RETRY:", re_eval)
                         if check_validity(re_eval) != -1:
                             json_res = json.loads(check_validity(re_eval))
                         else:
@@ -211,19 +213,20 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                         error = False
 
                     except:
-                        print("*** trying again** \n")
                         error = True
                     error_count += 1
 
                     if error_count > 3:
-                        print("Error count exceeded 3. Skipping this prompt.")
+                        print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
                         jsonifyed_res.append(
                             {"error": "Error count exceeded 3. Skipping this prompt."}
                         )
                         return []
                 jsonifyed_res.append(json_res)
-                print("<<< PASS >>>")
-
+    
+    # print percentage of valid responses
+    valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
+    total_count = len(jsonifyed_res)
     return jsonifyed_res
 
 
@@ -317,7 +320,6 @@ def jsonify_ans(
         try:
             jsonifyed_res.append(json.loads(raw_response))
         except:
-            # print(f"Error in eval_answer: {raw_response}")
             error = True
             error_count = 0
 
@@ -325,7 +327,6 @@ def jsonify_ans(
                 re_eval = generate(eval_prompt, model, tokenizer)
 
                 try:
-                    # print("\n** RETRY, prompt is:", eval_prompt)
                     if check_validity(re_eval) != -1:
                         json_res = json.loads(check_validity(re_eval))
                     else:
@@ -333,16 +334,17 @@ def jsonify_ans(
                     error = False
 
                 except:
-                    # print("*** trying again** \n")
                     error = True
                 error_count += 1
 
                 if error_count > 3:
-                    # print("Error count exceeded 3. Skipping this prompt.")
+                    print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
                     jsonifyed_res.append(
-                        {"error": "Error count exceeded 3. Skipping this prompt."}
+                        {"error": "Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response.".format(key, key)}
                     )
                     return []
             jsonifyed_res.append(json_res)
-            print("<<< PASS >>>")
+    # print percentage of valid responses
+    valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
+    total_count = len(jsonifyed_res)
     return jsonifyed_res

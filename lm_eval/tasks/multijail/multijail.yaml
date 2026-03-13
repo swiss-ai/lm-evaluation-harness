@@ -14,5 +14,8 @@ aggregate_metric_list:
   - metric: score
     aggregation: mean
     weight_by_size: true
+  - metric: invalid
+    aggregation: mean
+    weight_by_size: true
 metadata:
   version: 1.0

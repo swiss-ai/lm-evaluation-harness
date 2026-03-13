@@ -1,0 +1,24 @@
+group: wmt25_translation
+task:
+- wmt25_cs-de_DE
+- wmt25_cs-uk_UA
+- wmt25_en-ar_EG
+- wmt25_en-bho_IN
+- wmt25_en-cs_CZ
+- wmt25_en-et_EE
+- wmt25_en-is_IS
+- wmt25_en-it_IT
+- wmt25_en-ja_JP
+- wmt25_en-ko_KR
+- wmt25_en-mas_KE
+- wmt25_en-ru_RU
+- wmt25_en-sr_Cyrl_RS
+- wmt25_en-uk_UA
+- wmt25_en-zh_CN
+- wmt25_ja-zh_CN
+aggregate_metric_list:
+- metric: cometkiwi22
+  aggregation: mean
+  weight_by_size: true
+metadata:
+  version: 1.0
