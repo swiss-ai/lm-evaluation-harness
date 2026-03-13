@@ -855,24 +855,48 @@ class ConfigurableTask(Task):
                     )
 
     def download(self, dataset_kwargs: dict[str, Any] | None = None, **kwargs) -> None:
+        import re
+        import time
+
         from packaging.version import parse as vparse
 
         if dataset_kwargs and vparse(datasets.__version__) >= vparse("4.0.0"):
             dataset_kwargs.pop("trust_remote_code", None)
-        if isinstance(self.config.custom_dataset, Callable):
-            eval_logger.warning(
-                f"{self.config.task}: Custom kwargs can be passed to `--metadata` in console (as json string) or to the TaskManager."
-                + "\nFor example --metadata='{\"max_seq_lengths\":[4096, 8192]}'. For details see task Readme."
-            )
-            self.dataset = self.config.custom_dataset(
-                **(self.config.metadata or {}), **(self.config.dataset_kwargs or {})
-            )
-        else:
-            self.dataset = datasets.load_dataset(
-                path=self.DATASET_PATH,
-                name=self.DATASET_NAME,
-                **dataset_kwargs if dataset_kwargs is not None else {},
-            )
+
+        def _do_download():
+            if isinstance(self.config.custom_dataset, Callable):
+                eval_logger.warning(
+                    f"{self.config.task}: Custom kwargs can be passed to `--metadata` in console (as json string) or to the TaskManager."
+                    + "\nFor example --metadata='{\"max_seq_lengths\":[4096, 8192]}'. For details see task Readme."
+                )
+                return self.config.custom_dataset(
+                    **(self.config.metadata or {}), **(self.config.dataset_kwargs or {})
+                )
+            else:
+                return datasets.load_dataset(
+                    path=self.DATASET_PATH,
+                    name=self.DATASET_NAME,
+                    **dataset_kwargs if dataset_kwargs is not None else {},
+                )
+
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                self.dataset = _do_download()
+                return
+            except Exception as e:
+                is_rate_limit = "429" in str(type(e).__name__ + str(e))
+                if not is_rate_limit or attempt == max_retries - 1:
+                    raise
+                match = re.search(r"[Rr]etry after (\d+) second", str(e))
+                wait = int(match.group(1)) if match else 300
+                wait += attempt * 10
+                eval_logger.warning(
+                    f"HuggingFace API rate limit hit while loading dataset for task "
+                    f"'{self.config.task}' (attempt {attempt + 1}/{max_retries}). "
+                    f"Waiting {wait}s before retrying..."
+                )
+                time.sleep(wait)
 
     def has_training_docs(self) -> bool:
         return self.config.training_split is not None
