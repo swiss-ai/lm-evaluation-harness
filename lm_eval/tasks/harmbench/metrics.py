@@ -13,6 +13,7 @@ from spacy.cli import download
 import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer
+import os
 
 # Load spaCy model
 try:
@@ -262,7 +263,7 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
             )
 
     return {
-        "score": p
+        "score": p,
     }
 
 
