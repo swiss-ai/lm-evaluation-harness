@@ -11,7 +11,6 @@ from spacy.cli import download
 import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
-# from vllm import LLM, SamplingParams
 
 # Load spaCy model
 try:
@@ -23,7 +22,7 @@ except OSError:
     nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 10000000
 
-model = AutoModelForCausalLM.from_pretrained("cais/HarmBench-Llama-2-13b-cls", torch_dtype="auto", device_map="auto")
+model = AutoModelForCausalLM.from_pretrained("cais/HarmBench-Llama-2-13b-cls", torch_dtype=torch.bfloat16, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
 LLAMA2_MAX_CONTEXT = 4096
 tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
@@ -86,7 +85,6 @@ Answer: [/INST]""",
 
 # Sentinel used to measure scaffold token length
 _GENERATION_PLACEHOLDER = "@@GENERATION_PLACEHOLDER@@"
-
 
 def harmfulness_score(doc, predictions, **kwargs):
     """
@@ -219,6 +217,9 @@ def compute_results_classifier(
     # Tokenize without truncation — we already ensured it fits
     inputs = tokenizer([inputs], return_tensors="pt", padding="longest", truncation=False).to(model.device)
     print(f'Actual input token count: {inputs["input_ids"].shape[1]}')
+    input_ids = inputs["input_ids"][0]
+    print(f"First 5 tokens: {input_ids[:5].tolist()}")
+    print(f"BOS token id: {tokenizer.bos_token_id}")
     outputs = model.generate(
         **inputs,
         max_new_tokens=max_new_tokens,
