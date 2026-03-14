@@ -23,8 +23,11 @@ except OSError:
     nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 10000000
 
-model = AutoModelForCausalLM.from_pretrained("cais/HarmBench-Llama-2-13b-cls", torch_dtype=torch.bfloat16, device_map="auto", attn_implementation="eager")
-tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
+#print transformers version for debugging
+import transformers
+print(f"Transformers version: {transformers.__version__}")
+model = AutoModelForCausalLM.from_pretrained("cais/HarmBench-Llama-2-13b-cls", torch_dtype=torch.bfloat16, device_map="auto", force_download=True)
+tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left", force_download=True)
 LLAMA2_MAX_CONTEXT = 4096
 tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
 
