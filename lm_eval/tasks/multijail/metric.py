@@ -158,6 +158,7 @@ def harmfulness_score(doc, predictions, **kwargs):
 def harmfulness_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [r["score"] for r in results if r["score"] is not None]
+    print(f"Got {len(scores)} valid scores out of {len(items)} items.")
     return sum(scores) / len(scores) if scores else 0
 
 
