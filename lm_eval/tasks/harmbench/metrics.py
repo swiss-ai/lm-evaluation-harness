@@ -22,11 +22,11 @@ except OSError:
     download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
 nlp.max_length = 10000000
-LLAMA2_MAX_CONTEXT = 4096
-tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
+
 model = AutoModelForCausalLM.from_pretrained("cais/HarmBench-Llama-2-13b-cls", torch_dtype="auto", device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
-
+LLAMA2_MAX_CONTEXT = 4096
+tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
 
 def tokenize(text):
     doc = nlp(text)
