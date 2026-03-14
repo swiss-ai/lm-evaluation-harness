@@ -11,6 +11,7 @@ from spacy.cli import download
 import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 # Load spaCy model
 try:
