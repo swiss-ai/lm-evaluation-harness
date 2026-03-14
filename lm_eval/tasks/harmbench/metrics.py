@@ -34,7 +34,7 @@ LLAMA2_MAX_CONTEXT = 4096
 tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
 
 
-def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=10):
+def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
     """
     Attempt to generate text from the SwissAI API.
     Returns the text if successful, raises an exception otherwise.
@@ -66,9 +66,13 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=10):
             print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2 ** attempt, 60)
+            wait = min(2 ** attempt, 30)
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
+        
+        if attempt > 4:
+            print(f"We are hitting over 4 attempts. I am trying to feed the input {prompt} to the model.")
+        
 
     print(f"Failed after {max_retries} attempts")
     return None
