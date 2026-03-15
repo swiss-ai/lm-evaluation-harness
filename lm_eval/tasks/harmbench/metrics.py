@@ -65,7 +65,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
             print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2 ** attempt, 30)
+            wait = min(2 ** attempt, 15)
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
         
