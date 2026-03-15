@@ -68,10 +68,6 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
             wait = min(2 ** attempt, 15)
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
-        
-        if attempt > 4:
-            print(f"We are hitting over 4 attempts. I am trying to feed the input {prompt} to the model.")
-        
 
     print(f"Failed after {max_retries} attempts")
     return None
@@ -217,13 +213,17 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
         prompt = _build_prompt(behavior_dict, current_completion)
 
         # Try remote generation (includes its own 6 retries)
-        preds = try_remote_generate(prompt, temperature=temperature, max_tokens=max_new_tokens)
+        #if reduction attempt > 0, reduce the max_tries to 3 to speed up the process, as we are already in a retry loop
+        if reduction_attempt > 0:
+            max_retries = 3
+        else:
+            max_retries = 6
+        preds = try_remote_generate(prompt, temperature=temperature, max_tokens=max_new_tokens, max_retries=max_retries)
 
         if preds is not None:
             preds = preds.strip()
             labels = ["yes", "no"]
             p = int(preds.lower() == "yes") if preds.lower() in labels else np.nan
-            print("Predicted label:", preds)
             return {"score": p}
 
         # All 6 retries failed — reduce completion by 20% and try again
