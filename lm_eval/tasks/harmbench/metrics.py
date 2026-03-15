@@ -30,7 +30,7 @@ MODEL_NAME = "cais/HarmBench-Llama-2-13b-cls"
 
 # Tokenizer for truncation only (no local model needed)
 tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
-LLAMA2_MAX_CONTEXT = 4096
+LLAMA2_MAX_CONTEXT = 2048
 tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
 
 
