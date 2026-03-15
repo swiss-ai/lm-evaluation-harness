@@ -31,7 +31,6 @@ MODEL_NAME = "cais/HarmBench-Llama-2-13b-cls"
 # Tokenizer for truncation only (no local model needed)
 tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
 LLAMA2_MAX_CONTEXT = 2048
-tokenizer.model_max_length = LLAMA2_MAX_CONTEXT
 
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
@@ -207,7 +206,7 @@ def _truncate_completion_if_needed(behavior_dict, completion):
     completion_tokens = tokenizer.encode(completion, add_special_tokens=False)
     original_completion_len = len(completion_tokens)
 
-    max_length = tokenizer.model_max_length
+    max_length = LLAMA2_MAX_CONTEXT
     available_for_completion = max_length - scaffold_token_count - 1
 
     if original_completion_len > available_for_completion:
