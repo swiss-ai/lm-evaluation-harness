@@ -60,9 +60,8 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
                 return data["choices"][0]["message"]["content"]
 
             #print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
-
         except Exception as e:
-            #print(f"Attempt {attempt + 1}/{max_retries}: {e}")
+            pass
 
         if attempt < max_retries - 1:
             wait = min(2 ** attempt, 15)
