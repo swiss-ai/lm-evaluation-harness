@@ -59,17 +59,17 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]
 
-            print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
+            #print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
 
         except Exception as e:
-            print(f"Attempt {attempt + 1}/{max_retries}: {e}")
+            #print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
             wait = min(2 ** attempt, 15)
-            print(f"Retrying in {wait}s...")
+            #print(f"Retrying in {wait}s...")
             time.sleep(wait)
 
-    print(f"Failed after {max_retries} attempts")
+    #print(f"Failed after {max_retries} attempts")
     return None
 
 
@@ -230,7 +230,7 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
         original_word_count = len(current_completion.split())
         current_completion, new_word_count = _reduce_completion(current_completion)
         print(
-            f"[REDUCTION] All retries failed. Reducing completion from {original_word_count} "
+            f"[REDUCTION] Remote generation was unsuccessful, may have exceeded context window, reducing completion from {original_word_count} "
             f"to {new_word_count} words (attempt {reduction_attempt + 1}/{max_reduction_attempts})"
         )
 
@@ -238,7 +238,7 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
             print("[REDUCTION] Completion reduced to minimum. Giving up.")
             break
 
-    print("Failed to get a prediction even after repeated reductions.")
+    print("Failed to get a prediction even after repeated reductions of completion length, skipping this sample.")
     return {"score": np.nan}
 
 
