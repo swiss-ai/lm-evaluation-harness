@@ -472,7 +472,7 @@ def _bootstrap_winrate(scores, num_bootstrap=NUM_BOOTSTRAP, seed=42):
     ci_lower = np.quantile(bootstrap_means, 0.05)
     ci_upper = np.quantile(bootstrap_means, 0.95)
 
-    return mean_score * 100, ci_lower * 100, ci_upper * 100
+    return mean_score, ci_lower, ci_upper
 
 
 # ── Optional logging ─────────────────────────────────────────────────
@@ -680,8 +680,8 @@ def arena_hard_agg(items):
     win_rate, ci_lower, ci_upper = _bootstrap_winrate(all_scores)
 
     logger.info(
-        f"Arena-Hard v0.1 results: {win_rate:.1f}% "
-        f"(90% CI: {ci_lower:.1f}% - {ci_upper:.1f}%)"
+        f"Arena-Hard v0.1 results: {win_rate:.4f} "
+        f"(90% CI: {ci_lower:.4f} - {ci_upper:.4f})"
     )
     logger.info(
         f"  Valid judgments: {len(valid_items) - null_judgments}/{len(valid_items)}, "
