@@ -41,8 +41,11 @@ def clean_text(text: str) -> str:
 
 
 def extract_code_blocks(text: str) -> str:
-    # Pattern to match ```...``` blocks
-    pattern = r"```(?:\w+)?\n?(.*?)\n?```"
+    # Pattern to match ```...``` blocks.
+    # The language identifier (e.g. "python") must be followed by a line break
+    # so that Python keywords like "def" at the start of the code are never
+    # mistakenly consumed as a language tag.
+    pattern = r"```(?:\w+\r?\n|\r?\n)?(.*?)\r?\n?```"
     # (+ ```) as we add the opening "```python" to the gen_prefix
     matches = re.findall(pattern, r"```" + text, re.DOTALL)
     # if no matches, try to match ```...``` blocks (after removing the language)
