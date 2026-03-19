@@ -4,6 +4,7 @@ import os
 import numpy as np
 import concurrent.futures
 import requests
+import time
 
 MODEL_NAME = "meta-llama/Llama-Guard-4-12B"
 
@@ -12,40 +13,44 @@ API_KEY = os.getenv("CSCS_SERVING_API")
 
 eval_logger = logging.getLogger(__name__)
 
-
-def try_remote_generate(messages, temperature=0.0, max_tokens=50):
+def try_remote_generate(messages, temperature=0.0, max_tokens=50, max_retries=10):
     """Call Llama Guard via /v1/chat/completions with list-of-dicts content."""
-    try:
-        headers = {
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": MODEL_NAME,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
+    for attempt in range(max_retries):
+        try:
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": MODEL_NAME,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
 
-        resp = requests.post(
-            f"{API_URL}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=2000,
-        )
-
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"API returned status {resp.status_code}: {resp.text}"
+            resp = requests.post(
+                f"{API_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=2000,
             )
 
-        data = resp.json()
-        return data["choices"][0]["message"]["content"].strip()
+            if resp.status_code == 200:
+                data = resp.json()
+                return data["choices"][0]["message"]["content"].strip()
 
-    except Exception as e:
-        eval_logger.error(f"Error in remote generation: {e}")
-        return None
+            eval_logger.error(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
 
+        except Exception as e:
+            eval_logger.error(f"Attempt {attempt + 1}/{max_retries}: {e}")
+
+        if attempt < max_retries - 1:
+            wait = min(2 ** attempt, 60)
+            eval_logger.info(f"Retrying in {wait}s...")
+            time.sleep(wait)
+
+    eval_logger.error(f"Failed after {max_retries} attempts")
+    return None
 
 def evaluate_llama_guard(response):
     if response is None:
@@ -76,7 +81,7 @@ def harmfulness_score(doc, predictions):
     return {"score": {"prompt": prompt, "completion": completion}}
 
 
-def harmfulness_agg(items, max_workers=32):
+def harmfulness_agg(items, max_workers=16):
     """Called once with all collected items. Fires concurrent API calls."""
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         scores = list(

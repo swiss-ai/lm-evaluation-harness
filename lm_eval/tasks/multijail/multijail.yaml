@@ -11,7 +11,13 @@ task:
   - multijail_jv
   - multijail_en
 aggregate_metric_list:
-  - metric: score
+  - metric: safe
+    aggregation: mean
+    weight_by_size: true
+  - metric: unsafe
+    aggregation: mean
+    weight_by_size: true
+  - metric: invalid
     aggregation: mean
     weight_by_size: true
 metadata:
