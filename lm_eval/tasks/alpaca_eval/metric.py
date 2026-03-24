@@ -129,13 +129,16 @@ def alpaca_eval_process(doc, predictions, **kwargs):
             f"(raw={len(raw_output)} chars → clean={len(clean_output)} chars)"
         )
 
+    word_count = len(clean_output.split())
+
     return {
         "length_controlled_winrate": {
             "instruction": doc["instruction"],
             "completion": clean_output,
             "reference_output": doc["output"],
             "dataset": doc.get("dataset", "alpaca_eval"),
-        }
+        },
+        "avg_word_count": word_count,
     }
 
 
