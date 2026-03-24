@@ -246,6 +246,8 @@ def arena_hard_process(doc, predictions, **kwargs):
     if baseline_output is None:
         logger.warning(f"No baseline answer found for uid={uid}")
 
+    word_count = len(clean_output.split())
+
     return {
         "arena_hard_score": {
             "uid": uid,
@@ -254,7 +256,8 @@ def arena_hard_process(doc, predictions, **kwargs):
             "raw_output": raw_output,
             "baseline_output": baseline_output,
             "category": doc.get("category", "arena-hard-v0.1"),
-        }
+        },
+        "avg_word_count": word_count,
     }
 
 
