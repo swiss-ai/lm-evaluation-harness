@@ -53,6 +53,15 @@ NUM_BOOTSTRAP = 100
 JUDGE_LOG_PATH_ENV = "ARENA_HARD_JUDGE_LOG_PATH"
 MAX_GEN_TOKS_ENV = "ARENA_HARD_MAX_GEN_TOKS"
 
+# ── Scoring method configuration ─────────────────────────────────
+# "weighted"      = original Arena-Hard weighted average + bootstrap
+# "style_control" = Bradley-Terry model controlling for style features
+SCORING_METHOD = "style_control"
+
+# Which style features to control for (only used when SCORING_METHOD = "style_control").
+# Supported: ["length", "markdown"] (both), ["length"], or ["markdown"].
+CONTROL_FEATURES = ["length", "markdown"]
+
 # ── Judge system prompt (from arena-hard-auto/utils/judge_utils.py) ──
 SYSTEM_PROMPT = (
     "Please act as an impartial judge and evaluate the quality of the "
@@ -442,6 +451,120 @@ def _compute_scores_weighted(valid_items, results_map):
     return all_scores, null_judgments
 
 
+def _compute_scores_style_controlled(valid_items, results_map):
+    """Compute style-controlled win rate using a Bradley-Terry model.
+
+    Instead of averaging raw scores, fits a logistic regression that
+    separates style effects (length, markdown formatting) from quality.
+    Uses bootstrap resampling for confidence intervals.
+
+    Args:
+        valid_items: List of item dicts with 'uid', 'model_output',
+            'baseline_output' keys.
+        results_map: Dict mapping uid -> {round_num: judgment_text}.
+
+    Returns:
+        Tuple of (win_rate, ci_lower, ci_upper, null_count) where
+        win_rate/ci values are on 0-1 scale, or (None, None, None, N)
+        if no valid judgments.
+    """
+    from lm_eval.tasks.arena_hard_v01.style_utils import (
+        bootstrap_style_controlled_winrate,
+        compute_relative_features,
+        extract_style_features,
+        zscore_normalize,
+    )
+
+    all_outcomes = []
+    all_model_feats = []
+    all_baseline_feats = []
+    null_judgments = 0
+
+    for item in valid_items:
+        uid = item["uid"]
+        judgments = results_map.get(uid, {})
+
+        judgment1 = judgments.get(1)
+        judgment2 = judgments.get(2)
+
+        score1 = _get_score(judgment1) if judgment1 else None
+        score2 = _get_score(judgment2) if judgment2 else None
+
+        if score1 is None or score2 is None:
+            null_judgments += 1
+            continue
+
+        r1_scores = LABEL_TO_SCORE.get(score1)
+        r2_scores = LABEL_TO_SCORE.get(score2)
+
+        if r1_scores is None or r2_scores is None:
+            null_judgments += 1
+            continue
+
+        # Same scoring as weighted: round2 direct + round1 flipped
+        item_scores = r2_scores + [1 - s for s in r1_scores]
+
+        # Extract style features once per item, replicate for each score entry
+        m_feats = extract_style_features(item["model_output"])
+        b_feats = extract_style_features(item["baseline_output"])
+
+        for s in item_scores:
+            all_outcomes.append(s)
+            all_model_feats.append(m_feats)
+            all_baseline_feats.append(b_feats)
+
+    if not all_outcomes:
+        return None, None, None, null_judgments
+
+    import torch
+
+    # Convert to torch tensors (style_utils uses PyTorch internally,
+    # matching the reference arena-hard-auto implementation)
+    outcomes = torch.tensor(all_outcomes, dtype=torch.float32)
+    model_features = torch.tensor(
+        np.vstack(all_model_feats), dtype=torch.float32
+    )
+    baseline_features = torch.tensor(
+        np.vstack(all_baseline_feats), dtype=torch.float32
+    )
+
+    # Normalize: relative features → z-score
+    relative = compute_relative_features(model_features, baseline_features)
+    normalized = zscore_normalize(relative)
+
+    # Select feature columns based on CONTROL_FEATURES
+    # (show_result.py lines 190-199)
+    if "length" in CONTROL_FEATURES and "markdown" in CONTROL_FEATURES:
+        style_matrix = normalized  # all 4 columns
+        num_style = 4
+    elif "length" in CONTROL_FEATURES:
+        style_matrix = normalized[:, :1]  # just relative length
+        num_style = 1
+    elif "markdown" in CONTROL_FEATURES:
+        style_matrix = normalized[:, 1:]  # 3 markdown columns
+        num_style = 3
+    else:
+        raise ValueError(f"Invalid CONTROL_FEATURES: {CONTROL_FEATURES}")
+
+    # Build design matrix: [intercept | style_features]
+    # In our single-model case the intercept replaces the one-hot model
+    # encoding from show_result.py line 182-186
+    intercept = torch.ones((len(outcomes), 1))
+    features = torch.cat([intercept, style_matrix], dim=1)
+
+    if len(valid_items) - null_judgments < 5:
+        logger.warning(
+            f"Only {len(valid_items) - null_judgments} valid items for "
+            "style-controlled scoring; confidence intervals may be unreliable"
+        )
+
+    win_rate, ci_lower, ci_upper = bootstrap_style_controlled_winrate(
+        features, outcomes, num_style_features=num_style, num_bootstrap=NUM_BOOTSTRAP
+    )
+
+    return win_rate, ci_lower, ci_upper, null_judgments
+
+
 # ── Statistics ───────────────────────────────────────────────────────
 
 
@@ -666,26 +789,39 @@ def arena_hard_agg(items):
     tasks = _build_judge_tasks(valid_items)
     results_map = _run_judge_calls(client, tasks)
 
-    # Convert verdicts to numeric scores
-    all_scores, null_judgments = _compute_scores_weighted(valid_items, results_map)
-
-    if null_judgments > 0:
-        logger.warning(f"Number of null/invalid judgments: {null_judgments}")
-
-    if not all_scores:
-        logger.error("No valid judgments produced. Returning 0.")
-        return 0.0
-
-    # Bootstrap win rate with 90% CI
-    win_rate, ci_lower, ci_upper = _bootstrap_winrate(all_scores)
+    # Convert verdicts to scores and compute win rate
+    if SCORING_METHOD == "style_control":
+        logger.info(
+            f"Using style-controlled scoring (features: {CONTROL_FEATURES})"
+        )
+        win_rate, ci_lower, ci_upper, null_judgments = (
+            _compute_scores_style_controlled(valid_items, results_map)
+        )
+        if null_judgments > 0:
+            logger.warning(f"Number of null/invalid judgments: {null_judgments}")
+        if win_rate is None:
+            logger.error("No valid judgments produced. Returning 0.")
+            return 0.0
+        score_entries_msg = ""
+    else:
+        all_scores, null_judgments = _compute_scores_weighted(
+            valid_items, results_map
+        )
+        if null_judgments > 0:
+            logger.warning(f"Number of null/invalid judgments: {null_judgments}")
+        if not all_scores:
+            logger.error("No valid judgments produced. Returning 0.")
+            return 0.0
+        win_rate, ci_lower, ci_upper = _bootstrap_winrate(all_scores)
+        score_entries_msg = f", total score entries: {len(all_scores)}"
 
     logger.info(
-        f"Arena-Hard v0.1 results: {win_rate:.4f} "
+        f"Arena-Hard v0.1 results ({SCORING_METHOD}): {win_rate:.4f} "
         f"(90% CI: {ci_lower:.4f} - {ci_upper:.4f})"
     )
     logger.info(
-        f"  Valid judgments: {len(valid_items) - null_judgments}/{len(valid_items)}, "
-        f"total score entries: {len(all_scores)}"
+        f"  Valid judgments: {len(valid_items) - null_judgments}/{len(valid_items)}"
+        f"{score_entries_msg}"
     )
 
     _log_judgments(valid_items, results_map, win_rate)
