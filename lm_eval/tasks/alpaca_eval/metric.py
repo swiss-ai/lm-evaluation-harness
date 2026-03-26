@@ -129,13 +129,16 @@ def alpaca_eval_process(doc, predictions, **kwargs):
             f"(raw={len(raw_output)} chars → clean={len(clean_output)} chars)"
         )
 
+    word_count = len(clean_output.split())
+
     return {
         "length_controlled_winrate": {
             "instruction": doc["instruction"],
             "completion": clean_output,
             "reference_output": doc["output"],
             "dataset": doc.get("dataset", "alpaca_eval"),
-        }
+        },
+        "avg_word_count": word_count,
     }
 
 
@@ -241,8 +244,8 @@ def alpaca_eval_agg(items):
     logger.info(f"AlpacaEval leaderboard columns: {list(df_leaderboard.columns)}")
     logger.info(f"AlpacaEval full leaderboard:\n{df_leaderboard.to_string()}")
 
-    lc_winrate = df_leaderboard["length_controlled_winrate"].iloc[0]
-    logger.info(f"AlpacaEval length-controlled winrate: {lc_winrate:.2f}")
+    lc_winrate = df_leaderboard["length_controlled_winrate"].iloc[0] / 100.0
+    logger.info(f"AlpacaEval length-controlled winrate: {lc_winrate:.4f}")
 
     # Log standard error if available in the leaderboard
     se_candidates = [
@@ -251,7 +254,7 @@ def alpaca_eval_agg(items):
         if "standard_error" in c.lower() or "_se" in c.lower() or c == "se"
     ]
     for col in se_candidates:
-        val = df_leaderboard[col].iloc[0]
+        val = df_leaderboard[col].iloc[0] / 100.0
         logger.info(f"  {col}: {val}")
 
     return float(lc_winrate)
