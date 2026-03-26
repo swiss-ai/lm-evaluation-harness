@@ -56,7 +56,7 @@ MAX_GEN_TOKS_ENV = "ARENA_HARD_MAX_GEN_TOKS"
 # ── Scoring method configuration ─────────────────────────────────
 # "weighted"      = original Arena-Hard weighted average + bootstrap
 # "style_control" = Bradley-Terry model controlling for style features
-SCORING_METHOD = "style_control"
+SCORING_METHOD = "weighted"
 
 # Which style features to control for (only used when SCORING_METHOD = "style_control").
 # Supported: ["length", "markdown"] (both), ["length"], or ["markdown"].
