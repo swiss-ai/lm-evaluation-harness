@@ -131,9 +131,12 @@ class LongWikiRetrieval(object):
     def save_cache(self):
         if self.add_n_embed > 0:
             if os.path.exists(self.embed_cache_path):
-                with open(self.embed_cache_path, "rb") as f:
-                    new_cache = pkl.load(f)
-                self.embed_cache.update(new_cache)
+                try:
+                    with open(self.embed_cache_path, "rb") as f:
+                        new_cache = pkl.load(f)
+                    self.embed_cache.update(new_cache)
+                except (EOFError, pkl.UnpicklingError):
+                    pass  # file empty/corrupted from prior crash; overwrite it
 
             with open(self.embed_cache_path, "wb") as f:
                 pkl.dump(self.embed_cache, f)
