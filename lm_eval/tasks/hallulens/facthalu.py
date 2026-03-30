@@ -138,26 +138,26 @@ class FactHalu:
         ### [[[ STEP #4]]] Calculate metrics: precision, recall@k, f1, response ratio
 
         final_results = []
-        for sentence in generation.sentences:
+        for sentence in _generation.sentences:
             if not sentence.claims:
                 final_results.append(
                     {
-                        "prompt": generation.prompt,
+                        "prompt": _generation.prompt,
                         "is_supported": None,
                         "claim": "no claims",
                         "sentence": sentence.sentence,
-                        "title": generation.topic,
+                        "title": _generation.topic,
                     }
                 )
             else:
                 for claim in sentence.claims:
                     final_results.append(
                         {
-                            "prompt": generation.prompt,
+                            "prompt": _generation.prompt,
                             "is_supported": claim.is_supported,
                             "claim": claim.claim,
                             "sentence": sentence.sentence,
-                            "title": generation.topic,
+                            "title": _generation.topic,
                         }
                     )
         final_results_df = pd.DataFrame(final_results)
@@ -235,7 +235,7 @@ class FactHalu:
                 sentence.claims = []
                 continue
 
-            parsed_claim_extraction = utils.parse_claim_extraction(claim_extraction)
+            parsed_claim_extraction = base_utils.parse_claim_extraction(claim_extraction)
 
             sentence_claims = []
             for claim_text in parsed_claim_extraction:
