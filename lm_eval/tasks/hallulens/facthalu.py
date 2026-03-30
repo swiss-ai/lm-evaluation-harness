@@ -93,6 +93,7 @@ class FactHalu:
         os.makedirs(cache_dir, exist_ok=True)
 
         self.CACHE_BASE_PATH = cache_dir
+        self.embedded_cache_path = os.path.join(cache_dir, "embedded_cache.json")
 
     def run(self, prompt, generation, title, reference=None):
         """
