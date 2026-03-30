@@ -110,8 +110,12 @@ class LongWikiRetrieval(object):
 
         # embedding cache
         if os.path.exists(self.embed_cache_path):
-            with open(self.embed_cache_path, "rb") as f:
-                self.embed_cache = pkl.load(f)
+            try:
+                with open(self.embed_cache_path, "rb") as f:
+                    self.embed_cache = pkl.load(f)
+            except (EOFError, pkl.UnpicklingError):
+                # File is empty or corrupted (e.g. crashed mid-write); start fresh
+                self.embed_cache = {}
         else:
             self.embed_cache = {}
 
