@@ -54,7 +54,8 @@ Question: {prompt}
 Response: {generation}
 Correct Answer: {gold_answer}
 
-Remember you have to judge the correctness of the response based on the provided correct answer.
+Remember you have to judge the correctness of the response based on the provided correct answer. 
+Please answer with "CORRECT", "INCORRECT", or "UNVERIFIABLE" only, without any additional explanation or text.
 YOUR JUDGEMENT:
 """
 
