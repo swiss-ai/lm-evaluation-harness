@@ -251,24 +251,33 @@ class LongWikiRetrieval(object):
                 lambda args: self._collect_key_passages(*args), uncached
             ))
 
-        # Phase 2: batch encode all passage sets not yet in embed_cache
+        # Phase 2: batch encode ALL passages across ALL topics in one encoder call
         topics_to_encode = {}
         for key_passages in all_key_passages:
             for t, passages in key_passages.items():
                 if t not in self.embed_cache and t not in topics_to_encode:
                     topics_to_encode[t] = passages
 
-        for t, passages in topics_to_encode.items():
-            inputs = [
-                psg["title"] + " " + psg["text"].replace("<s>", "").replace("</s>", "")
-                for psg in passages
-            ]
-            self.embed_cache[t] = self.encoder.encode(
-                inputs, batch_size=self.batch_size, device=self.encoder.device
-            )
-            self.add_n_embed += 1
+        if topics_to_encode:
+            all_inputs = []
+            topic_boundaries = {}  # topic -> (start, end) index into all_inputs
+            idx = 0
+            for t, passages in topics_to_encode.items():
+                inputs = [
+                    psg["title"] + " " + psg["text"].replace("<s>", "").replace("</s>", "")
+                    for psg in passages
+                ]
+                topic_boundaries[t] = (idx, idx + len(inputs))
+                all_inputs.extend(inputs)
+                idx += len(inputs)
 
-        if self.add_n_embed > 0:
+            all_vectors = self.encoder.encode(
+                all_inputs, batch_size=self.batch_size, device=self.encoder.device
+            )
+            for t, (start, end) in topic_boundaries.items():
+                self.embed_cache[t] = all_vectors[start:end]
+                self.add_n_embed += 1
+
             self.save_cache()
             self.add_n_embed = 0
 
