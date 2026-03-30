@@ -95,6 +95,14 @@ class FactHalu:
         self.CACHE_BASE_PATH = cache_dir
         self.embedded_cache_path = os.path.join(cache_dir, "embedded_cache.json")
 
+        self.retrieval = LongWikiRetrieval(
+            self.db,
+            cache_base_path=self.CACHE_BASE_PATH,
+            embed_cache_path=self.embedded_cache_path,
+            retrieval_type="gtr-t5-large",
+            batch_size=64,
+        )
+
     def run(self, prompt, generation, title, reference=None):
         """
         Evaluate longwiki from model error.
@@ -267,17 +275,11 @@ class FactHalu:
 
     def verify_claims(self, all_claims: List[Claim]):
         # 1. Prepare the prompt for verification
-        retrieval = LongWikiRetrieval(
-            self.db,
-            cache_base_path=self.CACHE_BASE_PATH,
-            embed_cache_path=self.embedded_cache_path,
-            retrieval_type="gtr-t5-large",
-            batch_size=64,
-        )
+
         questions = list(set([claim.question for claim in all_claims]))
-        retrieval.make_ner_cache(questions)
+        self.retrieval.make_ner_cache(questions)
         for claim in tqdm(all_claims):
-            passages = retrieval.get_topk_related_passages(
+            passages = self.retrieval.get_topk_related_passages(
                 topic=claim.topic, claim=claim.claim, question=claim.question, k=5
             )
             context = ""
