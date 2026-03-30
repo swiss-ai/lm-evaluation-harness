@@ -6,10 +6,92 @@ import gc
 import requests
 import os
 import time
+import asyncio
+import aiohttp
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
+
+# Shared session for connection reuse (keep-alive)
+_sync_session = requests.Session()
+_sync_session.headers.update({
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json",
+})
+
+# Async primitives — lazily initialised
+_aio_session: aiohttp.ClientSession | None = None
+_aio_semaphore: asyncio.Semaphore | None = None
+
+def _get_aio_session_and_semaphore(max_concurrent: int = 64):
+    global _aio_session, _aio_semaphore
+    if _aio_session is None or _aio_session.closed:
+        connector = aiohttp.TCPConnector(limit=max_concurrent, limit_per_host=max_concurrent)
+        _aio_session = aiohttp.ClientSession(
+            connector=connector,
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            },
+            timeout=aiohttp.ClientTimeout(total=2000),
+        )
+    if _aio_semaphore is None:
+        _aio_semaphore = asyncio.Semaphore(max_concurrent)
+    return _aio_session, _aio_semaphore
+
+
+async def _async_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
+    session, semaphore = _get_aio_session_and_semaphore()
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    async with semaphore:
+        for attempt in range(max_retries):
+            try:
+                async with session.post(
+                    f"{API_URL}/chat/completions", json=payload
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data["choices"][0]["message"]["content"]
+                    body = await resp.text()
+                    print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status}: {body}")
+            except Exception as e:
+                print(f"Attempt {attempt + 1}/{max_retries}: {e}")
+            if attempt < max_retries - 1:
+                wait = min(2 ** attempt, 60)
+                print(f"Retrying in {wait}s...")
+                await asyncio.sleep(wait)
+    print(f"Failed after {max_retries} attempts")
+    return None
+
+
+def async_generate_batch(prompts, temperature=0.0, max_tokens=512, max_concurrent=64):
+    """Run many remote generation calls concurrently via asyncio."""
+    async def _run():
+        tasks = [
+            _async_remote_generate(p, temperature=temperature, max_tokens=max_tokens)
+            for p in prompts
+        ]
+        return await asyncio.gather(*tasks)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None and loop.is_running():
+        # Already inside an event loop (e.g. Jupyter) — run in a new thread
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(1) as pool:
+            return list(pool.submit(asyncio.run, _run()).result())
+    else:
+        return list(asyncio.run(_run()))
+
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
@@ -18,10 +100,6 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
     """
     for attempt in range(max_retries):
         try:
-            headers = {
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-            }
             payload = {
                 "model": MODEL_NAME,
                 "messages": [{"role": "user", "content": prompt}],
@@ -29,8 +107,8 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
                 "max_tokens": max_tokens,
             }
 
-            resp = requests.post(
-                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
+            resp = _sync_session.post(
+                f"{API_URL}/chat/completions", json=payload, timeout=2000
             )
 
             if resp.status_code == 200:
@@ -117,16 +195,15 @@ def generate_batch(
     prompts, model=None, tokenizer=None, temperature=0.0, max_tokens=512
 ):
     if model is None or tokenizer is None:
-        # remote generation
-        results = []
-        for p in prompts:
-            result = try_remote_generate(
-                p, temperature=temperature, max_tokens=max_tokens
-            )
-            assert result is not None, (
+        # remote generation — run all prompts concurrently
+        results = async_generate_batch(
+            prompts, temperature=temperature, max_tokens=max_tokens
+        )
+        for i, r in enumerate(results):
+            assert r is not None, (
+                f"Remote generation failed for prompt {i}. "
                 "If no model or tokenizer is given, remote generation should be functional."
             )
-            results.append(result)
         return results
     else:
         prompts = [
