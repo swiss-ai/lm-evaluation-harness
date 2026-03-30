@@ -137,9 +137,10 @@ Result:
 # ============================================================================
 # Caching and aggregation infrastructure
 # ============================================================================
-global _eval_cache
 _eval_cache = {}
 _eval_cache_lock = threading.Lock()
+
+_longwiki_evaluator = None 
 
 def _get_longwiki_evaluator():
     global _longwiki_evaluator
@@ -350,11 +351,8 @@ def judge_hallucination(original_prompt, generated_answer, gold_answer):
     return generated_evaluation
 
 
-def process_res(abstantion_res_raw, halu_eval_raw):
-    try:
-        abstantion_res = json.loads(abstantion_res_raw)["is_abstaining"]
-    except json.JSONDecodeError:
-        print(f"Error decoding JSON from abstention response: {abstantion_res_raw}")
+def process_res(abstantion_res, halu_eval_raw):
+    if abstantion_res is None:
         return None, None
     # remove . and strip whitespace, and convert to lowercase for more robust matching
     halu_eval_raw = halu_eval_raw.strip().lower().replace(".", "")
@@ -370,13 +368,14 @@ def process_res(abstantion_res_raw, halu_eval_raw):
 
 
 def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
-    abstantion_res, abstantion_raw_gen = eval_abstention(
+    abstantion_res, _ = eval_abstention(
         original_prompt, generated_answer, model, tokenizer
     )
     halu_test_raw_gen = judge_hallucination(
         original_prompt, generated_answer, gold_answer
     )
-    abstantion_res, halu_test_res = process_res(abstantion_raw_gen, halu_test_raw_gen)
+    abstantion_val = abstantion_res[0] if abstantion_res else None
+    abstantion_res, halu_test_res = process_res(abstantion_val, halu_test_raw_gen)
     if abstantion_res is None or halu_test_res is None:
         return {"hallu_rate": np.nan, "refusal_rate": np.nan, "correct_rate": np.nan}
     not_abstained = (
