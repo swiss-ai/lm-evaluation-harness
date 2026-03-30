@@ -10,28 +10,6 @@ from transformers import AutoTokenizer
 import concurrent.futures
 import threading
 
-# ========================================================================
-# Global batch cache (prevents duplicate _run_all calls)
-# ========================================================================
-
-_run_all_cache = {}
-_run_all_locks = {}
-_run_all_global_lock = threading.Lock()
-
-def _items_cache_key(items):
-    """
-    Stable key based ONLY on prompt (ignore completion).
-    Assumes same prompt → same evaluation intent.
-    """
-    prompts = []
-
-    for item in items:
-        doc = item["doc"]
-        prompts.append(doc.get("prompt", "").strip())
-
-    prompts.sort()
-    return tuple(prompts)
-
 # Verify remote API connection
 test = try_remote_generate("hello there")
 
@@ -159,9 +137,29 @@ Result:
 # ============================================================================
 # Caching and aggregation infrastructure
 # ============================================================================
-
+global _eval_cache
 _eval_cache = {}
 _eval_cache_lock = threading.Lock()
+
+def _get_longwiki_evaluator():
+    global _longwiki_evaluator
+
+    if _longwiki_evaluator is None:
+        evaluator = FactHalu(
+            abstention_model=model,
+            abstention_tokenizer=tokenizer,
+            claim_extractor=model,
+            claim_extractor_tokenizer=tokenizer,
+            claim_verifier=model,
+            claim_verifier_tokenizer=tokenizer,
+            k=32,
+            db_path=local_db,
+        )
+        _longwiki_evaluator = evaluator
+
+    return _longwiki_evaluator
+
+_longwiki_evaluator = _get_longwiki_evaluator()
 
 def replace_none_with_nan(scores):
     """Replace None values in the scores dictionary with NaN."""
@@ -170,261 +168,63 @@ def replace_none_with_nan(scores):
             scores[key] = np.nan
     return scores
 
-
-def _run_all_precise_wiki(items):
-    """
-    Batched evaluation for precise_wiki items.
-    Sends ALL abstention prompts concurrently, then ALL hallucination prompts
-    concurrently — maximising API throughput.
-    """
-    # Separate cached vs uncached items
-    uncached_indices = []
-    results = [None] * len(items)
-
-    for i, item in enumerate(items):
-        doc = item["doc"]
-        cache_key = (doc["prompt"], item["completion"])
-        with _eval_cache_lock:
-            if cache_key in _eval_cache:
-                results[i] = _eval_cache[cache_key]
-            else:
-                uncached_indices.append(i)
-
-    if not uncached_indices:
-        return results
-
-    # Build all prompts for uncached items
-    abstain_prompts = []
-    halu_prompts = []
-    for i in uncached_indices:
-        doc = items[i]["doc"]
-        completion = items[i]["completion"]
-        abstain_prompts.append(
-            ABSTAIN_PROMPT_UPDATED.format(prompt=doc["prompt"], generation=completion)
-        )
-        halu_prompts.append(
-            IS_HALLUCINATION_RESPONSE.format(
-                prompt=doc["prompt"], generation=completion, gold_answer=doc["answer"]
-            )
-        )
-
-    # Fire ALL abstention + hallucination prompts concurrently in one batch
-    all_prompts = abstain_prompts + halu_prompts
-    print(f"[precise_wiki] Sending {len(all_prompts)} judge calls concurrently ({len(uncached_indices)} items × 2 calls)...")
-    all_responses = async_generate_batch(all_prompts)
-
-    abstain_responses = all_responses[: len(uncached_indices)]
-    halu_responses = all_responses[len(uncached_indices) :]
-
-    # Process results
-    for j, i in enumerate(uncached_indices):
-        doc = items[i]["doc"]
-        abstantion_res, halu_test_res = process_res(abstain_responses[j], halu_responses[j])
-        if abstantion_res is None or halu_test_res is None:
-            result = {"hallu_rate": np.nan, "refusal_rate": np.nan, "correct_rate": np.nan}
-        else:
-            not_abstained = 0 if abstantion_res else 1
-            if not_abstained == 0:
-                hallu_rate_not_abstain = 0
-                refusal_rate = 1
-            else:
-                refusal_rate = 0
-                hallu_rate_not_abstain = 1 if halu_test_res else 0
-            correct_rate = 0 if halu_test_res else 1
-            result = {
-                "hallu_rate": hallu_rate_not_abstain,
-                "refusal_rate": refusal_rate,
-                "correct_rate": correct_rate,
-            }
-        results[i] = result
-        cache_key = (doc["prompt"], items[i]["completion"])
-        with _eval_cache_lock:
-            _eval_cache[cache_key] = result
-
-    return results
-
-
-def _run_all_nonsense(items):
-    """
-    Batched evaluation for generated_entities / mixed_entities.
-    Sends ALL abstention prompts concurrently.
-    """
-    import lm_eval.tasks.hallulens.prompt_template_nonsense as pt_nonsense
-
-    uncached_indices = []
-    results = [None] * len(items)
-
-    for i, item in enumerate(items):
-        doc = item["doc"]
-        cache_key = (doc["prompt"], item["completion"])
-        with _eval_cache_lock:
-            if cache_key in _eval_cache:
-                results[i] = _eval_cache[cache_key]
-            else:
-                uncached_indices.append(i)
-
-    if not uncached_indices:
-        return results
-
-    # Build all prompts
-    prompts = []
-    for i in uncached_indices:
-        doc = items[i]["doc"]
-        completion = items[i]["completion"]
-        category = doc["category"]
-
-        if category == "generated_entities":
-            name = doc["name"]
-            _type = doc["type_"]
-            place = doc.get("place")
-            _place = " in " + place if place else ""
-            prompts.append(
-                pt_nonsense.ABSTAIN_PROMPT_PLACE_NONSENSE.format(
-                    name=name, TYPE=_type, PLACE=_place, generation=completion
-                )
-            )
-        elif category == "mixed_entities":
-            name = doc["name"]
-            _type = doc["type"]
-            eval_prompts_map = {
-                "medicine": pt_nonsense.ABSTAIN_PROMPT_NONSENSE_MEDICINE,
-                "animal": pt_nonsense.ABSTAIN_PROMPT_ANIMAL_NONSENSE,
-                "plant": pt_nonsense.ABSTAIN_PROMPT_ANIMAL_NONSENSE,
-                "bacteria": pt_nonsense.ABSTAIN_PROMPT_ANIMAL_NONSENSE,
-            }
-            prompts.append(
-                eval_prompts_map.get(_type).format(
-                    prompt=doc["prompt"], name=name, generation=completion
-                )
-            )
-
-    print(f"[nonsense] Sending {len(prompts)} judge calls concurrently...")
-    responses = async_generate_batch(prompts)
-
-    # Process each response
-    for j, i in enumerate(uncached_indices):
-        doc = items[i]["doc"]
-        category = doc["category"]
-        raw_response = responses[j]
-
-        if raw_response is None:
-            result = {"abstention": np.nan}
-        else:
-            key = "does_believe"
-            abstains_eval = jsonify_ans(
-                raw_response=raw_response,
-                eval_prompt=prompts[j],
-                key=key,
-                model=model,
-                tokenizer=tokenizer,
-            )
-            abstains_eval_res = []
-            for o in abstains_eval:
-                try:
-                    abstains_eval_res.append(not o[key])
-                except (TypeError, KeyError):
-                    continue
-            if len(abstains_eval_res) == 0:
-                result = {"abstention": None}
-            else:
-                result = {"abstention": abstains_eval_res[0]}
-
-        result = replace_none_with_nan(result)
-        results[i] = result
-        cache_key = (doc["prompt"], items[i]["completion"])
-        with _eval_cache_lock:
-            _eval_cache[cache_key] = result
-
-    return results
-
-
-def _evaluate_single_longwiki(item):
-    """Run the full evaluation for a single longwiki doc — with caching."""
+def _evaluate_single(item):
+    """Run the full evaluation for a single doc — with caching."""
     doc = item["doc"]
     completion = item["completion"]
+
     cache_key = (doc["prompt"], completion)
 
     with _eval_cache_lock:
         if cache_key in _eval_cache:
             return _eval_cache[cache_key]
 
-    title = doc["title"]
-    reference = doc["reference"]
-    evaluator = FactHalu(
-        abstention_model=model,
-        abstention_tokenizer=tokenizer,
-        claim_extractor=model,
-        claim_extractor_tokenizer=tokenizer,
-        claim_verifier=model,
-        claim_verifier_tokenizer=tokenizer,
-        k=32,
-        db_path=local_db,
-    )
-    result = replace_none_with_nan(
-        evaluator.run(doc["prompt"], completion, title, reference)
-    )
+    category = doc["category"]
+    original_prompt = doc["prompt"]
+
+    if category == "precise_wiki":
+        golden_answer = doc["answer"]
+        result = run_eval_precise_wiki(original_prompt, completion, golden_answer)
+
+    elif category == "longwiki":
+        title = doc["title"]
+        reference = doc["reference"]
+
+        result = replace_none_with_nan(
+            _longwiki_evaluator.run(original_prompt, completion, title, reference)
+        )
+
+    elif category == "mixed_entities":
+        name = doc["name"]
+        _type = doc["type"]
+        mixed_eval = NonsenseMixedEval(eval_model=model, eval_tokenizer=tokenizer)
+        result = replace_none_with_nan(
+            mixed_eval.run_eval_mixed(completion, original_prompt, _type, name)
+        )
+
+    elif category == "generated_entities":
+        name = doc["name"]
+        _type = doc["type_"]
+        place = doc["place"]
+        generated_eval = NonsenseNameEval(
+            evaluator_model=model, evaluator_tokenizer=tokenizer
+        )
+        result = replace_none_with_nan(
+            generated_eval.run_eval_generated(completion, name, _type, place)
+        )
+
+    else:
+        result = {}
 
     with _eval_cache_lock:
         _eval_cache[cache_key] = result
+
     return result
 
 
 def _run_all(items, max_workers=64):
-    if not items:
-        return []
-
-    key = _items_cache_key(items)
-
-    with _run_all_global_lock:
-        if key in _run_all_cache:
-            return _run_all_cache[key]
-
-        if key not in _run_all_locks:
-            _run_all_locks[key] = threading.Lock()
-
-        lock = _run_all_locks[key]
-
-    with lock:
-        with _run_all_global_lock:
-            if key in _run_all_cache:
-                return _run_all_cache[key]
-
-        category = items[0]["doc"]["category"]
-
-        print(f"[RUN_ALL EXECUTING] category={category}, size={len(items)}")
-
-        if category == "precise_wiki":
-            results = _run_all_precise_wiki(items)
-        elif category in ("generated_entities", "mixed_entities"):
-            results = _run_all_nonsense(items)
-        elif category == "longwiki":
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                results = list(executor.map(_evaluate_single_longwiki, items))
-        else:
-            results = [{}] * len(items)
-
-        with _run_all_global_lock:
-            _run_all_cache[key] = results
-
-        return results
-
-# def _run_all(items, max_workers=64):
-#     """Route to the best strategy per category."""
-#     if not items:
-#         return []
-
-#     category = items[0]["doc"]["category"]
-
-#     if category == "precise_wiki":
-#         return _run_all_precise_wiki(items)
-#     elif category in ("generated_entities", "mixed_entities"):
-#         return _run_all_nonsense(items)
-#     elif category == "longwiki":
-#         # longwiki involves GPU-based retrieval, so keep thread pool
-#         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-#             return list(executor.map(_evaluate_single_longwiki, items))
-#     else:
-#         return [{}] * len(items)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return list(executor.map(_evaluate_single, items))
 
 # ============================================================================
 # Per-document score function (defers to aggregation)

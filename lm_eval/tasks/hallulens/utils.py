@@ -4,89 +4,14 @@ from typing import List
 import torch
 import gc
 import requests
+from requests.adapters import HTTPAdapter
 import os
 import time
-import asyncio
 import aiohttp
 
 API_URL = "https://api.swissai.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
-
-# Shared session for connection reuse (keep-alive) used by synchronous calls
-_sync_session = requests.Session()
-_sync_session.headers.update({
-    "Authorization": f"Bearer {API_KEY}",
-    "Content-Type": "application/json",
-})
-
-MAX_CONCURRENT_REQUESTS = 100
-
-
-async def _run_async_batch(prompts, temperature=0.0, max_tokens=512, max_concurrent=MAX_CONCURRENT_REQUESTS):
-    """
-    Core async implementation. Session and semaphore are created fresh inside
-    each event-loop context so they are never reused across asyncio.run() calls.
-    """
-    semaphore = asyncio.Semaphore(max_concurrent)
-    connector = aiohttp.TCPConnector(limit=max_concurrent, limit_per_host=max_concurrent)
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-    }
-
-    async def _one(prompt):
-        payload = {
-            "model": MODEL_NAME,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        async with semaphore:
-            for attempt in range(10):
-                try:
-                    async with session.post(
-                        f"{API_URL}/chat/completions", json=payload
-                    ) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            return data["choices"][0]["message"]["content"]
-                        body = await resp.text()
-                        print(f"Attempt {attempt + 1}/10: status {resp.status}: {body}")
-                except Exception as e:
-                    print(f"Attempt {attempt + 1}/10: {e}")
-                if attempt < 9:
-                    wait = min(2 ** attempt, 60)
-                    print(f"Retrying in {wait}s...")
-                    await asyncio.sleep(wait)
-        print("Failed after 10 attempts")
-        return None
-
-    async with aiohttp.ClientSession(
-        connector=connector,
-        headers=headers,
-        timeout=aiohttp.ClientTimeout(total=2000),
-    ) as session:
-        return list(await asyncio.gather(*[_one(p) for p in prompts]))
-
-
-def async_generate_batch(prompts, temperature=0.0, max_tokens=512, max_concurrent=MAX_CONCURRENT_REQUESTS):
-    """Run many remote generation calls concurrently via asyncio."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-
-    coro = _run_async_batch(prompts, temperature=temperature, max_tokens=max_tokens, max_concurrent=max_concurrent)
-
-    if loop is not None and loop.is_running():
-        # Already inside an event loop (e.g. Jupyter) — run in a new thread
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor(1) as pool:
-            return list(pool.submit(asyncio.run, coro).result())
-    else:
-        return list(asyncio.run(coro))
-
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
@@ -95,6 +20,10 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
     """
     for attempt in range(max_retries):
         try:
+            headers = {
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            }
             payload = {
                 "model": MODEL_NAME,
                 "messages": [{"role": "user", "content": prompt}],
@@ -102,8 +31,8 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
                 "max_tokens": max_tokens,
             }
 
-            resp = _sync_session.post(
-                f"{API_URL}/chat/completions", json=payload, timeout=2000
+            resp = requests.post(
+                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
             )
 
             if resp.status_code == 200:
@@ -190,15 +119,16 @@ def generate_batch(
     prompts, model=None, tokenizer=None, temperature=0.0, max_tokens=512
 ):
     if model is None or tokenizer is None:
-        # remote generation — run all prompts concurrently
-        results = async_generate_batch(
-            prompts, temperature=temperature, max_tokens=max_tokens
-        )
-        for i, r in enumerate(results):
-            assert r is not None, (
-                f"Remote generation failed for prompt {i}. "
+        # remote generation
+        results = []
+        for p in prompts:
+            result = try_remote_generate(
+                p, temperature=temperature, max_tokens=max_tokens
+            )
+            assert result is not None, (
                 "If no model or tokenizer is given, remote generation should be functional."
             )
+            results.append(result)
         return results
     else:
         prompts = [
@@ -243,6 +173,7 @@ def generate_batch(
         del inputs  # Free memory
         clear_memory()  # Clear memory after generation
         return result
+
 
 
 def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
