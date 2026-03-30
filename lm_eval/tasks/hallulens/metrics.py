@@ -496,11 +496,12 @@ def process_res(abstantion_res_raw, halu_eval_raw):
         return None, None
     # remove . and strip whitespace, and convert to lowercase for more robust matching
     halu_eval_raw = halu_eval_raw.strip().lower().replace(".", "")
-    if halu_eval_raw not in ["correct", "incorrect", "unverifiable"]:
+    # instead just check if it starts with "correct", "incorrect", or "unverifiable" to allow for some flexibility in the model's response
+    if not (halu_eval_raw.startswith("correct") or halu_eval_raw.startswith("incorrect") or halu_eval_raw.startswith("unverifiable")):
         print("Unexpected hallucination evaluation response: {}. Expected 'Correct', 'Incorrect', or 'Unverifiable'.".format(halu_eval_raw))
     hallucinated_judge = (
         False
-        if halu_eval_raw == "correct" or halu_eval_raw == "yes"
+        if halu_eval_raw.startswith("correct")
         else True
     )
     return abstantion_res, hallucinated_judge
