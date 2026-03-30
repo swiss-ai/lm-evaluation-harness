@@ -1,5 +1,5 @@
 from lm_eval.tasks.hallulens.facthalu import FactHalu
-from lm_eval.tasks.hallulens.utils import jsonify_ans, generate, try_remote_generate, async_generate_batch
+from lm_eval.tasks.hallulens.utils import jsonify_ans, generate, try_remote_generate
 from lm_eval.tasks.hallulens.nonsensename import NonsenseNameEval, NonsenseMixedEval
 import json
 import os
