@@ -306,7 +306,7 @@ class FactHalu:
         claim_verification_res = []
         for i in range(0, len(verification_prompts), 100):
             batch_prompts = verification_prompts[i : i + 100]
-            batch_results = utils.generate_batch(
+            batch_results = base_utils.generate_batch(
                 batch_prompts,
                 self.verifier,
                 tokenizer=self.verifier_tokenizer,
