@@ -4,6 +4,7 @@ from lm_eval.tasks.hallulens.nonsensename import NonsenseNameEval, NonsenseMixed
 import json
 import os
 import numpy as np
+import hashlib
 from huggingface_hub import HfApi, hf_hub_download
 from transformers import AutoTokenizer
 import concurrent.futures
@@ -17,16 +18,25 @@ _run_all_cache = {}
 _run_all_locks = {}
 _run_all_global_lock = threading.Lock()
 
-
 def _items_cache_key(items):
     """
-    Build a stable cache key for a batch of items.
-    Uses prompt + completion (same as your per-item cache).
+    Build a stable, order-independent key for items using only built-ins.
     """
-    return tuple(
-        (item["doc"]["prompt"], item["completion"])
-        for item in items
-    )
+    normalized = []
+
+    for item in items:
+        doc = item["doc"]
+
+        normalized.append((
+            doc.get("category", ""),
+            doc.get("prompt", "").strip(),
+            item.get("completion", "").strip(),
+        ))
+
+    normalized.sort()
+
+    # tuple is hashable → can be dict key
+    return tuple(normalized)
 
 # Verify remote API connection
 test = try_remote_generate("hello there")
@@ -366,13 +376,11 @@ def _evaluate_single_longwiki(item):
 
 
 def _run_all(items, max_workers=64):
-    """Route to the best strategy per category — WITH STRONG CACHING."""
     if not items:
         return []
 
     key = _items_cache_key(items)
 
-    # Ensure only one thread computes this batch
     with _run_all_global_lock:
         if key in _run_all_cache:
             return _run_all_cache[key]
@@ -382,13 +390,14 @@ def _run_all(items, max_workers=64):
 
         lock = _run_all_locks[key]
 
-    # Only one thread enters computation
     with lock:
-        # Double-check after acquiring lock
-        if key in _run_all_cache:
-            return _run_all_cache[key]
+        with _run_all_global_lock:
+            if key in _run_all_cache:
+                return _run_all_cache[key]
 
         category = items[0]["doc"]["category"]
+
+        print(f"[RUN_ALL EXECUTING] category={category}, size={len(items)}")
 
         if category == "precise_wiki":
             results = _run_all_precise_wiki(items)
@@ -400,14 +409,11 @@ def _run_all(items, max_workers=64):
         else:
             results = [{}] * len(items)
 
-        # Store final result
         with _run_all_global_lock:
             _run_all_cache[key] = results
-            # Optional: cleanup lock to avoid memory leak
-            _run_all_locks.pop(key, None)
 
         return results
-        
+
 # def _run_all(items, max_workers=64):
 #     """Route to the best strategy per category."""
 #     if not items:
