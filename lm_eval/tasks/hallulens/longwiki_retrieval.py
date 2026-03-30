@@ -156,7 +156,6 @@ class LongWikiRetrieval(object):
                     inputs,
                     batch_size=self.batch_size,
                     device=self.encoder.device,
-                    clean_up_tokenization_spaces=True,
                 )
                 self.embed_cache[topic] = passage_vectors
 
