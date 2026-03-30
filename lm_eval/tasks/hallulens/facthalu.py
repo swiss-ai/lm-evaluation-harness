@@ -88,6 +88,10 @@ class FactHalu:
 
         self.verifier = claim_verifier
         self.verifier_tokenizer = claim_verifier_tokenizer
+        cache_dir = os.path.join(home_dir, "facthalu_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+
+        self.CACHE_BASE_PATH = cache_dir
 
     def run(self, prompt, generation, title, reference=None):
         """
