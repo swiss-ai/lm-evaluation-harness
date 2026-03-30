@@ -494,11 +494,13 @@ def process_res(abstantion_res_raw, halu_eval_raw):
     except json.JSONDecodeError:
         print(f"Error decoding JSON from abstention response: {abstantion_res_raw}")
         return None, None
-    if halu_eval_raw.lower() not in ["correct", "incorrect", "unverifiable"]:
+    # remove . and strip whitespace, and convert to lowercase for more robust matching
+    halu_eval_raw = halu_eval_raw.strip().lower().replace(".", "")
+    if halu_eval_raw not in ["correct", "incorrect", "unverifiable"]:
         print("Unexpected hallucination evaluation response: {}. Expected 'Correct', 'Incorrect', or 'Unverifiable'.".format(halu_eval_raw))
     hallucinated_judge = (
         False
-        if halu_eval_raw.lower() == "correct" or halu_eval_raw.lower() == "yes"
+        if halu_eval_raw == "correct" or halu_eval_raw == "yes"
         else True
     )
     return abstantion_res, hallucinated_judge
