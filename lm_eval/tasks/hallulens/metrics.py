@@ -20,23 +20,17 @@ _run_all_global_lock = threading.Lock()
 
 def _items_cache_key(items):
     """
-    Build a stable, order-independent key for items using only built-ins.
+    Stable key based ONLY on prompt (ignore completion).
+    Assumes same prompt → same evaluation intent.
     """
-    normalized = []
+    prompts = []
 
     for item in items:
         doc = item["doc"]
+        prompts.append(doc.get("prompt", "").strip())
 
-        normalized.append((
-            doc.get("category", ""),
-            doc.get("prompt", "").strip(),
-            item.get("completion", "").strip(),
-        ))
-
-    normalized.sort()
-
-    # tuple is hashable → can be dict key
-    return tuple(normalized)
+    prompts.sort()
+    return tuple(prompts)
 
 # Verify remote API connection
 test = try_remote_generate("hello there")
