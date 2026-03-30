@@ -9,6 +9,25 @@ from transformers import AutoTokenizer
 import concurrent.futures
 import threading
 
+# ========================================================================
+# Global batch cache (prevents duplicate _run_all calls)
+# ========================================================================
+
+_run_all_cache = {}
+_run_all_locks = {}
+_run_all_global_lock = threading.Lock()
+
+
+def _items_cache_key(items):
+    """
+    Build a stable cache key for a batch of items.
+    Uses prompt + completion (same as your per-item cache).
+    """
+    return tuple(
+        (item["doc"]["prompt"], item["completion"])
+        for item in items
+    )
+
 # Verify remote API connection
 test = try_remote_generate("hello there")
 
@@ -347,22 +366,65 @@ def _evaluate_single_longwiki(item):
 
 
 def _run_all(items, max_workers=64):
-    """Route to the best strategy per category."""
+    """Route to the best strategy per category — WITH STRONG CACHING."""
     if not items:
         return []
 
-    category = items[0]["doc"]["category"]
+    key = _items_cache_key(items)
 
-    if category == "precise_wiki":
-        return _run_all_precise_wiki(items)
-    elif category in ("generated_entities", "mixed_entities"):
-        return _run_all_nonsense(items)
-    elif category == "longwiki":
-        # longwiki involves GPU-based retrieval, so keep thread pool
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            return list(executor.map(_evaluate_single_longwiki, items))
-    else:
-        return [{}] * len(items)
+    # Ensure only one thread computes this batch
+    with _run_all_global_lock:
+        if key in _run_all_cache:
+            return _run_all_cache[key]
+
+        if key not in _run_all_locks:
+            _run_all_locks[key] = threading.Lock()
+
+        lock = _run_all_locks[key]
+
+    # Only one thread enters computation
+    with lock:
+        # Double-check after acquiring lock
+        if key in _run_all_cache:
+            return _run_all_cache[key]
+
+        category = items[0]["doc"]["category"]
+
+        if category == "precise_wiki":
+            results = _run_all_precise_wiki(items)
+        elif category in ("generated_entities", "mixed_entities"):
+            results = _run_all_nonsense(items)
+        elif category == "longwiki":
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                results = list(executor.map(_evaluate_single_longwiki, items))
+        else:
+            results = [{}] * len(items)
+
+        # Store final result
+        with _run_all_global_lock:
+            _run_all_cache[key] = results
+            # Optional: cleanup lock to avoid memory leak
+            _run_all_locks.pop(key, None)
+
+        return results
+        
+# def _run_all(items, max_workers=64):
+#     """Route to the best strategy per category."""
+#     if not items:
+#         return []
+
+#     category = items[0]["doc"]["category"]
+
+#     if category == "precise_wiki":
+#         return _run_all_precise_wiki(items)
+#     elif category in ("generated_entities", "mixed_entities"):
+#         return _run_all_nonsense(items)
+#     elif category == "longwiki":
+#         # longwiki involves GPU-based retrieval, so keep thread pool
+#         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+#             return list(executor.map(_evaluate_single_longwiki, items))
+#     else:
+#         return [{}] * len(items)
 
 # ============================================================================
 # Per-document score function (defers to aggregation)
