@@ -3,6 +3,7 @@ from lm_eval.tasks.hallulens.utils import jsonify_ans, generate, try_remote_gene
 from lm_eval.tasks.hallulens.nonsensename import NonsenseNameEval, NonsenseMixedEval
 import json
 import os
+import sys
 import numpy as np
 import hashlib
 from huggingface_hub import HfApi, hf_hub_download
@@ -10,15 +11,26 @@ from transformers import AutoTokenizer
 import concurrent.futures
 import threading
 
-# Verify remote API connection
-test = try_remote_generate("hello there")
+_METRICS_CACHE_KEY = "__hallulens_metrics_cache__"
+if _METRICS_CACHE_KEY not in sys.modules:
+    # Verify remote API connection
+    _test = try_remote_generate("hello there")
 
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
-if test is None:
-    raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
-else:
-    print("Remote generation successful, using remote model.")
-    model = None
+    _tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
+    if _test is None:
+        raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
+    else:
+        print("Remote generation successful, using remote model.")
+        _model = None
+
+    sys.modules[_METRICS_CACHE_KEY] = {
+        "tokenizer": _tokenizer,
+        "model": _model,
+    }
+
+_metrics_cache = sys.modules[_METRICS_CACHE_KEY]
+tokenizer = _metrics_cache["tokenizer"]
+model = _metrics_cache["model"]
 
 home_dir = os.path.expanduser("~")
 local_db = os.path.join(home_dir, "wiki_data/enwiki-20230401.db")
@@ -140,27 +152,20 @@ Result:
 _eval_cache = {}
 _eval_cache_lock = threading.Lock()
 
-_longwiki_evaluator = None 
+_LONGWIKI_EVALUATOR_KEY = "__hallulens_longwiki_evaluator__"
+if _LONGWIKI_EVALUATOR_KEY not in sys.modules:
+    sys.modules[_LONGWIKI_EVALUATOR_KEY] = FactHalu(
+        abstention_model=model,
+        abstention_tokenizer=tokenizer,
+        claim_extractor=model,
+        claim_extractor_tokenizer=tokenizer,
+        claim_verifier=model,
+        claim_verifier_tokenizer=tokenizer,
+        k=32,
+        db_path=local_db,
+    )
 
-def _get_longwiki_evaluator():
-    global _longwiki_evaluator
-
-    if _longwiki_evaluator is None:
-        evaluator = FactHalu(
-            abstention_model=model,
-            abstention_tokenizer=tokenizer,
-            claim_extractor=model,
-            claim_extractor_tokenizer=tokenizer,
-            claim_verifier=model,
-            claim_verifier_tokenizer=tokenizer,
-            k=32,
-            db_path=local_db,
-        )
-        _longwiki_evaluator = evaluator
-
-    return _longwiki_evaluator
-
-_longwiki_evaluator = _get_longwiki_evaluator()
+_longwiki_evaluator = sys.modules[_LONGWIKI_EVALUATOR_KEY]
 
 def replace_none_with_nan(scores):
     """Replace None values in the scores dictionary with NaN."""
