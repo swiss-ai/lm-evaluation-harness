@@ -209,7 +209,7 @@ def _evaluate_single(item):
     return result
 
 
-def _run_all(items, max_workers=16):
+def _run_all(items, max_workers=64):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         return list(executor.map(_evaluate_single, items))
 
