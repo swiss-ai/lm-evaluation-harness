@@ -44,6 +44,19 @@ if not os.path.exists(local_db):
         repo_type="dataset",
     )
 
+local_title_db = local_db.replace(".db", "-title.db")
+# Use size check: SQLite auto-creates an empty file (~0 bytes) when connecting
+# to a non-existent path, so os.path.exists alone is not a reliable guard.
+if not os.path.exists(local_title_db) or os.path.getsize(local_title_db) < 1024:
+    if os.path.exists(local_title_db):
+        os.remove(local_title_db)
+    hf_hub_download(
+        repo_id="alexanderstern/hallulens",
+        filename="wiki_data/enwiki-20230401-title.db",
+        local_dir=home_dir,
+        repo_type="dataset",
+    )
+
 if not os.path.exists(local_titles):
     hf_hub_download(
         repo_id="swiss-ai/hallulens",
@@ -149,8 +162,16 @@ Result:
 # ============================================================================
 # Caching and aggregation infrastructure
 # ============================================================================
-_eval_cache = {}
-_eval_cache_lock = threading.Lock()
+# Share eval cache and lock across all module re-executions so that the 4
+# longwiki aggregation functions (abstained_agg, precision_agg, etc.) all hit
+# the same cache instead of each recomputing from scratch.
+_EVAL_CACHE_KEY = "__hallulens_eval_cache__"
+_EVAL_CACHE_LOCK_KEY = "__hallulens_eval_cache_lock__"
+if _EVAL_CACHE_KEY not in sys.modules:
+    sys.modules[_EVAL_CACHE_KEY] = {}
+    sys.modules[_EVAL_CACHE_LOCK_KEY] = threading.Lock()
+_eval_cache = sys.modules[_EVAL_CACHE_KEY]
+_eval_cache_lock = sys.modules[_EVAL_CACHE_LOCK_KEY]
 
 _LONGWIKI_EVALUATOR_KEY = "__hallulens_longwiki_evaluator__"
 if _LONGWIKI_EVALUATOR_KEY not in sys.modules:
