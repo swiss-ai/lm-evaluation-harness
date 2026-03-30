@@ -145,6 +145,9 @@ class LongWikiRetrieval(object):
         if self.encoder is None:
             self.load_encoder()
 
+        if not key_passages:
+            return []
+
         self.add_n_embed = 0
         passage_vectors_all = None
         passages_all = []
