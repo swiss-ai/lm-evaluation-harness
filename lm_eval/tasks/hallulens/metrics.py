@@ -55,7 +55,6 @@ Response: {generation}
 Correct Answer: {gold_answer}
 
 Remember you have to judge the correctness of the response based on the provided correct answer.
-Please answer with Yes or No without any explanation.
 YOUR JUDGEMENT:
 """
 
