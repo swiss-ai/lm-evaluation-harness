@@ -11,6 +11,7 @@ import sqlite3
 import numpy as np
 import pickle as pkl
 from typing import List
+import concurrent.futures
 
 from lm_eval.tasks.hallulens.cache import Cache
 from lm_eval.tasks.hallulens.retrieval import DocDB
@@ -84,6 +85,7 @@ class LongWikiRetrieval(object):
         )
 
         self.encoder = None
+        self._query_vec_cache = {}
         self.not_existing_pages = set()
         self.debugging = debugging
 
@@ -167,9 +169,12 @@ class LongWikiRetrieval(object):
                 else passage_vectors
             )
 
-        query_vectors = self.encoder.encode(
-            [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
-        )[0]
+        if retrieval_query in self._query_vec_cache:
+            query_vectors = self._query_vec_cache.pop(retrieval_query)
+        else:
+            query_vectors = self.encoder.encode(
+                [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
+            )[0]
 
         scores = np.inner(query_vectors, passage_vectors_all)
         indices = np.argsort(-scores)[:k]
@@ -186,6 +191,90 @@ class LongWikiRetrieval(object):
                 ner_results = self.ner(question)
                 ners = [r["word"] for r in ner_results if "#" not in r["word"]]
                 self.Q_NER_cache.set_item(question, ners)
+
+    def _collect_key_passages(self, topic, claim, question):
+        """Collect the passage pool for one claim (DB + cache lookups only, no encoding)."""
+        ners = self.Q_NER_cache.get_item(question) or []
+        ner_relevant_titles = []
+        for ner in ners:
+            pgs_selected = self.relevant_pages_cache.get_item(ner)
+            if pgs_selected:
+                pgs = pgs_selected
+            else:
+                pgs = self.db.get_relevant_titles(ner)
+                if not pgs:
+                    continue
+                self.relevant_pages_cache.set_item(ner, pgs)
+            ner_relevant_titles += [
+                pg
+                for pg in pgs
+                if ((pg.lower() in claim.lower()) or (pg.lower() in question.lower()))
+            ]
+
+        combined = [topic] + ner_relevant_titles + ners
+        key_passages = {}
+        for title in list(set(combined)):
+            title = title.replace("_", " ")
+            if title in self.not_existing_pages:
+                continue
+            try:
+                key_passages[title] = self.db.get_text_from_title(title)
+            except Exception:
+                self.not_existing_pages.add(title)
+        return key_passages
+
+    def prewarm(self, claims):
+        """Pre-compute all passage and query embeddings in batch before the claim loop.
+
+        Args:
+            claims: list of (topic, claim_text, question) tuples
+        """
+        if self.encoder is None:
+            self.load_encoder()
+
+        # Filter to claims not already in the retrieval cache
+        uncached = [
+            (topic, claim, question)
+            for topic, claim, question in claims
+            if self.cache.get_item(topic + "#" + claim.strip()) is None
+        ]
+        if not uncached:
+            return
+
+        # Phase 1: collect key_passages in parallel (DB/cache I/O, no GPU)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            all_key_passages = list(executor.map(
+                lambda args: self._collect_key_passages(*args), uncached
+            ))
+
+        # Phase 2: batch encode all passage sets not yet in embed_cache
+        topics_to_encode = {}
+        for key_passages in all_key_passages:
+            for t, passages in key_passages.items():
+                if t not in self.embed_cache and t not in topics_to_encode:
+                    topics_to_encode[t] = passages
+
+        for t, passages in topics_to_encode.items():
+            inputs = [
+                psg["title"] + " " + psg["text"].replace("<s>", "").replace("</s>", "")
+                for psg in passages
+            ]
+            self.embed_cache[t] = self.encoder.encode(
+                inputs, batch_size=self.batch_size, device=self.encoder.device
+            )
+            self.add_n_embed += 1
+
+        if self.add_n_embed > 0:
+            self.save_cache()
+            self.add_n_embed = 0
+
+        # Phase 3: batch encode all retrieval queries at once
+        retrieval_queries = [topic + " " + claim.strip() for topic, claim, _ in uncached]
+        query_vectors = self.encoder.encode(
+            retrieval_queries, batch_size=self.batch_size, device=self.encoder.device
+        )
+        for (topic, claim, _), vec in zip(uncached, query_vectors):
+            self._query_vec_cache[topic + " " + claim.strip()] = vec
 
     def get_topk_related_passages(self, topic, claim, question, k=5, use_cache=True):
         """

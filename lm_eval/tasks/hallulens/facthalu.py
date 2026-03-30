@@ -278,6 +278,13 @@ class FactHalu:
 
         questions = list(set([claim.question for claim in all_claims]))
         self.retrieval.make_ner_cache(questions)
+
+        # Pre-compute passage embeddings (in batch per topic) and query embeddings
+        # (one batched encode call for all claims) to avoid N sequential GPU calls.
+        self.retrieval.prewarm(
+            [(claim.topic, claim.claim, claim.question) for claim in all_claims]
+        )
+
         for claim in tqdm(all_claims):
             passages = self.retrieval.get_topk_related_passages(
                 topic=claim.topic, claim=claim.claim, question=claim.question, k=5
