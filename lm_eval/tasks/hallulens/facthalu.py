@@ -106,7 +106,25 @@ class FactHalu:
     def run(self, prompt, generation, title, reference=None):
         """
         Evaluate longwiki from model error.
-        Saves results to output_csv as jsonl with one line per prompt.
+        Full pipeline: extract claims, prewarm, verify, score.
+        For batched processing, use extract_phase + bulk_prewarm + verify_and_score_phase instead.
+        """
+        # Phase 1: extraction
+        _generation, all_claims, final_result = self.extract_phase(
+            prompt, generation, title, reference
+        )
+
+        if not all_claims:
+            return final_result
+
+        # Phase 2: prewarm + verify + score
+        return self.verify_and_score_phase(_generation, all_claims, final_result)
+
+    def extract_phase(self, prompt, generation, title, reference=None):
+        """
+        Phase 1: Abstention check + claim extraction (API calls only, no GPU).
+        Returns (Generation, list_of_claims, partial_result).
+        If abstained or no claims, list_of_claims will be empty and partial_result is final.
         """
         final_result = {
             "abstained": np.nan,
@@ -114,7 +132,6 @@ class FactHalu:
             "recall": np.nan,
             "f1": np.nan,
         }
-        # initiate generation object
         _generation = Generation(generation=generation, prompt=prompt)
         if reference is not None:
             _generation.reference = reference
@@ -131,7 +148,7 @@ class FactHalu:
         if _generation.abstain is not None:
             if _generation.abstain:
                 final_result["abstained"] = 1
-                return final_result
+                return _generation, [], final_result
             else:
                 final_result["abstained"] = 0
 
@@ -141,16 +158,39 @@ class FactHalu:
         if _generation.abstain is not None:
             if _generation.abstain:
                 final_result["abstained"] = 1
-                return final_result
+                return _generation, [], final_result
 
-        ### [[STEP #3]] Verify claims
-        all_verification_responses = self.verify_claims(all_claims)
+        return _generation, all_claims, final_result
+
+    def bulk_prewarm(self, all_claims_tuples):
+        """
+        Single prewarm for ALL claims across ALL documents.
+        Call this once after extract_phase for all items, before verify_and_score_phase.
+
+        Args:
+            all_claims_tuples: list of (topic, claim_text, question) from all documents
+        """
+        if not all_claims_tuples:
+            return
+        questions = list(set([q for _, _, q in all_claims_tuples]))
+        self.retrieval.make_ner_cache(questions)
+        self.retrieval.prewarm(all_claims_tuples)
+
+    def verify_and_score_phase(self, _generation, all_claims, final_result):
+        """
+        Phase 2: Verify claims and compute metrics.
+        Assumes bulk_prewarm has already been called for these claims.
+        """
+        if not all_claims:
+            return final_result
+
+        ### [[STEP #3]] Verify claims (retrieval should be cache hits after bulk prewarm)
+        all_verification_responses = self._verify_claims_no_prewarm(all_claims)
 
         for claim, verification_response in zip(all_claims, all_verification_responses):
             claim.is_supported = verification_response["is_supported"]
 
-        ### [[[ STEP #4]]] Calculate metrics: precision, recall@k, f1, response ratio
-
+        ### [[STEP #4]] Calculate metrics
         final_results = []
         for sentence in _generation.sentences:
             if not sentence.claims:
@@ -274,17 +314,19 @@ class FactHalu:
         return all_claims
 
     def verify_claims(self, all_claims: List[Claim]):
-        # 1. Prepare the prompt for verification
-
+        """Original verify_claims with built-in prewarm. Kept for backward compatibility."""
         questions = list(set([claim.question for claim in all_claims]))
         self.retrieval.make_ner_cache(questions)
 
-        # Pre-compute passage embeddings (in batch per topic) and query embeddings
-        # (one batched encode call for all claims) to avoid N sequential GPU calls.
         self.retrieval.prewarm(
             [(claim.topic, claim.claim, claim.question) for claim in all_claims]
         )
 
+        return self._verify_claims_no_prewarm(all_claims)
+
+    def _verify_claims_no_prewarm(self, all_claims: List[Claim]):
+        """Verify claims assuming NER cache and prewarm are already done."""
+        # 1. Build retrieval prompts
         for claim in tqdm(all_claims):
             passages = self.retrieval.get_topk_related_passages(
                 topic=claim.topic, claim=claim.claim, question=claim.question, k=5
