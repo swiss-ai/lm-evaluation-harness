@@ -344,13 +344,10 @@ class LongWikiRetrieval(object):
 
     def get_topk_related_passages(self, topic, claim, question, k=5, use_cache=True):
         """
-        NER based top-k passage retrieval
-        Extract named entities from question, get relevant pages for each entity.
-        -> Passage pool: topic (where question is generated), NERs, NER-relevant pages
-        Out of the passage pool, get top-k similar passages to the query using the encoder (self.get_topk_passages)
-        return top-k passages
+        NER based top-k passage retrieval.
+        Reuses _collect_key_passages so the same titles discovered by prewarm
+        are used here — avoiding cache misses during evaluation.
         """
-        #### Function called from facthalu.py
         retrieval_query = topic + " " + claim.strip()
         cache_key = topic + "#" + claim.strip()
 
@@ -359,40 +356,8 @@ class LongWikiRetrieval(object):
         if use_cache and cache_res is not None:
             return cache_res
 
-        # Using NER to get named entities from question
-        ners, ner_relevant_titles = [], []
-        ners = self.Q_NER_cache.get_item(question)
-        for ner in ners:
-            pgs_selected = self.relevant_pages_cache.get_item(ner)
-            if pgs_selected:
-                pgs = pgs_selected
-            else:
-                pgs = self.db.get_relevant_titles(ner)
-                if not pgs:
-                    continue
-                self.relevant_pages_cache.set_item(ner, pgs)
-            ner_relevant_titles += [
-                pg
-                for pg in pgs
-                if ((pg.lower() in claim.lower()) or (pg.lower() in question.lower()))
-            ]
-
-        # Get all relevant pages
-        combined = [topic] + ner_relevant_titles + ners
-        all_related_pages = list(set(combined))
-
-        # get all passages
-        key_passages = {}
-        for title in all_related_pages:
-            title = title.replace("_", " ")
-            if title in self.not_existing_pages:
-                continue
-            try:
-                pages = self.db.get_text_from_title(title)
-                key_passages[title] = pages
-            except:
-                self.not_existing_pages.add(title)
-                continue
+        # Reuse the shared passage collection logic
+        key_passages = self._collect_key_passages(topic, claim, question)
 
         top_k_related_passages = self.get_topk_passages(
             topic, retrieval_query, key_passages, k
