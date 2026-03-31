@@ -87,7 +87,7 @@ class LongWikiRetrieval(object):
             model=ner_model,
             tokenizer=ner_tokenizer,
             aggregation_strategy="simple",
-            batch_size=8,
+            batch_size=64,
             device=0,
         )
 
@@ -242,8 +242,9 @@ class LongWikiRetrieval(object):
         if not uncached:
             return
         
+        print(f"Prewarming NER cache for {len(uncached)} questions...", flush=True)
         # Batch NER inference
-        all_results = self.ner(uncached, batch_size=32)
+        all_results = self.ner(uncached, batch_size=64)
         
         for question, ner_results in zip(uncached, all_results):
             ners = [r["word"] for r in ner_results if "#" not in r["word"]]

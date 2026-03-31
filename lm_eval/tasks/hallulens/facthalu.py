@@ -173,7 +173,10 @@ class FactHalu:
         if not all_claims_tuples:
             return
         questions = list(set([q for _, _, q in all_claims_tuples]))
+        print(f"Prewarming NER cache for {len(all_claims_tuples)} claims across {len(questions)} unique questions...", flush=True)
         self.retrieval.make_ner_cache(questions)
+
+        print(f"Prewarming retrieval cache with {len(all_claims_tuples)} claim tuples...", flush=True)
         self.retrieval.prewarm(all_claims_tuples)
 
     def verify_and_score_phase(self, _generation, all_claims, final_result):
@@ -185,6 +188,7 @@ class FactHalu:
             return final_result
 
         ### [[STEP #3]] Verify claims (retrieval should be cache hits after bulk prewarm)
+        print(f"Verifying {len(all_claims)} claims for current document, this should be cache hits...", flush=True)
         all_verification_responses = self._verify_claims_no_prewarm(all_claims)
 
         for claim, verification_response in zip(all_claims, all_verification_responses):
