@@ -237,12 +237,17 @@ class LongWikiRetrieval(object):
         return [passages_all[i] for i in indices]
 
     def make_ner_cache(self, questions: List[str]):
-        for question in questions:
-            ners = self.Q_NER_cache.get_item(question)
-            if ners is None:
-                ner_results = self.ner(question)
-                ners = [r["word"] for r in ner_results if "#" not in r["word"]]
-                self.Q_NER_cache.set_item(question, ners)
+        # Filter to uncached questions
+        uncached = [q for q in questions if self.Q_NER_cache.get_item(q) is None]
+        if not uncached:
+            return
+        
+        # Batch NER inference
+        all_results = self.ner(uncached, batch_size=32)
+        
+        for question, ner_results in zip(uncached, all_results):
+            ners = [r["word"] for r in ner_results if "#" not in r["word"]]
+            self.Q_NER_cache.set_item(question, ners)
 
     def _collect_key_passages(self, topic, claim, question):
         """Collect the passage pool for one claim (DB + cache lookups only, no encoding)."""

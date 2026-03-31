@@ -254,6 +254,10 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
       Phase 2: One big prewarm for ALL claims (single GPU batch)
       Phase 3: Verify + score in parallel (retrieval = cache hits, verification = API calls)
     """
+    print(f"[LONGWIKI] Starting batch: {len(longwiki_indices)} docs", flush=True)
+    
+    # Phase 1
+    print(f"[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
     # Phase 1: parallel extraction (abstention check + claim extraction are API calls)
     extraction_data = [None] * len(longwiki_indices)
 
@@ -272,14 +276,19 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
             pos, gen, claims, partial_result = future.result()
             extraction_data[pos] = (gen, claims, partial_result)
 
+
+
     # Phase 2: one big prewarm across ALL documents (single batched GPU call)
     all_claims_tuples = []
     for gen, claims, _ in extraction_data:
         for claim in claims:
             all_claims_tuples.append((claim.topic, claim.claim, claim.question))
 
+    print(f"Longwiki batch: {len(longwiki_indices)} docs, {len(all_claims_tuples)} total claims", flush=True)
+
     _longwiki_evaluator.bulk_prewarm(all_claims_tuples)
 
+    print(f"[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
     # Phase 3: parallel verification + scoring (retrieval = cache hits, verification = API)
     def _verify(pos):
         gen, claims, partial_result = extraction_data[pos]
@@ -298,7 +307,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
             cache_key = (items[idx]["doc"]["prompt"], items[idx]["completion"])
             with _eval_cache_lock:
                 _eval_cache[cache_key] = result
-
+    print(f"[LONGWIKI] Phase 3 done.", flush=True)
 
 def _run_all(items, max_workers=64):
     results = [None] * len(items)
