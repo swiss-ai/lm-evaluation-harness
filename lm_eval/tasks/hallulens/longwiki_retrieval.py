@@ -12,6 +12,7 @@ import numpy as np
 import pickle as pkl
 from typing import List
 import concurrent.futures
+import threading
 
 from lm_eval.tasks.hallulens.cache import Cache
 from lm_eval.tasks.hallulens.retrieval import DocDB
@@ -23,13 +24,17 @@ class LongWikiDB(DocDB):
         # import DocDB from FactScore
         super(LongWikiDB, self).__init__(db_path, data_path)
         self.title_db_path = db_path.replace(".db", "-title.db")
-        self.title_connection = sqlite3.connect(
-            self.title_db_path, check_same_thread=False
-        )
+        self._local = threading.local()
         self.SPECIAL_SEPARATOR = "####SPECIAL####SEPARATOR####"
 
+    def _get_title_connection(self):
+        if not hasattr(self._local, 'connection'):
+            self._local.connection = sqlite3.connect(self.title_db_path)
+        return self._local.connection
+
     def get_relevant_titles(self, entity: str):
-        cursor = self.title_connection.cursor()
+        conn = self._get_title_connection()
+        cursor = conn.cursor()
         entity = entity.replace("'", "''")
         cursor.execute(
             "SELECT title_name FROM titles WHERE title_name LIKE ?",
@@ -66,6 +71,8 @@ class LongWikiRetrieval(object):
         self.db = db
         self.CACHE_BASE_PATH = cache_base_path
         self.embed_cache_path = embed_cache_path
+        self._embed_lock = threading.Lock()
+        self._encode_lock = threading.Lock()  # serialize GPU encoding calls
         self.load_cache()
 
         self.retrieval_type = retrieval_type
@@ -80,7 +87,7 @@ class LongWikiRetrieval(object):
             model=ner_model,
             tokenizer=ner_tokenizer,
             aggregation_strategy="simple",
-            batch_size=8,
+            batch_size=64,
             device=0,
         )
 
@@ -129,17 +136,20 @@ class LongWikiRetrieval(object):
         self.cache = Cache(self.cache_path)
 
     def save_cache(self):
-        if self.add_n_embed > 0:
-            if os.path.exists(self.embed_cache_path):
-                try:
-                    with open(self.embed_cache_path, "rb") as f:
-                        new_cache = pkl.load(f)
-                    self.embed_cache.update(new_cache)
-                except (EOFError, pkl.UnpicklingError):
-                    pass  # file empty/corrupted from prior crash; overwrite it
+        with self._embed_lock:
+            if self.add_n_embed > 0:
+                disk_cache = {}
+                if os.path.exists(self.embed_cache_path):
+                    try:
+                        with open(self.embed_cache_path, "rb") as f:
+                            disk_cache = pkl.load(f)
+                    except (EOFError, pkl.UnpicklingError):
+                        pass  # file empty/corrupted from prior crash; overwrite it
 
-            with open(self.embed_cache_path, "wb") as f:
-                pkl.dump(self.embed_cache, f)
+                disk_cache.update(self.embed_cache)  # in-memory wins over disk
+
+                with open(self.embed_cache_path, "wb") as f:
+                    pkl.dump(disk_cache, f)
 
     def get_topk_passages(self, topic, retrieval_query, key_passages, k=5):
         if self.encoder is None:
@@ -148,59 +158,97 @@ class LongWikiRetrieval(object):
         if not key_passages:
             return []
 
-        self.add_n_embed = 0
+        add_n_embed = 0
         passage_vectors_all = None
         passages_all = []
 
-        for topic, passages in key_passages.items():
-            passages_all += passages
+        # Snapshot the embed cache once — brief lock, no contention during encoding
+        with self._embed_lock:
+            embed_snapshot = dict(self.embed_cache)
 
-            if topic in self.embed_cache:
-                passage_vectors = self.embed_cache[topic]
+        # Separate cached vs uncached topics
+        topics_to_encode = {}
+        topic_order = []
+        cached_vectors = {}
+
+        for t, passages in key_passages.items():
+            passages_all += passages
+            if t in embed_snapshot and embed_snapshot[t].shape[0] == len(passages):
+                cached_vectors[t] = embed_snapshot[t]
             else:
+                topics_to_encode[t] = passages
+                topic_order.append(t)
+
+        # Batch encode all missing topics in a single GPU call
+        if topics_to_encode:
+            all_inputs = []
+            topic_boundaries = {}
+            idx = 0
+            for t in topic_order:
                 inputs = [
                     psg["title"]
                     + " "
                     + psg["text"].replace("<s>", "").replace("</s>", "")
-                    for psg in passages
+                    for psg in topics_to_encode[t]
                 ]
-                passage_vectors = self.encoder.encode(
-                    inputs,
+                topic_boundaries[t] = (idx, idx + len(inputs))
+                all_inputs.extend(inputs)
+                idx += len(inputs)
+
+            with self._encode_lock:
+                all_vectors = self.encoder.encode(
+                    all_inputs,
                     batch_size=self.batch_size,
                     device=self.encoder.device,
                 )
-                self.embed_cache[topic] = passage_vectors
 
-                self.add_n_embed += 1
+            with self._embed_lock:
+                for t, (start, end) in topic_boundaries.items():
+                    vec = all_vectors[start:end]
+                    self.embed_cache[t] = vec
+                    cached_vectors[t] = vec
+                    add_n_embed += 1
 
+        # Build passage_vectors_all in key_passages iteration order
+        for t in key_passages:
+            vecs = cached_vectors[t]
             passage_vectors_all = (
-                np.concatenate([passage_vectors_all, passage_vectors], axis=0)
+                np.concatenate([passage_vectors_all, vecs], axis=0)
                 if passage_vectors_all is not None
-                else passage_vectors
+                else vecs
             )
 
         if retrieval_query in self._query_vec_cache:
             query_vectors = self._query_vec_cache.pop(retrieval_query)
         else:
-            query_vectors = self.encoder.encode(
-                [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
-            )[0]
+            with self._encode_lock:
+                query_vectors = self.encoder.encode(
+                    [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
+                )[0]
 
         scores = np.inner(query_vectors, passage_vectors_all)
         indices = np.argsort(-scores)[:k]
 
-        if self.add_n_embed > 0:
+        if add_n_embed > 0:
+            self.add_n_embed += add_n_embed
             self.save_cache()
 
+        indices = [i for i in indices if i < len(passages_all)]
         return [passages_all[i] for i in indices]
 
     def make_ner_cache(self, questions: List[str]):
-        for question in questions:
-            ners = self.Q_NER_cache.get_item(question)
-            if ners is None:
-                ner_results = self.ner(question)
-                ners = [r["word"] for r in ner_results if "#" not in r["word"]]
-                self.Q_NER_cache.set_item(question, ners)
+        # Filter to uncached questions
+        uncached = [q for q in questions if self.Q_NER_cache.get_item(q) is None]
+        if not uncached:
+            return
+        
+        print(f"Prewarming NER cache for {len(uncached)} questions...", flush=True)
+        # Batch NER inference
+        all_results = self.ner(uncached, batch_size=64)
+        
+        for question, ner_results in zip(uncached, all_results):
+            ners = [r["word"] for r in ner_results if "#" not in r["word"]]
+            self.Q_NER_cache.set_item(question, ners)
 
     def _collect_key_passages(self, topic, claim, question):
         """Collect the passage pool for one claim (DB + cache lookups only, no encoding)."""
@@ -258,10 +306,13 @@ class LongWikiRetrieval(object):
             ))
 
         # Phase 2: batch encode ALL passages across ALL topics in one encoder call
+        with self._embed_lock:
+            already_cached = set(self.embed_cache.keys())
+
         topics_to_encode = {}
         for key_passages in all_key_passages:
             for t, passages in key_passages.items():
-                if t not in self.embed_cache and t not in topics_to_encode:
+                if t not in already_cached and t not in topics_to_encode:
                     topics_to_encode[t] = passages
 
         if topics_to_encode:
@@ -280,9 +331,11 @@ class LongWikiRetrieval(object):
             all_vectors = self.encoder.encode(
                 all_inputs, batch_size=self.batch_size, device=self.encoder.device
             )
-            for t, (start, end) in topic_boundaries.items():
-                self.embed_cache[t] = all_vectors[start:end]
-                self.add_n_embed += 1
+
+            with self._embed_lock:
+                for t, (start, end) in topic_boundaries.items():
+                    self.embed_cache[t] = all_vectors[start:end]
+                    self.add_n_embed += 1
 
             self.save_cache()
             self.add_n_embed = 0
@@ -297,13 +350,10 @@ class LongWikiRetrieval(object):
 
     def get_topk_related_passages(self, topic, claim, question, k=5, use_cache=True):
         """
-        NER based top-k passage retrieval
-        Extract named entities from question, get relevant pages for each entity.
-        -> Passage pool: topic (where question is generated), NERs, NER-relevant pages
-        Out of the passage pool, get top-k similar passages to the query using the encoder (self.get_topk_passages)
-        return top-k passages
+        NER based top-k passage retrieval.
+        Reuses _collect_key_passages so the same titles discovered by prewarm
+        are used here — avoiding cache misses during evaluation.
         """
-        #### Function called from facthalu.py
         retrieval_query = topic + " " + claim.strip()
         cache_key = topic + "#" + claim.strip()
 
@@ -312,40 +362,8 @@ class LongWikiRetrieval(object):
         if use_cache and cache_res is not None:
             return cache_res
 
-        # Using NER to get named entities from question
-        ners, ner_relevant_titles = [], []
-        ners = self.Q_NER_cache.get_item(question)
-        for ner in ners:
-            pgs_selected = self.relevant_pages_cache.get_item(ner)
-            if pgs_selected:
-                pgs = pgs_selected
-            else:
-                pgs = self.db.get_relevant_titles(ner)
-                if not pgs:
-                    continue
-                self.relevant_pages_cache.set_item(ner, pgs)
-            ner_relevant_titles += [
-                pg
-                for pg in pgs
-                if ((pg.lower() in claim.lower()) or (pg.lower() in question.lower()))
-            ]
-
-        # Get all relevant pages
-        combined = [topic] + ner_relevant_titles + ners
-        all_related_pages = list(set(combined))
-
-        # get all passages
-        key_passages = {}
-        for title in all_related_pages:
-            title = title.replace("_", " ")
-            if title in self.not_existing_pages:
-                continue
-            try:
-                pages = self.db.get_text_from_title(title)
-                key_passages[title] = pages
-            except:
-                self.not_existing_pages.add(title)
-                continue
+        # Reuse the shared passage collection logic
+        key_passages = self._collect_key_passages(topic, claim, question)
 
         top_k_related_passages = self.get_topk_passages(
             topic, retrieval_query, key_passages, k

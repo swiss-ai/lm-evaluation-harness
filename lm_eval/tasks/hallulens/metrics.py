@@ -153,7 +153,7 @@ Result:{{"is_abstaining":true}}
 
 Remember, if the chatbot abstains from providing an answer, it should not attempt to correct the user's question or provide an answer. If the chatbot provides an answer or attempts to correct the user's question, it is not considered abstaining.
 
-Now it's your turn. Don’t apologize or correct yourself. Reply your result only with a valid JSON using: {{"is_abstaining":true|false}}.
+Now it's your turn. Don't apologize or correct yourself. Reply your result only with a valid JSON using: {{"is_abstaining":true|false}}.
 User: {prompt}
 Chatbot: {generation}
 Result:
@@ -162,9 +162,6 @@ Result:
 # ============================================================================
 # Caching and aggregation infrastructure
 # ============================================================================
-# Share eval cache and lock across all module re-executions so that the 4
-# longwiki aggregation functions (abstained_agg, precision_agg, etc.) all hit
-# the same cache instead of each recomputing from scratch.
 _EVAL_CACHE_KEY = "__hallulens_eval_cache__"
 _EVAL_CACHE_LOCK_KEY = "__hallulens_eval_cache_lock__"
 if _EVAL_CACHE_KEY not in sys.modules:
@@ -196,7 +193,8 @@ def replace_none_with_nan(scores):
     return scores
 
 def _evaluate_single(item):
-    """Run the full evaluation for a single doc — with caching."""
+    """Run the full evaluation for a single doc — with caching.
+    Used for non-longwiki categories. Longwiki uses the two-phase path."""
     doc = item["doc"]
     completion = item["completion"]
 
@@ -214,9 +212,9 @@ def _evaluate_single(item):
         result = run_eval_precise_wiki(original_prompt, completion, golden_answer)
 
     elif category == "longwiki":
+        # Fallback: if called directly (not via _run_all), use the original full pipeline
         title = doc["title"]
         reference = doc["reference"]
-
         result = replace_none_with_nan(
             _longwiki_evaluator.run(original_prompt, completion, title, reference)
         )
@@ -249,9 +247,104 @@ def _evaluate_single(item):
     return result
 
 
-def _run_all(items, max_workers=64):
+def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
+    """
+    Two-phase longwiki processing:
+      Phase 1: Extract claims in parallel (API calls benefit from threading)
+      Phase 2: One big prewarm for ALL claims (single GPU batch)
+      Phase 3: Verify + score in parallel (retrieval = cache hits, verification = API calls)
+    """
+    print(f"[LONGWIKI] Starting batch: {len(longwiki_indices)} docs", flush=True)
+    
+    # Phase 1
+    print(f"[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
+    # Phase 1: parallel extraction (abstention check + claim extraction are API calls)
+    extraction_data = [None] * len(longwiki_indices)
+
+    def _extract(pos):
+        idx = longwiki_indices[pos]
+        doc = items[idx]["doc"]
+        completion = items[idx]["completion"]
+        gen, claims, partial_result = _longwiki_evaluator.extract_phase(
+            doc["prompt"], completion, doc["title"], doc.get("reference")
+        )
+        return pos, gen, claims, partial_result
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        return list(executor.map(_evaluate_single, items))
+        futures = [executor.submit(_extract, pos) for pos in range(len(longwiki_indices))]
+        for future in concurrent.futures.as_completed(futures):
+            pos, gen, claims, partial_result = future.result()
+            extraction_data[pos] = (gen, claims, partial_result)
+
+
+
+    # Phase 2: one big prewarm across ALL documents (single batched GPU call)
+    all_claims_tuples = []
+    for gen, claims, _ in extraction_data:
+        for claim in claims:
+            all_claims_tuples.append((claim.topic, claim.claim, claim.question))
+
+    print(f"Longwiki batch: {len(longwiki_indices)} docs, {len(all_claims_tuples)} total claims", flush=True)
+
+    _longwiki_evaluator.bulk_prewarm(all_claims_tuples)
+
+    print(f"[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
+    # Phase 3: parallel verification + scoring (retrieval = cache hits, verification = API)
+    def _verify(pos):
+        gen, claims, partial_result = extraction_data[pos]
+        if not claims:
+            return pos, partial_result
+        result = _longwiki_evaluator.verify_and_score_phase(gen, claims, partial_result)
+        return pos, result
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(_verify, pos) for pos in range(len(longwiki_indices))]
+        for future in concurrent.futures.as_completed(futures):
+            pos, result = future.result()
+            idx = longwiki_indices[pos]
+            results[idx] = result
+            # Cache the result
+            cache_key = (items[idx]["doc"]["prompt"], items[idx]["completion"])
+            with _eval_cache_lock:
+                _eval_cache[cache_key] = result
+    print(f"[LONGWIKI] Phase 3 done.", flush=True)
+
+def _run_all(items, max_workers=64):
+    results = [None] * len(items)
+
+    # Check cache for all items first
+    uncached_indices = []
+    for i, item in enumerate(items):
+        cache_key = (item["doc"]["prompt"], item["completion"])
+        with _eval_cache_lock:
+            if cache_key in _eval_cache:
+                results[i] = _eval_cache[cache_key]
+            else:
+                uncached_indices.append(i)
+
+    if not uncached_indices:
+        return results
+
+    # Separate longwiki from other categories
+    longwiki_indices = [i for i in uncached_indices if items[i]["doc"]["category"] == "longwiki"]
+    other_indices = [i for i in uncached_indices if items[i]["doc"]["category"] != "longwiki"]
+
+    # Process non-longwiki items in parallel (unchanged behavior)
+    if other_indices:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_idx = {
+                executor.submit(_evaluate_single, items[i]): i
+                for i in other_indices
+            }
+            for future in concurrent.futures.as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                results[idx] = future.result()
+
+    # Process longwiki items with two-phase approach
+    if longwiki_indices:
+        _run_longwiki_batch(items, longwiki_indices, results, max_workers)
+
+    return results
 
 # ============================================================================
 # Per-document score function (defers to aggregation)
@@ -425,7 +518,3 @@ def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
         "refusal_rate": refusal_rate,
         "correct_rate": correct_rate,
     }
-
-
-
-
