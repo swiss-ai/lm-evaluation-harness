@@ -319,7 +319,7 @@ class FactHalu:
         claim_verification_results = base_utils.jsonify_ans_longwiki(
             raw_responses=claim_verification_res,
             eval_prompts=verification_prompts,
-            evaluator=self.verifier,
+            model=self.verifier,
             tokenizer=self.verifier_tokenizer,
             key="is_supported",
         )
