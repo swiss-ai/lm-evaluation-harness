@@ -72,6 +72,7 @@ class LongWikiRetrieval(object):
         self.CACHE_BASE_PATH = cache_base_path
         self.embed_cache_path = embed_cache_path
         self._embed_lock = threading.Lock()
+        self._encode_lock = threading.Lock()  # serialize GPU encoding calls
         self.load_cache()
 
         self.retrieval_type = retrieval_type
@@ -157,52 +158,79 @@ class LongWikiRetrieval(object):
         if not key_passages:
             return []
 
-        self.add_n_embed = 0
+        add_n_embed = 0
         passage_vectors_all = None
         passages_all = []
 
-        for topic, passages in key_passages.items():
+        # Snapshot the embed cache once — brief lock, no contention during encoding
+        with self._embed_lock:
+            embed_snapshot = dict(self.embed_cache)
+
+        # Separate cached vs uncached topics
+        topics_to_encode = {}
+        topic_order = []
+        cached_vectors = {}
+
+        for t, passages in key_passages.items():
             passages_all += passages
-
-            with self._embed_lock:
-                cached = self.embed_cache.get(topic)
-
-            if cached is not None:
-                passage_vectors = cached
+            if t in embed_snapshot and embed_snapshot[t].shape[0] == len(passages):
+                cached_vectors[t] = embed_snapshot[t]
             else:
+                topics_to_encode[t] = passages
+                topic_order.append(t)
+
+        # Batch encode all missing topics in a single GPU call
+        if topics_to_encode:
+            all_inputs = []
+            topic_boundaries = {}
+            idx = 0
+            for t in topic_order:
                 inputs = [
                     psg["title"]
                     + " "
                     + psg["text"].replace("<s>", "").replace("</s>", "")
-                    for psg in passages
+                    for psg in topics_to_encode[t]
                 ]
-                passage_vectors = self.encoder.encode(
-                    inputs,
+                topic_boundaries[t] = (idx, idx + len(inputs))
+                all_inputs.extend(inputs)
+                idx += len(inputs)
+
+            with self._encode_lock:
+                all_vectors = self.encoder.encode(
+                    all_inputs,
                     batch_size=self.batch_size,
                     device=self.encoder.device,
                 )
-                with self._embed_lock:
-                    self.embed_cache[topic] = passage_vectors
 
-                self.add_n_embed += 1
+            with self._embed_lock:
+                for t, (start, end) in topic_boundaries.items():
+                    vec = all_vectors[start:end]
+                    self.embed_cache[t] = vec
+                    cached_vectors[t] = vec
+                    add_n_embed += 1
 
+        # Build passage_vectors_all in key_passages iteration order
+        for t in key_passages:
+            vecs = cached_vectors[t]
             passage_vectors_all = (
-                np.concatenate([passage_vectors_all, passage_vectors], axis=0)
+                np.concatenate([passage_vectors_all, vecs], axis=0)
                 if passage_vectors_all is not None
-                else passage_vectors
+                else vecs
             )
 
         if retrieval_query in self._query_vec_cache:
             query_vectors = self._query_vec_cache.pop(retrieval_query)
         else:
-            query_vectors = self.encoder.encode(
-                [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
-            )[0]
+            with self._encode_lock:
+                query_vectors = self.encoder.encode(
+                    [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
+                )[0]
 
         scores = np.inner(query_vectors, passage_vectors_all)
         indices = np.argsort(-scores)[:k]
 
-        if self.add_n_embed > 0:
+        if add_n_embed > 0:
+            self.add_n_embed += add_n_embed
             self.save_cache()
 
         indices = [i for i in indices if i < len(passages_all)]
@@ -272,12 +300,14 @@ class LongWikiRetrieval(object):
             ))
 
         # Phase 2: batch encode ALL passages across ALL topics in one encoder call
-        topics_to_encode = {}
         with self._embed_lock:
-            for key_passages in all_key_passages:
-                for t, passages in key_passages.items():
-                    if t not in self.embed_cache and t not in topics_to_encode:
-                        topics_to_encode[t] = passages
+            already_cached = set(self.embed_cache.keys())
+
+        topics_to_encode = {}
+        for key_passages in all_key_passages:
+            for t, passages in key_passages.items():
+                if t not in already_cached and t not in topics_to_encode:
+                    topics_to_encode[t] = passages
 
         if topics_to_encode:
             all_inputs = []
