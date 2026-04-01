@@ -88,11 +88,8 @@ class FactHalu:
 
         self.verifier = claim_verifier
         self.verifier_tokenizer = claim_verifier_tokenizer
-        cache_dir = os.environ.get(
-            "FACTHALU_CACHE_DIR",
-            os.path.join(os.path.expanduser("~"), "facthalu_cache"),
-        )
-        os.makedirs(cache_dir, exist_ok=True)
+        home_dir = os.path.expanduser("~")
+        cache_dir = os.path.join(home_dir, "facthalu_cache")
 
         self.CACHE_BASE_PATH = cache_dir
         self.embedded_cache_path = os.path.join(cache_dir, "embedded_cache.json")
