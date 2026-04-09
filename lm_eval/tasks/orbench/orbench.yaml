@@ -1,3 +1,4 @@
+task: orbench
 dataset_path: bench-llm/or-bench
 dataset_name: or-bench-hard-1k
 output_type: generate_until
