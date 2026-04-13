@@ -20,7 +20,6 @@ from typing import (
 import datasets
 import numpy as np
 from tqdm import tqdm
-import huggingface_hub
 
 from lm_eval import utils
 from lm_eval.api import samplers
@@ -92,7 +91,9 @@ def _is_saved_dataset_dir(path: Path) -> bool:
     if not path.is_dir():
         return False
     # `datasets.save_to_disk` writes one of these at the root.
-    return (path / "dataset_dict.json").is_file() or (path / "dataset_info.json").is_file()
+    return (path / "dataset_dict.json").is_file() or (
+        path / "dataset_info.json"
+    ).is_file()
 
 
 def _resolve_private_saved_dataset_path(
@@ -620,7 +621,7 @@ class Task(abc.ABC):
         self._config["process_results"] = "process_results"
 
     def set_fewshot_seed(self, seed: int | None = None) -> None:
-        self.fewshot_rnd = random.Random(seed)
+        self.fewshot_rnd = random.Random(seed)  # noqa: S311
         if hasattr(self, "sampler"):
             self.sampler.set_rnd(seed)
 
