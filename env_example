@@ -1,2 +1,3 @@
 HF_TOKEN = ...  # For private datasets in the swiss-ai Hugging Face org
+LM_EVAL_PRIVATE_DATASET_ROOT = /capstor/store/cscs/swissai/infra01/datasets-hf-private  # Optional: local-first override for swiss-ai/switzerland_qa and swiss-ai/include-base-new-45
 PERSPECTIVE_API_KEY = ...  # For RealToxicityPrompts and PolygloToxicityPrompts

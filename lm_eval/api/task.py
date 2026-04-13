@@ -3,11 +3,13 @@ from __future__ import annotations
 import abc
 import ast
 import logging
+import os
 import random
 import re
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from copy import deepcopy
 from functools import partial
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -56,6 +58,34 @@ ALL_OUTPUT_TYPES = [
 ]
 
 eval_logger = logging.getLogger(__name__)
+
+_PRIVATE_DATASET_ROOT_ENV = "LM_EVAL_PRIVATE_DATASET_ROOT"
+_DEFAULT_PRIVATE_DATASET_ROOT = (
+    "/capstor/store/cscs/swissai/infra01/datasets-hf-private"
+)
+_PRIVATE_DATASET_OVERRIDES = {
+    "swiss-ai/switzerland_qa": "swiss-ai__switzerland_qa",
+    "swiss-ai/include-base-new-45": "swiss-ai__include-base-new-45",
+}
+
+
+def _resolve_private_dataset_path(dataset_path: str | None) -> str | None:
+    if dataset_path is None:
+        return None
+
+    relative_path = _PRIVATE_DATASET_OVERRIDES.get(dataset_path)
+    if relative_path is None:
+        return None
+
+    root = os.getenv(_PRIVATE_DATASET_ROOT_ENV, _DEFAULT_PRIVATE_DATASET_ROOT)
+    if not root:
+        return None
+
+    candidate = Path(root) / relative_path
+    if candidate.is_dir():
+        return str(candidate)
+
+    return None
 
 
 TaskConfig = TaskConfig
@@ -863,7 +893,7 @@ class ConfigurableTask(Task):
         if dataset_kwargs and vparse(datasets.__version__) >= vparse("4.0.0"):
             dataset_kwargs.pop("trust_remote_code", None)
 
-        def _do_download():
+        def _do_download(path_override: str | None = None):
             if isinstance(self.config.custom_dataset, Callable):
                 eval_logger.warning(
                     f"{self.config.task}: Custom kwargs can be passed to `--metadata` in console (as json string) or to the TaskManager."
@@ -874,9 +904,25 @@ class ConfigurableTask(Task):
                 )
             else:
                 return datasets.load_dataset(
-                    path=self.DATASET_PATH,
+                    path=path_override or self.DATASET_PATH,
                     name=self.DATASET_NAME,
                     **dataset_kwargs if dataset_kwargs is not None else {},
+                )
+
+        private_dataset_path = _resolve_private_dataset_path(self.DATASET_PATH)
+        if private_dataset_path is not None:
+            try:
+                self.dataset = _do_download(path_override=private_dataset_path)
+                eval_logger.info(
+                    f"Loaded task '{self.config.task}' from private dataset path: "
+                    f"{private_dataset_path} (source id: {self.DATASET_PATH})."
+                )
+                return
+            except Exception as e:
+                eval_logger.warning(
+                    f"Failed loading private dataset for task '{self.config.task}' "
+                    f"from '{private_dataset_path}' ({type(e).__name__}: {e}). "
+                    f"Falling back to '{self.DATASET_PATH}'."
                 )
 
         max_retries = 5

@@ -12,6 +12,11 @@ from lm_eval.loggers.utils import _handle_non_serializable, remove_none_pattern
 
 logger = logging.getLogger(__name__)
 
+_WANDB_SAMPLES_BLOCKED_DATASET_PATHS = {
+    "swiss-ai/switzerland_qa",
+    "swiss-ai/include-base-new-45",
+}
+
 
 def get_wandb_printer() -> Literal["Printer"]:
     """Returns a wandb printer instance for pretty stdout."""
@@ -319,6 +324,11 @@ class WandbLogger:
         self.run.log_artifact(artifact)
         # artifact.wait()
 
+    def _should_skip_samples_upload(self, task_name: str) -> bool:
+        task_config = self.task_configs.get(task_name, {})
+        dataset_path = task_config.get("dataset_path")
+        return dataset_path in _WANDB_SAMPLES_BLOCKED_DATASET_PATHS
+
     def log_eval_samples(self, samples: Dict[str, List[Dict[str, Any]]]) -> None:
         """Log evaluation samples to W&B.
 
@@ -347,6 +357,13 @@ class WandbLogger:
                 ungrouped_tasks.append(task_name)
 
         for task_name in ungrouped_tasks:
+            if self._should_skip_samples_upload(task_name):
+                logger.info(
+                    f"Skipping W&B sample upload for private dataset task '{task_name}'."
+                )
+                continue
+            if task_name not in samples:
+                continue
             eval_preds = samples[task_name]
 
             # log the samples as a W&B Table
@@ -361,6 +378,14 @@ class WandbLogger:
         for group, grouped_tasks in tasks_by_groups.items():
             grouped_df = pd.DataFrame()
             for task_name in grouped_tasks:
+                if self._should_skip_samples_upload(task_name):
+                    logger.info(
+                        f"Skipping W&B sample upload for private dataset task "
+                        f"'{task_name}' in group '{group}'."
+                    )
+                    continue
+                if task_name not in samples:
+                    continue
                 eval_preds = samples[task_name]
                 df = self._generate_dataset(
                     eval_preds, self.task_configs.get(task_name)
@@ -372,6 +397,8 @@ class WandbLogger:
                 # log the samples as a json file as W&B Artifact
                 self._log_samples_as_artifact(eval_preds, task_name)
 
-            self.run.log(
-                {f"{group}_eval_results": grouped_df, **self.step_metrics}, commit=True
-            )
+            if not grouped_df.empty:
+                self.run.log(
+                    {f"{group}_eval_results": grouped_df, **self.step_metrics},
+                    commit=True,
+                )

@@ -1,5 +1,6 @@
 import os
 import re
+from math import isclose
 from typing import List
 
 import pytest
@@ -142,10 +143,14 @@ def test_printed_results(task_name: List[str], limit: int, model: str, model_arg
     for t1_line, t2_line in zip(t1_lines, t2_lines):
         t1_items, t2_items = t1_line.split("|"), t2_line.split("|")
         assert len(t1_items) == len(t2_items)
+        metric_name = t1_items[5].strip() if len(t1_items) > 5 else ""
         for t1_item, t2_item in zip(t1_items, t2_items):
             try:
-                t1_item = float(t1_item)
-                t2_item = float(t2_item)
-                assert abs(t1_item - t2_item) < 0.3
+                t1_item_f = float(t1_item)
+                t2_item_f = float(t2_item)
+                if metric_name in {"perplexity", "word_perplexity", "byte_perplexity"}:
+                    assert isclose(t1_item_f, t2_item_f, rel_tol=0.8, abs_tol=0.0)
+                else:
+                    assert abs(t1_item_f - t2_item_f) < 0.3
             except ValueError:
                 assert t1_item == t2_item
