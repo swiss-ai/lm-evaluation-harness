@@ -1,7 +1,7 @@
 import copy
 import json
 import logging
-from typing import Any, Literal, Tuple
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -94,7 +94,7 @@ class WandbLogger:
 
         return configs
 
-    def _sanitize_results_dict(self) -> Tuple[dict[str, str], dict[str, Any]]:
+    def _sanitize_results_dict(self) -> tuple[dict[str, str], dict[str, Any]]:
         """Sanitize the results dictionary."""
         _results = copy.deepcopy(self.results.get("results", dict()))
 
