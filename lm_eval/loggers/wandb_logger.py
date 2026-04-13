@@ -1,7 +1,7 @@
 import copy
 import json
 import logging
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Literal, Tuple
 
 import numpy as np
 import pandas as pd
@@ -31,8 +31,8 @@ class WandbLogger:
         """Attaches to wandb logger if already initialized. Otherwise, passes init_args to wandb.init() and config_args to wandb.config.update()
 
         Args:
-            init_args Optional[Dict]: Arguments for init configuration.
-            config_args Optional[Dict]: Arguments for config
+            init_args Optional[dict]: Arguments for init configuration.
+            config_args Optional[dict]: Arguments for config
 
         Parse and log the results returned from evaluator.simple_evaluate() with:
             wandb_logger.post_init(results)
@@ -52,8 +52,8 @@ class WandbLogger:
                 f"{e}"
             )
 
-        self.wandb_args: Dict[str, Any] = init_args or {}
-        self.wandb_config_args: Dict[str, Any] = config_args or {}
+        self.wandb_args: dict[str, Any] = init_args or {}
+        self.wandb_config_args: dict[str, Any] = config_args or {}
 
         # pop the step key from the args to save for all logging calls
         self.step = self.wandb_args.pop("step", None)
@@ -78,12 +78,12 @@ class WandbLogger:
 
         self.printer = get_wandb_printer()
 
-    def post_init(self, results: Dict[str, Any]) -> None:
-        self.results: Dict[str, Any] = copy.deepcopy(results)
-        self.task_names: List[str] = list(results.get("results", {}).keys())
-        self.group_names: List[str] = list(results.get("groups", {}).keys())
+    def post_init(self, results: dict[str, Any]) -> None:
+        self.results: dict[str, Any] = copy.deepcopy(results)
+        self.task_names: list[str] = list(results.get("results", {}).keys())
+        self.group_names: list[str] = list(results.get("groups", {}).keys())
 
-    def _get_config(self) -> Dict[str, Any]:
+    def _get_config(self) -> dict[str, Any]:
         """Get configuration parameters."""
         self.task_configs = self.results.get("configs", {})
         cli_configs = self.results.get("config", {})
@@ -94,7 +94,7 @@ class WandbLogger:
 
         return configs
 
-    def _sanitize_results_dict(self) -> Tuple[Dict[str, str], Dict[str, Any]]:
+    def _sanitize_results_dict(self) -> Tuple[dict[str, str], dict[str, Any]]:
         """Sanitize the results dictionary."""
         _results = copy.deepcopy(self.results.get("results", dict()))
 
@@ -141,7 +141,7 @@ class WandbLogger:
             "Stderr",
         ]
 
-        def make_table(columns: List[str], key: str = "results"):
+        def make_table(columns: list[str], key: str = "results"):
             import wandb
 
             table = wandb.Table(columns=columns)
@@ -214,13 +214,13 @@ class WandbLogger:
         self._log_results_as_artifact()
 
     def _generate_dataset(
-        self, data: List[Dict[str, Any]], config: Dict[str, Any]
+        self, data: list[dict[str, Any]], config: dict[str, Any]
     ) -> pd.DataFrame:
         """Generate a dataset from evaluation data.
 
         Args:
-            data (List[Dict[str, Any]]): The data to generate a dataset for.
-            config (Dict[str, Any]): The configuration of the task.
+            data (list[dict[str, Any]]): The data to generate a dataset for.
+            config (dict[str, Any]): The configuration of the task.
 
         Returns:
             pd.DataFrame: A dataframe that is ready to be uploaded to W&B.
@@ -305,7 +305,7 @@ class WandbLogger:
         return pd.DataFrame(df_data)
 
     def _log_samples_as_artifact(
-        self, data: List[Dict[str, Any]], task_name: str
+        self, data: list[dict[str, Any]], task_name: str
     ) -> None:
         import wandb
 
@@ -329,13 +329,13 @@ class WandbLogger:
         dataset_path = task_config.get("dataset_path")
         return dataset_path in _WANDB_SAMPLES_BLOCKED_DATASET_PATHS
 
-    def log_eval_samples(self, samples: Dict[str, List[Dict[str, Any]]]) -> None:
+    def log_eval_samples(self, samples: dict[str, list[dict[str, Any]]]) -> None:
         """Log evaluation samples to W&B.
 
         Args:
-            samples (Dict[str, List[Dict[str, Any]]]): Evaluation samples for each task.
+            samples (dict[str, list[dict[str, Any]]]): Evaluation samples for each task.
         """
-        task_names: List[str] = [
+        task_names: list[str] = [
             x for x in self.task_names if x not in self.group_names
         ]
 
