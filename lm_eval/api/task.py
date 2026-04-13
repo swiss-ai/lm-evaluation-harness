@@ -88,6 +88,32 @@ def _resolve_private_dataset_path(dataset_path: str | None) -> str | None:
     return None
 
 
+def _is_saved_dataset_dir(path: Path) -> bool:
+    if not path.is_dir():
+        return False
+    # `datasets.save_to_disk` writes one of these at the root.
+    return (path / "dataset_dict.json").is_file() or (path / "dataset_info.json").is_file()
+
+
+def _resolve_private_saved_dataset_path(
+    private_dataset_root: str, dataset_name: str | None
+) -> str | None:
+    root = Path(private_dataset_root)
+
+    # Common mirror layout for configured datasets:
+    # <private-root>/<dataset-id>/<config>/dataset_dict.json
+    if dataset_name:
+        config_dir = root / dataset_name
+        if _is_saved_dataset_dir(config_dir):
+            return str(config_dir)
+
+    # Also support direct save_to_disk at the dataset root.
+    if _is_saved_dataset_dir(root):
+        return str(root)
+
+    return None
+
+
 TaskConfig = TaskConfig
 
 
@@ -912,6 +938,18 @@ class ConfigurableTask(Task):
         private_dataset_path = _resolve_private_dataset_path(self.DATASET_PATH)
         if private_dataset_path is not None:
             try:
+                saved_dataset_path = _resolve_private_saved_dataset_path(
+                    private_dataset_root=private_dataset_path,
+                    dataset_name=self.DATASET_NAME,
+                )
+                if saved_dataset_path is not None:
+                    self.dataset = datasets.load_from_disk(saved_dataset_path)
+                    eval_logger.info(
+                        f"Loaded task '{self.config.task}' from private saved dataset path: "
+                        f"{saved_dataset_path} (source id: {self.DATASET_PATH})."
+                    )
+                    return
+
                 self.dataset = _do_download(path_override=private_dataset_path)
                 eval_logger.info(
                     f"Loaded task '{self.config.task}' from private dataset path: "
