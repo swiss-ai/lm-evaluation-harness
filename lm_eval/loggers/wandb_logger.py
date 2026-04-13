@@ -116,7 +116,7 @@ class WandbLogger:
                 if isinstance(metric_value, str):
                     wandb_summary[f"{task}/{metric_name}"] = metric_value
 
-        for summary_metric, summary_value in wandb_summary.items():
+        for summary_metric, _summary_value in wandb_summary.items():
             _task, _summary_metric = summary_metric.split("/")
             _results[_task].pop(_summary_metric)
 
@@ -148,7 +148,7 @@ class WandbLogger:
             results = copy.deepcopy(self.results)
 
             for k, dic in results.get(key).items():
-                if k in self.group_names and not key == "groups":
+                if k in self.group_names and key != "groups":
                     continue
                 version = results.get("versions").get(k)
                 if version == "N/A":
@@ -165,7 +165,7 @@ class WandbLogger:
                     if m + "_stderr" + "," + f in dic:
                         se = dic[m + "_stderr" + "," + f]
                         if se != "N/A":
-                            se = "%.4f" % se
+                            se = f"{se:.4f}"
                         table.add_data(*[k, version, f, n, m, str(v), str(se)])
                     else:
                         table.add_data(*[k, version, f, n, m, str(v), ""])
@@ -274,11 +274,7 @@ class WandbLogger:
             filtered_resps = [
                 np.argmax([n[0] for n in x["filtered_resps"]]) for x in data
             ]
-        elif config["output_type"] == "loglikelihood_rolling":
-            instance = [x["arguments"][0][0] for x in data]
-            resps = [x["resps"][0][0] for x in data]
-            filtered_resps = [x["filtered_resps"][0] for x in data]
-        elif config["output_type"] == "generate_until":
+        elif config["output_type"] in {"loglikelihood_rolling", "generate_until"}:
             instance = [x["arguments"][0][0] for x in data]
             resps = [x["resps"][0][0] for x in data]
             filtered_resps = [x["filtered_resps"][0] for x in data]
