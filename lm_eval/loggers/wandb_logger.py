@@ -1,7 +1,7 @@
 import copy
 import json
 import logging
-from typing import Any, Dict, List, Literal, Tuple
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,11 @@ from lm_eval.loggers.utils import _handle_non_serializable, remove_none_pattern
 
 
 logger = logging.getLogger(__name__)
+
+_WANDB_SAMPLES_BLOCKED_DATASET_PATHS = {
+    "swiss-ai/switzerland_qa",
+    "swiss-ai/include-base-new-45",
+}
 
 
 def get_wandb_printer() -> Literal["Printer"]:
@@ -26,8 +31,8 @@ class WandbLogger:
         """Attaches to wandb logger if already initialized. Otherwise, passes init_args to wandb.init() and config_args to wandb.config.update()
 
         Args:
-            init_args Optional[Dict]: Arguments for init configuration.
-            config_args Optional[Dict]: Arguments for config
+            init_args Optional[dict]: Arguments for init configuration.
+            config_args Optional[dict]: Arguments for config
 
         Parse and log the results returned from evaluator.simple_evaluate() with:
             wandb_logger.post_init(results)
@@ -47,8 +52,8 @@ class WandbLogger:
                 f"{e}"
             )
 
-        self.wandb_args: Dict[str, Any] = init_args or {}
-        self.wandb_config_args: Dict[str, Any] = config_args or {}
+        self.wandb_args: dict[str, Any] = init_args or {}
+        self.wandb_config_args: dict[str, Any] = config_args or {}
 
         # pop the step key from the args to save for all logging calls
         self.step = self.wandb_args.pop("step", None)
@@ -73,12 +78,12 @@ class WandbLogger:
 
         self.printer = get_wandb_printer()
 
-    def post_init(self, results: Dict[str, Any]) -> None:
-        self.results: Dict[str, Any] = copy.deepcopy(results)
-        self.task_names: List[str] = list(results.get("results", {}).keys())
-        self.group_names: List[str] = list(results.get("groups", {}).keys())
+    def post_init(self, results: dict[str, Any]) -> None:
+        self.results: dict[str, Any] = copy.deepcopy(results)
+        self.task_names: list[str] = list(results.get("results", {}).keys())
+        self.group_names: list[str] = list(results.get("groups", {}).keys())
 
-    def _get_config(self) -> Dict[str, Any]:
+    def _get_config(self) -> dict[str, Any]:
         """Get configuration parameters."""
         self.task_configs = self.results.get("configs", {})
         cli_configs = self.results.get("config", {})
@@ -89,7 +94,7 @@ class WandbLogger:
 
         return configs
 
-    def _sanitize_results_dict(self) -> Tuple[Dict[str, str], Dict[str, Any]]:
+    def _sanitize_results_dict(self) -> tuple[dict[str, str], dict[str, Any]]:
         """Sanitize the results dictionary."""
         _results = copy.deepcopy(self.results.get("results", dict()))
 
@@ -111,7 +116,7 @@ class WandbLogger:
                 if isinstance(metric_value, str):
                     wandb_summary[f"{task}/{metric_name}"] = metric_value
 
-        for summary_metric, summary_value in wandb_summary.items():
+        for summary_metric, _summary_value in wandb_summary.items():
             _task, _summary_metric = summary_metric.split("/")
             _results[_task].pop(_summary_metric)
 
@@ -136,14 +141,14 @@ class WandbLogger:
             "Stderr",
         ]
 
-        def make_table(columns: List[str], key: str = "results"):
+        def make_table(columns: list[str], key: str = "results"):
             import wandb
 
             table = wandb.Table(columns=columns)
             results = copy.deepcopy(self.results)
 
             for k, dic in results.get(key).items():
-                if k in self.group_names and not key == "groups":
+                if k in self.group_names and key != "groups":
                     continue
                 version = results.get("versions").get(k)
                 if version == "N/A":
@@ -160,7 +165,7 @@ class WandbLogger:
                     if m + "_stderr" + "," + f in dic:
                         se = dic[m + "_stderr" + "," + f]
                         if se != "N/A":
-                            se = "%.4f" % se
+                            se = f"{se:.4f}"
                         table.add_data(*[k, version, f, n, m, str(v), str(se)])
                     else:
                         table.add_data(*[k, version, f, n, m, str(v), ""])
@@ -209,13 +214,13 @@ class WandbLogger:
         self._log_results_as_artifact()
 
     def _generate_dataset(
-        self, data: List[Dict[str, Any]], config: Dict[str, Any]
+        self, data: list[dict[str, Any]], config: dict[str, Any]
     ) -> pd.DataFrame:
         """Generate a dataset from evaluation data.
 
         Args:
-            data (List[Dict[str, Any]]): The data to generate a dataset for.
-            config (Dict[str, Any]): The configuration of the task.
+            data (list[dict[str, Any]]): The data to generate a dataset for.
+            config (dict[str, Any]): The configuration of the task.
 
         Returns:
             pd.DataFrame: A dataframe that is ready to be uploaded to W&B.
@@ -269,11 +274,7 @@ class WandbLogger:
             filtered_resps = [
                 np.argmax([n[0] for n in x["filtered_resps"]]) for x in data
             ]
-        elif config["output_type"] == "loglikelihood_rolling":
-            instance = [x["arguments"][0][0] for x in data]
-            resps = [x["resps"][0][0] for x in data]
-            filtered_resps = [x["filtered_resps"][0] for x in data]
-        elif config["output_type"] == "generate_until":
+        elif config["output_type"] in {"loglikelihood_rolling", "generate_until"}:
             instance = [x["arguments"][0][0] for x in data]
             resps = [x["resps"][0][0] for x in data]
             filtered_resps = [x["filtered_resps"][0] for x in data]
@@ -300,7 +301,7 @@ class WandbLogger:
         return pd.DataFrame(df_data)
 
     def _log_samples_as_artifact(
-        self, data: List[Dict[str, Any]], task_name: str
+        self, data: list[dict[str, Any]], task_name: str
     ) -> None:
         import wandb
 
@@ -319,13 +320,18 @@ class WandbLogger:
         self.run.log_artifact(artifact)
         # artifact.wait()
 
-    def log_eval_samples(self, samples: Dict[str, List[Dict[str, Any]]]) -> None:
+    def _should_skip_samples_upload(self, task_name: str) -> bool:
+        task_config = self.task_configs.get(task_name, {})
+        dataset_path = task_config.get("dataset_path")
+        return dataset_path in _WANDB_SAMPLES_BLOCKED_DATASET_PATHS
+
+    def log_eval_samples(self, samples: dict[str, list[dict[str, Any]]]) -> None:
         """Log evaluation samples to W&B.
 
         Args:
-            samples (Dict[str, List[Dict[str, Any]]]): Evaluation samples for each task.
+            samples (dict[str, list[dict[str, Any]]]): Evaluation samples for each task.
         """
-        task_names: List[str] = [
+        task_names: list[str] = [
             x for x in self.task_names if x not in self.group_names
         ]
 
@@ -347,6 +353,13 @@ class WandbLogger:
                 ungrouped_tasks.append(task_name)
 
         for task_name in ungrouped_tasks:
+            if self._should_skip_samples_upload(task_name):
+                logger.info(
+                    f"Skipping W&B sample upload for private dataset task '{task_name}'."
+                )
+                continue
+            if task_name not in samples:
+                continue
             eval_preds = samples[task_name]
 
             # log the samples as a W&B Table
@@ -361,6 +374,14 @@ class WandbLogger:
         for group, grouped_tasks in tasks_by_groups.items():
             grouped_df = pd.DataFrame()
             for task_name in grouped_tasks:
+                if self._should_skip_samples_upload(task_name):
+                    logger.info(
+                        f"Skipping W&B sample upload for private dataset task "
+                        f"'{task_name}' in group '{group}'."
+                    )
+                    continue
+                if task_name not in samples:
+                    continue
                 eval_preds = samples[task_name]
                 df = self._generate_dataset(
                     eval_preds, self.task_configs.get(task_name)
@@ -372,6 +393,8 @@ class WandbLogger:
                 # log the samples as a json file as W&B Artifact
                 self._log_samples_as_artifact(eval_preds, task_name)
 
-            self.run.log(
-                {f"{group}_eval_results": grouped_df, **self.step_metrics}, commit=True
-            )
+            if not grouped_df.empty:
+                self.run.log(
+                    {f"{group}_eval_results": grouped_df, **self.step_metrics},
+                    commit=True,
+                )

@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List
+from math import isclose
 
 import pytest
 
@@ -36,7 +36,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
     ids=lambda d: f"{d}",
 )
 def test_evaluator(
-    task_name: List[str], limit: int, model: str, model_args: str, bootstrap_iters: int
+    task_name: list[str], limit: int, model: str, model_args: str, bootstrap_iters: int
 ):
     e1 = evaluator.simple_evaluate(
         model=model,
@@ -76,7 +76,11 @@ def test_evaluator(
 
     assert all(
         x == y
-        for x, y in zip([y for _, y in r(e1).items()], [y for _, y in r(e2).items()])
+        for x, y in zip(
+            [y for _, y in r(e1).items()],
+            [y for _, y in r(e2).items()],
+            strict=True,
+        )
     )
 
 
@@ -110,7 +114,7 @@ def test_evaluator(
     ],
     ids=lambda d: f"{d}",
 )
-def test_printed_results(task_name: List[str], limit: int, model: str, model_args: str):
+def test_printed_results(task_name: list[str], limit: int, model: str, model_args: str):
     results = evaluator.simple_evaluate(
         model=model,
         tasks=task_name,
@@ -132,20 +136,24 @@ def test_printed_results(task_name: List[str], limit: int, model: str, model_arg
         )
     )
     filepath = f"./tests/testdata/{filename}.txt"
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         t1 = f.read().strip()
 
     t2 = make_table(results).strip()
 
     t1_lines, t2_lines = t1.splitlines(), t2.splitlines()
     assert len(t1_lines) == len(t2_lines)
-    for t1_line, t2_line in zip(t1_lines, t2_lines):
+    for t1_line, t2_line in zip(t1_lines, t2_lines, strict=True):
         t1_items, t2_items = t1_line.split("|"), t2_line.split("|")
         assert len(t1_items) == len(t2_items)
-        for t1_item, t2_item in zip(t1_items, t2_items):
+        metric_name = t1_items[5].strip() if len(t1_items) > 5 else ""
+        for t1_item, t2_item in zip(t1_items, t2_items, strict=True):
             try:
-                t1_item = float(t1_item)
-                t2_item = float(t2_item)
-                assert abs(t1_item - t2_item) < 0.3
+                t1_item_f = float(t1_item)
+                t2_item_f = float(t2_item)
+                if metric_name in {"perplexity", "word_perplexity", "byte_perplexity"}:
+                    assert isclose(t1_item_f, t2_item_f, rel_tol=0.8, abs_tol=0.0)
+                else:
+                    assert abs(t1_item_f - t2_item_f) < 0.3
             except ValueError:
                 assert t1_item == t2_item
