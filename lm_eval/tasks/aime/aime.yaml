@@ -14,7 +14,7 @@ metric_list:
   - metric: exact_match
     aggregation: mean
     higher_is_better: true
-  - metric: !function metrics.degeneration
+  - metric: degeneration
     aggregation: mean
     higher_is_better: false
 generation_kwargs:

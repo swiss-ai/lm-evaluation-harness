@@ -16,6 +16,20 @@ T = TypeVar("T")
 
 eval_logger = logging.getLogger(__name__)
 
+def is_degenerating_text(
+    text: str,
+    max_n: int = 3,
+    threshold: float = 0.9,
+) -> bool:
+    words = text.split()
+    for n in range(1, max_n + 1):
+        if len(words) < n:
+            continue
+        ngrams = [tuple(words[i:i+n]) for i in range(len(words) - n + 1)]
+        repetition = 1 - (len(set(ngrams)) / len(ngrams))
+        if repetition > threshold:
+            return True
+    return False
 
 # Register Aggregations First
 @register_aggregation("bypass")
@@ -402,6 +416,15 @@ def acc_all(items):
     acc = np.mean([int(all(x)) for x in question_scoring_dict.values()])
     return acc
 
+@register_metric(
+    metric="degeneration",
+    higher_is_better=False,
+    output_type=["generate_until", "multiple_choice"],
+    aggregation="mean",
+)
+def degeneration(items):
+    gold, pred = items
+    return int(is_degenerating_text(pred.lower()))
 
 def acc_all_stderr(items):
     # Only count as correct if all answers are labeled correctly for each question
