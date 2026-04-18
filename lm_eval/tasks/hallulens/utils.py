@@ -10,7 +10,7 @@ import time
 import aiohttp
 
 # API_URL = "https://api.swissai.cscs.ch/v1"
-API_URL = "http://172.28.44.152:8080/v1"
+API_URL = "http://172.28.43.112:8080/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "Qwen/Qwen3.5-27B"
 
