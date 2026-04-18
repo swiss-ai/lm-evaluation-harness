@@ -10,6 +10,9 @@ metric_list:
   - metric: refusal
     aggregation: mean
     higher_is_better: false
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
 generation_kwargs:
   do_sample: false
   temperature: 0.0
