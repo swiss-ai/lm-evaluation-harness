@@ -13,11 +13,7 @@ def is_degenerating_text(
             return True
     return False
 
-def score(doc, predictions, **kwargs):
-    pred = predictions[0]
-    pred = pred.lower()
-    degenerating = is_degenerating_text(pred)
-    if degenerating:
-        return 1
-    else:
-        return 0
+def score(items):
+    """items = [gold, prediction]"""
+    gold, pred = items
+    return int(is_degenerating_text(pred.lower()))
