@@ -21,7 +21,7 @@ metric_list:
       - "\\$"
       - "(?s).*#### "
       - "\\.$"
-  - metric: !function metrics.score
+  - metric: !function metrics.degeneration
     aggregation: mean
     higher_is_better: false
 
