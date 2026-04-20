@@ -16,7 +16,7 @@ if _METRICS_CACHE_KEY not in sys.modules:
     # Verify remote API connection
     _test = try_remote_generate("hello there")
 
-    _tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.3-70B-Instruct")
+    _tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-27B")
     if _test is None:
         raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
     else:

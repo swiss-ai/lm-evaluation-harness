@@ -15,6 +15,9 @@ metric_list:
       - "\\$"
       - "(?s).*#### "
       - "\\.$"
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
 generation_kwargs:
   until:
     - "Question:"
