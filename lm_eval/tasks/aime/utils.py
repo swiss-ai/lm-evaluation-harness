@@ -51,6 +51,8 @@ def process_2024(dataset: Dataset) -> Dataset:
 
 from typing import Dict, List
 
+from lm_eval.api.metrics import is_degenerating_text
+
 
 def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
     retval = 0
@@ -79,7 +81,10 @@ def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
     if is_equiv(answer, target):
         retval = 1
 
-    return {"exact_match": retval}
+    return {
+        "exact_match": retval,
+        "degeneration": int(is_degenerating_text(response.lower())),
+    }
 
 
 # string normalization from https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/hendrycks_math.py
