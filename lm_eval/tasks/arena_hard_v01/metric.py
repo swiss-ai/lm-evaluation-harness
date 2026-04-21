@@ -1,6 +1,6 @@
 """Arena-Hard v0.1 metric for lm-evaluation-harness.
 
-Implements pairwise judge evaluation using Llama-3.3-70B-Instruct as judge,
+Implements pairwise judge evaluation using Qwen3.5—27B as judge,
 served via the CSCS SwissAI API.
 
 The evaluation follows the Arena-Hard protocol:
@@ -18,7 +18,8 @@ Prerequisites:
     openai
     huggingface_hub
     numpy
-    CSCS_SERVING_API environment variable (with access to Llama-3.3-70B-Instruct)
+    CSCS_SERVING_API environment variable (with access to Qwen3.5—27B judge endpoint. 
+                                Make sure this model is served on the CSCS platform.)
 """
 
 import concurrent.futures
@@ -37,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 # CSCS SwissAI serving endpoint
 API_URL = "https://api.swissai.cscs.ch/v1"
-JUDGE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
+JUDGE_MODEL = "Qwen/Qwen3.5—27B"
 
 # Number of concurrent threads hitting the judge API.
 # vLLM with continuous batching on GH200s can handle high concurrency.
-_JUDGE_MAX_WORKERS = 128
+_JUDGE_MAX_WORKERS = 64
 
 # Number of retries for the OpenAI client (covers transient HTTP errors).
 _CLIENT_MAX_RETRIES = 10
@@ -56,7 +57,7 @@ MAX_GEN_TOKS_ENV = "ARENA_HARD_MAX_GEN_TOKS"
 # ── Scoring method configuration ─────────────────────────────────
 # "weighted"      = original Arena-Hard weighted average + bootstrap
 # "style_control" = Bradley-Terry model controlling for style features
-SCORING_METHOD = "weighted"
+SCORING_METHOD = os.environ.get("ARENA_HARD_SCORING_METHOD", "weighted")
 
 # Which style features to control for (only used when SCORING_METHOD = "style_control").
 # Supported: ["length", "markdown"] (both), ["length"], or ["markdown"].
@@ -289,7 +290,8 @@ def _judge_call(client, uid, round_num, user_prompt):
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.0,
-            max_tokens=4096,
+            max_tokens=6000,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
         return (uid, round_num, resp.choices[0].message.content)
     except Exception as e:
@@ -787,6 +789,7 @@ def arena_hard_agg(items):
         f"using {JUDGE_MODEL} as judge via CSCS API "
         f"({total_calls} judge calls with {_JUDGE_MAX_WORKERS} concurrent workers)..."
     )
+    logger.info(f"Scoring method: {SCORING_METHOD} (env ARENA_HARD_SCORING_METHOD)")
 
     # Build prompts and run judge calls
     tasks = _build_judge_tasks(valid_items)
