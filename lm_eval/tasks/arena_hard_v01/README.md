@@ -97,3 +97,4 @@ If other tasks on this dataset are already supported:
 * [ ] Have you noted which, if any, published evaluation setups are matched by this variant?
 
 ### Changelog
+Changed to Qwen 3.5-27B judge. Make sure this model is served on the CSCS platform to be called as judge.
