@@ -1686,6 +1686,12 @@ class ConfigurableTask(Task):
                 acc_mutual_info = 1.0 if np.argmax(lls_mutual_info) == gold else 0.0
                 result_dict["acc_mutual_info"] = acc_mutual_info
 
+            if "degeneration" in use_metric:
+                pred_text = choices[pred]
+                result_dict["degeneration"] = self._metric_fn_list["degeneration"](
+                    [gold, pred_text]
+                )
+
         elif self.OUTPUT_TYPE == "generate_until":
             gold = self.doc_to_target(doc)
             result = results[0]
