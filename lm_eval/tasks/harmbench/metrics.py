@@ -228,16 +228,15 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
         # All 6 retries failed — reduce completion by 20% and try again
         original_word_count = len(current_completion.split())
         current_completion, new_word_count = _reduce_completion(current_completion)
-        print(
-            f"[REDUCTION] Remote generation was unsuccessful, may have exceeded context window, reducing completion from {original_word_count} "
-            f"to {new_word_count} words (attempt {reduction_attempt + 1}/{max_reduction_attempts})"
-        )
+        # print(
+        #     f"[REDUCTION] Remote generation was unsuccessful, may have exceeded context window, reducing completion from {original_word_count} "
+        #     f"to {new_word_count} words (attempt {reduction_attempt + 1}/{max_reduction_attempts})"
+        # )
 
         if new_word_count <= 1:
-            print("[REDUCTION] Completion reduced to minimum. Giving up.")
             break
 
-    print("Failed to get a prediction even after repeated reductions of completion length, skipping this sample.")
+    print("[SKIPPED SAMPLE] Failed to get a prediction through the remote API endpoint, even after repeated reductions of completion length, skipping this sample. Either this sample is too long for the max context window of the judge model (2048), or there is a problem with the model endpoint.")
     return {"score": np.nan}
 
 
