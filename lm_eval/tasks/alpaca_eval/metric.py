@@ -27,7 +27,7 @@ import yaml
 logger = logging.getLogger(__name__)
 
 # CSCS SwissAI serving endpoint
-API_URL = "https://api.swissai.cscs.ch/v1"
+API_URL = "https://api.swissai.svc.cscs.ch/v1"
 
 # Judge model served at the CSCS endpoint
 JUDGE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
