@@ -37,16 +37,16 @@ logger = logging.getLogger(__name__)
 # ── Constants ─────────────────────────────────────────────────────────
 
 # CSCS SwissAI serving endpoint
-API_URL = "https://api.swissai.cscs.ch/v1"
-JUDGE_MODEL = "Qwen/Qwen3.5—27B"
+API_URL = "https://api.swissai.svc.cscs.ch/v1"
+JUDGE_MODEL = "Qwen/Qwen3.5-27B"
 
 # Number of concurrent threads hitting the judge API.
 # vLLM with continuous batching on GH200s can handle high concurrency.
-_JUDGE_MAX_WORKERS = 32
+_JUDGE_MAX_WORKERS = 64
 
 # Number of retries for the OpenAI client (covers transient HTTP errors).
 _CLIENT_MAX_RETRIES = 10
-
+_TIMEOUT_SECONDS = 600
 # Bootstrap resampling parameters
 NUM_BOOTSTRAP = 100
 
@@ -282,6 +282,12 @@ def _judge_call(client, uid, round_num, user_prompt):
     Returns:
         Tuple of (uid, round_num, judgment_text_or_None).
     """
+    prompt_chars = len(user_prompt)
+    logger.info(
+        f"Judge call START uid={uid} round={round_num} "
+        f"prompt_chars={prompt_chars}"
+    )
+    t0 = time.time()
     try:
         resp = client.chat.completions.create(
             model=JUDGE_MODEL,
@@ -293,9 +299,34 @@ def _judge_call(client, uid, round_num, user_prompt):
             max_tokens=6000,
             extra_body={"chat_template_kwargs": {"enable_thinking": False}},
         )
-        return (uid, round_num, resp.choices[0].message.content)
+        elapsed = time.time() - t0
+        content = resp.choices[0].message.content
+        logger.info(
+            f"Judge call OK uid={uid} round={round_num} "
+            f"elapsed={elapsed:.1f}s response_chars={len(content or '')}"
+        )
+        return (uid, round_num, content)
     except Exception as e:
-        logger.warning(f"Judge API error uid={uid} round={round_num}: {e}")
+        elapsed = time.time() - t0
+        # Classify the error for easier log analysis
+        err_str = str(e)
+        if "504" in err_str:
+            err_type = "504_GATEWAY_TIMEOUT"
+        elif "502" in err_str:
+            err_type = "502_BAD_GATEWAY"
+        elif "429" in err_str:
+            err_type = "429_RATE_LIMITED"
+        elif "timeout" in err_str.lower() or "timed out" in err_str.lower():
+            err_type = "CLIENT_TIMEOUT"
+        else:
+            err_type = type(e).__name__
+        logger.warning(
+            f"Judge call FAILED uid={uid} round={round_num} "
+            f"error_type={err_type} elapsed={elapsed:.1f}s "
+            f"prompt_chars={prompt_chars} "
+            f"(retries were exhausted after {_CLIENT_MAX_RETRIES} attempts): "
+            f"{err_str[:300]}"
+        )
         return (uid, round_num, None)
 
 
@@ -355,6 +386,8 @@ def _run_judge_calls(client, tasks):
     total_calls = len(tasks)
     results_map = {}
     completed = 0
+    succeeded = 0
+    failed = 0
     judging_start = time.time()
 
     with concurrent.futures.ThreadPoolExecutor(
@@ -369,20 +402,38 @@ def _run_judge_calls(client, tasks):
             uid, rnd, judgment = future.result()
             results_map.setdefault(uid, {})[rnd] = judgment
             completed += 1
+            if judgment is not None:
+                succeeded += 1
+            else:
+                failed += 1
 
             if completed % 50 == 0 or completed == total_calls:
                 elapsed = time.time() - judging_start
                 rate = completed / elapsed if elapsed > 0 else 0
                 logger.info(
                     f"  Judge progress: {completed}/{total_calls} calls done "
-                    f"({elapsed:.0f}s elapsed, {rate:.1f} calls/s)"
+                    f"({succeeded} ok, {failed} failed, "
+                    f"{elapsed:.0f}s elapsed, {rate:.1f} calls/s)"
                 )
 
     total_judging_time = time.time() - judging_start
     logger.info(
         f"All {total_calls} judge calls completed in {total_judging_time:.0f}s "
-        f"({total_calls / total_judging_time:.1f} calls/s)"
+        f"({total_calls / total_judging_time:.1f} calls/s). "
+        f"Succeeded: {succeeded}, Failed: {failed}"
     )
+
+    if failed > 0:
+        failed_uids = [
+            f"uid={uid} round={rnd}"
+            for uid, rounds in results_map.items()
+            for rnd, judgment in rounds.items()
+            if judgment is None
+        ]
+        logger.warning(
+            f"{failed} judge calls failed permanently. "
+            f"Failed calls: {', '.join(failed_uids)}"
+        )
 
     return results_map
 
@@ -774,6 +825,7 @@ def arena_hard_agg(items):
         base_url=API_URL,
         api_key=api_key,
         max_retries=_CLIENT_MAX_RETRIES,
+        timeout=_TIMEOUT_SECONDS,
     )
 
     # Filter items without baseline answers
