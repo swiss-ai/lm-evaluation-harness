@@ -436,6 +436,10 @@ def acc_all(items):
 )
 def degeneration(items):
     gold, pred = items
+    if isinstance(pred, list):
+        if not pred:
+            return 0.0
+        return sum(int(is_degenerating_text(p.lower())) for p in pred) / len(pred)
     return int(is_degenerating_text(pred.lower()))
 
 def acc_all_stderr(items):
