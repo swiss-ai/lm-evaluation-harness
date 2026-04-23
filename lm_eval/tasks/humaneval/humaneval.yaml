@@ -10,6 +10,9 @@ metric_list:
     aggregation: mean
     higher_is_better: true
     k: [1, 10]
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
 generation_kwargs:
   until:
     - "\nclass"
