@@ -19,12 +19,9 @@ metric_list:
     aggregation: mean
     higher_is_better: false
 generation_kwargs:
-  until:
-    # - "Question:"
-    - "</s>"
-    - "<|im_end|>"
   do_sample: false
-  temperature: 0.0
+  temperature: 0.8
+  max_gen_toks: 32768
 # OLMES-style answer extraction - look for final numeric answer
 filter_list:
   - name: "numeric-fallback"
