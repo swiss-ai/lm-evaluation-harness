@@ -20,7 +20,7 @@ metric_list:
     higher_is_better: false
 generation_kwargs:
   until:
-    - "Question:"
+    # - "Question:"
     - "</s>"
     - "<|im_end|>"
   do_sample: false
