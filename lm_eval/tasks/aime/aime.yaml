@@ -21,6 +21,8 @@ generation_kwargs:
   do_sample: true
   temperature: 0.8
   max_gen_toks: 32768
+  until:
+    - "\n\n\n\n"
 repeats: 1
 metadata:
   version: 0.0

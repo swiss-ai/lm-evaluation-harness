@@ -22,6 +22,8 @@ generation_kwargs:
   do_sample: true
   temperature: 0.8
   max_gen_toks: 32768
+  until:
+    - "\n\n\n\n"
 # OLMES-style answer extraction - look for final numeric answer
 filter_list:
   - name: "numeric-fallback"

@@ -17,5 +17,7 @@ generation_kwargs:
   do_sample: false
   temperature: 0.0
   max_new_tokens: 256
+  until:
+    - "\n\n\n\n"
 metadata:
   version: 1.0
