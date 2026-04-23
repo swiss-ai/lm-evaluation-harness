@@ -5,7 +5,7 @@ import time
 
 MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
 
-API_URL = "https://api.swissai.cscs.ch/v1"
+API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 # check if the cscs serving API key is set and raise an error if not
 if API_KEY is None or API_KEY.strip() == "":

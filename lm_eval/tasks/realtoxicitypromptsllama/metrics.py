@@ -7,7 +7,7 @@ import requests
 
 MODEL_NAME = "meta-llama/Llama-Guard-4-12B"
 
-API_URL = "https://api.swissai.cscs.ch/v1"
+API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 
 eval_logger = logging.getLogger(__name__)

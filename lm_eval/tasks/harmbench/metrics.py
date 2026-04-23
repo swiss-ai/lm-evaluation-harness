@@ -24,7 +24,7 @@ except OSError:
 nlp.max_length = 10000000
 
 # Remote classifier config
-API_URL = "https://api.swissai.cscs.ch/v1"
+API_URL = "https://api.swissai.cscs.svc.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "cais/HarmBench-Llama-2-13b-cls"
 
