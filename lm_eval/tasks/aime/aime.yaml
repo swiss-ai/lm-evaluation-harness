@@ -18,7 +18,7 @@ metric_list:
     aggregation: mean
     higher_is_better: false
 generation_kwargs:
-  do_sample: false
+  do_sample: true
   temperature: 0.8
   max_gen_toks: 32768
 repeats: 1
