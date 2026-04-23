@@ -42,11 +42,11 @@ JUDGE_MODEL = "Qwen/Qwen3.5-27B"
 
 # Number of concurrent threads hitting the judge API.
 # vLLM with continuous batching on GH200s can handle high concurrency.
-_JUDGE_MAX_WORKERS = 32
+_JUDGE_MAX_WORKERS = 16
 
 # Number of retries for the OpenAI client (covers transient HTTP errors).
-_CLIENT_MAX_RETRIES = 10
-_TIMEOUT_SECONDS = 600
+_CLIENT_MAX_RETRIES = 8
+_TIMEOUT_SECONDS = 800
 # Bootstrap resampling parameters
 NUM_BOOTSTRAP = 100
 
