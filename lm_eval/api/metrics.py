@@ -16,19 +16,31 @@ T = TypeVar("T")
 
 eval_logger = logging.getLogger(__name__)
 
+def is_degenerating_chunk(
+    chunk: list,
+    n: int = 1,
+    threshold: float = 0.8,
+) -> bool:
+    if len(chunk) < n:
+        return False
+    ngrams = [tuple(chunk[i:i + n]) for i in range(len(chunk) - n + 1)]
+    if not ngrams:
+        return False
+    return (1 - len(set(ngrams)) / len(ngrams)) > threshold
+
+
 def is_degenerating_text(
     text: str,
     max_n: int = 3,
-    threshold: float = 0.9,
+    threshold: float = 0.8,
+    chunk_size: int = 512,
 ) -> bool:
     words = text.split()
-    for n in range(1, max_n + 1):
-        if len(words) < n:
-            continue
-        ngrams = [tuple(words[i:i+n]) for i in range(len(words) - n + 1)]
-        repetition = 1 - (len(set(ngrams)) / len(ngrams))
-        if repetition > threshold:
-            return True
+    for start in range(0, len(words), chunk_size):
+        chunk = words[start:start + chunk_size]
+        for n in range(1, max_n + 1):
+            if is_degenerating_chunk(chunk, n=n, threshold=threshold):
+                return True
     return False
 
 # Register Aggregations First
