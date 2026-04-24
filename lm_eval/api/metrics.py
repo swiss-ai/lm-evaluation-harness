@@ -33,7 +33,7 @@ def is_degenerating_text(
     text: str,
     max_n: int = 3,
     threshold: float = 0.8,
-    chunk_size: int = 1024,
+    chunk_size: int = 128,
 ) -> bool:
     words = text.split()
     for start in range(0, len(words), chunk_size):
