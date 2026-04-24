@@ -28,17 +28,16 @@ def is_degenerating_chunk(
         return False
     return (1 - len(set(ngrams)) / len(ngrams)) > threshold
 
-
 def is_degenerating_text(
     text: str,
-    max_n: int = 3,
+    list_n: list = [1, 2, 3, 10, 25, 50],
     threshold: float = 0.8,
-    chunk_size: int = 128,
+    chunk_size: int = 1024,
 ) -> bool:
     words = text.split()
     for start in range(0, len(words), chunk_size):
         chunk = words[start:start + chunk_size]
-        for n in range(1, max_n + 1):
+        for n in list_n:
             if is_degenerating_chunk(chunk, n=n, threshold=threshold):
                 return True
     return False
