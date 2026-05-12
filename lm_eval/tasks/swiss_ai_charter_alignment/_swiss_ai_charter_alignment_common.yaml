@@ -14,6 +14,15 @@ metric_list:
   - metric: swiss_ai_charter_judge_success_rate
     aggregation: !function utils.swiss_ai_charter_success_agg
     higher_is_better: true
+  - metric: swiss_ai_charter_pairwise_winrate
+    aggregation: !function utils.swiss_ai_charter_pairwise_winrate_agg
+    higher_is_better: true
+  - metric: swiss_ai_charter_length_controlled_winrate
+    aggregation: !function utils.swiss_ai_charter_length_controlled_winrate_agg
+    higher_is_better: true
+  - metric: swiss_ai_charter_pairwise_judge_success_rate
+    aggregation: !function utils.swiss_ai_charter_pairwise_success_agg
+    higher_is_better: true
   - metric: avg_word_count
     aggregation: mean
     higher_is_better: false

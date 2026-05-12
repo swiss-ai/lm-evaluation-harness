@@ -9,5 +9,11 @@ aggregate_metric_list:
     weight_by_size: true
   - metric: swiss_ai_charter_judge_success_rate
     weight_by_size: true
+  - metric: swiss_ai_charter_pairwise_winrate
+    weight_by_size: true
+  - metric: swiss_ai_charter_length_controlled_winrate
+    weight_by_size: true
+  - metric: swiss_ai_charter_pairwise_judge_success_rate
+    weight_by_size: true
   - metric: avg_word_count
     weight_by_size: true
