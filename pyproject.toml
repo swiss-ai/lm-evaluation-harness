@@ -73,6 +73,7 @@ sparsify = ["sparsify"]
 # Task specific dependencies
 acpbench = ["lark>=1.1.9", "tarski[clingo]==0.8.2", "pddl==0.4.2", "kstar-planner==1.4.2"]
 audiolm_qwen = ["librosa", "soundfile"]
+swiss_ai_charter_alignment = ["openai"]
 alpaca_eval = ["alpaca-eval>=0.6.2"]
 arena_hard = ["openai", "tiktoken"]
 dev = ["pytest", "pytest-cov", "pytest-xdist", "pre-commit", "requests", "aiohttp", "tenacity", "tqdm", "tiktoken", "sentencepiece", "ruff", "pillow"]

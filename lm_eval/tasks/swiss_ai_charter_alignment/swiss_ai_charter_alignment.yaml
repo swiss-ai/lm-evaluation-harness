@@ -1,0 +1,13 @@
+group: swiss_ai_charter_alignment
+task:
+  - swiss_ai_charter_alignment_prism
+  - swiss_ai_charter_alignment_wildchat
+  - swiss_ai_charter_alignment_synthetic
+
+aggregate_metric_list:
+  - metric: swiss_ai_charter_score
+    weight_by_size: true
+  - metric: swiss_ai_charter_judge_success_rate
+    weight_by_size: true
+  - metric: avg_word_count
+    weight_by_size: true
