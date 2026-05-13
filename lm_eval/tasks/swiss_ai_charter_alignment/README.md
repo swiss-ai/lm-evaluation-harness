@@ -33,18 +33,4 @@ Useful environment variables:
 
 If neither `SWISS_AI_CHARTER_REFERENCE_PATH` nor the bundled default reference file is available, pointwise judging still runs and the pairwise metrics are skipped.
 
-Example:
-
-```bash
-OPENAI_API_KEY=... python scripts/generate_swiss_ai_charter_references.py \
-  --model gpt-4.1-mini \
-  --subset full \
-  --output swiss_ai_charter_references.jsonl \
-  --resume
-
-CSCS_SERVING_API=... lm_eval --model ... --tasks swiss_ai_charter_alignment
-CSCS_SERVING_API=... lm_eval --model ... --tasks swiss_ai_charter_alignment_full
-```
-
-Reference rows can use `reference_completion`, `completion`, `response`, `output`, `generation`, or `answer` for the reference text. The bundled generator writes `reference_completion` and preserves the source metadata needed for auditability.
-Use `--limit 10 --dry-run` on the generator for a quick local dataset smoke test.
+If the pairwise metrics do not appear, first check that the loaded task config contains `swiss_ai_charter_pairwise_winrate` in `metric_list`. If the metrics appear as `nan` or the pairwise success rate is `0`, check stderr/log output for the reference-loading warning; common causes are a missing default reference file, a bad `SWISS_AI_CHARTER_REFERENCE_PATH`, or missing `prompt_id` values in the reference file.

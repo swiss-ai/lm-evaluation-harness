@@ -8,6 +8,7 @@ import math
 import os
 import re
 import time
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +106,7 @@ _CHARTER_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 _JUDGE_CACHE: dict[str, list[dict[str, Any]]] = {}
 _REFERENCE_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 _PAIRWISE_CACHE: dict[str, list[dict[str, Any]]] = {}
+_PAIRWISE_WARNINGS: set[str] = set()
 
 
 def _path_from_env(env_name: str, default: Path) -> Path:
@@ -467,6 +469,14 @@ def _attach_references(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _warn_pairwise_unavailable(message: str) -> None:
+    if message in _PAIRWISE_WARNINGS:
+        return
+    _PAIRWISE_WARNINGS.add(message)
+    eval_logger.warning(message)
+    warnings.warn(message, RuntimeWarning, stacklevel=2)
+
+
 def _extract_first_token_logprobs(choice: Any) -> dict[str, float] | None:
     logprobs = getattr(choice, "logprobs", None)
     if logprobs is None and isinstance(choice, dict):
@@ -799,14 +809,21 @@ def _run_judging(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _run_pairwise_judging(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not os.getenv(REFERENCE_PATH_ENV) and not DEFAULT_REFERENCE_PATH.exists():
-        eval_logger.warning(
-            "Skipping Swiss AI Charter pairwise judging because %s is not set "
-            "and the bundled default reference file is missing.",
-            REFERENCE_PATH_ENV,
+        _warn_pairwise_unavailable(
+            f"Skipping Swiss AI Charter pairwise judging because {REFERENCE_PATH_ENV} "
+            "is not set and the bundled default reference file is missing."
         )
         return []
 
-    referenced_items = _attach_references(items)
+    try:
+        referenced_items = _attach_references(items)
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        _warn_pairwise_unavailable(
+            "Skipping Swiss AI Charter pairwise judging because reference "
+            f"completions could not be loaded: {exc}"
+        )
+        return []
+
     cache_key = _items_cache_key(referenced_items)
     if cache_key in _PAIRWISE_CACHE:
         return _PAIRWISE_CACHE[cache_key]
@@ -904,6 +921,33 @@ def _length_controlled_winrate(rows: list[dict[str, Any]]) -> float:
     return _sigmoid(intercept + slope * zero_length_delta_z) * 100.0
 
 
+def _usable_pairwise_wins(rows: list[dict[str, Any]]) -> list[float]:
+    return [
+        float(row["pairwise_win"])
+        for row in rows
+        if not math.isnan(float(row["pairwise_win"]))
+    ]
+
+
+def _warn_no_usable_pairwise_wins(rows: list[dict[str, Any]]) -> None:
+    if not rows:
+        return
+    errors = [
+        str(row.get("pairwise_judge_error"))
+        for row in rows
+        if row.get("pairwise_judge_error")
+    ]
+    error_suffix = ""
+    if errors:
+        error_suffix = f" First judge error: {errors[0]}"
+    _warn_pairwise_unavailable(
+        "Swiss AI Charter pairwise judging produced no usable A/B decisions, "
+        "so win-rate metrics will print as '-'. Check "
+        "SWISS_AI_CHARTER_JUDGE_LOG_PATH for per-sample pairwise judge records."
+        + error_suffix
+    )
+
+
 def swiss_ai_charter_agg(items: list[dict[str, Any]]) -> float:
     rows = _run_judging(items)
     return float(_nanmean([float(row["rubric_score_0_100"]) for row in rows]))
@@ -922,20 +966,27 @@ def swiss_ai_charter_success_agg(items: list[dict[str, Any]]) -> float:
 
 def swiss_ai_charter_pairwise_winrate_agg(items: list[dict[str, Any]]) -> float:
     rows = _run_pairwise_judging(items)
-    return float(_nanmean([float(row["pairwise_win"]) for row in rows]) * 100.0)
+    wins = _usable_pairwise_wins(rows)
+    if not wins:
+        _warn_no_usable_pairwise_wins(rows)
+        return float("nan")
+    return float(_nanmean(wins) * 100.0)
 
 
 def swiss_ai_charter_length_controlled_winrate_agg(
     items: list[dict[str, Any]],
 ) -> float:
     rows = _run_pairwise_judging(items)
+    if not _usable_pairwise_wins(rows):
+        _warn_no_usable_pairwise_wins(rows)
+        return float("nan")
     return float(_length_controlled_winrate(rows))
 
 
 def swiss_ai_charter_pairwise_success_agg(items: list[dict[str, Any]]) -> float:
     rows = _run_pairwise_judging(items)
     if not rows:
-        return float("nan")
+        return 0.0
     successes = [
         not math.isnan(float(row["pairwise_win"]))
         and row["pairwise_judge_error"] is None
