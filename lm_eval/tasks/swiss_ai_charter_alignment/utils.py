@@ -444,13 +444,20 @@ def _reference_completion(row: dict[str, Any]) -> str | None:
 
 def _attach_references(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     references = _load_reference_completions()
+    references_by_source = _reference_source_lookup(references)
     rows = []
     missing = []
+    source_key_matches = 0
     for item in items:
         reference = references.get(str(item["prompt_id"]))
         if reference is None:
-            missing.append(str(item["prompt_id"]))
-            continue
+            reference = references_by_source.get(
+                (str(item["article_id"]), str(item.get("source_id", "")))
+            )
+            if reference is None:
+                missing.append(str(item["prompt_id"]))
+                continue
+            source_key_matches += 1
         rows.append(
             {
                 **item,
@@ -458,6 +465,7 @@ def _attach_references(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "reference_model": str(
                     reference.get("reference_model") or reference.get("model") or ""
                 ),
+                "reference_prompt_id": str(reference.get("prompt_id") or ""),
             }
         )
     if missing:
@@ -466,7 +474,33 @@ def _attach_references(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
             f"Missing {len(missing)} reference completions in {REFERENCE_PATH_ENV}; "
             f"first missing prompt_id values: {preview}"
         )
+    if source_key_matches:
+        eval_logger.info(
+            "Matched %d Swiss AI Charter references by article_id/source_id fallback.",
+            source_key_matches,
+        )
     return rows
+
+
+def _reference_source_lookup(
+    references: dict[str, dict[str, Any]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    by_source: dict[tuple[str, str], dict[str, Any]] = {}
+    duplicate_keys = set()
+    for reference in references.values():
+        key = (
+            str(reference.get("article_id") or ""),
+            str(reference.get("source_id") or ""),
+        )
+        if not all(key):
+            continue
+        if key in by_source:
+            duplicate_keys.add(key)
+            continue
+        by_source[key] = reference
+    for key in duplicate_keys:
+        by_source.pop(key, None)
+    return by_source
 
 
 def _warn_pairwise_unavailable(message: str) -> None:
