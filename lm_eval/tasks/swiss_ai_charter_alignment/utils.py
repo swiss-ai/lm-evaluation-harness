@@ -667,7 +667,9 @@ def _judge_one(client: Any, model: str, item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _judge_pairwise_one(client: Any, model: str, item: dict[str, Any]) -> dict[str, Any]:
+def _judge_pairwise_one(
+    client: Any, model: str, item: dict[str, Any]
+) -> dict[str, Any]:
     reference_completion = item["reference_completion"]
     candidate_completion = item["completion"]
     use_logprobs = os.getenv("SWISS_AI_CHARTER_JUDGE_LOGPROBS", "1") == "1"
@@ -941,7 +943,7 @@ def _length_controlled_winrate(rows: list[dict[str, Any]]) -> float:
     for _ in range(steps):
         grad_intercept = 0.0
         grad_slope = 0.0
-        for z, y in zip(zs, ys):
+        for z, y in zip(zs, ys, strict=False):
             prediction = _sigmoid(intercept + slope * z)
             error = prediction - y
             grad_intercept += error
