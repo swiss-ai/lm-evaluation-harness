@@ -4,7 +4,7 @@ tag:
 custom_dataset: !function utils.create_dataset
 output_type: generate_until
 test_split: test
-doc_to_text: prompt
+doc_to_text: !function utils.doc_to_text
 doc_to_target: ""
 process_results: !function utils.process_results
 metric_list:
