@@ -905,10 +905,7 @@ def _log_category_breakdown(
                 for row in group_rows
                 if not math.isnan(float(row[value_key]))
             ]
-            if not values:
-                mean_score = float("nan")
-            else:
-                mean_score = sum(values) / len(values)
+            mean_score = float("nan") if not values else sum(values) / len(values)
             label = _category_label(group_type, group_key, group_rows)
             record = {
                 "metric": metric_name,
@@ -952,9 +949,7 @@ def _group_category_rows(
     return dict(sorted(groups.items(), key=lambda item: item[0]))
 
 
-def _category_label(
-    group_type: str, group_key: str, rows: list[dict[str, Any]]
-) -> str:
+def _category_label(group_type: str, group_key: str, rows: list[dict[str, Any]]) -> str:
     if group_type == "article":
         title = str(rows[0].get("article_title") or "")
         return f"{group_key}: {title}" if title else group_key
