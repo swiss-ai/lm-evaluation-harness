@@ -1,0 +1,25 @@
+task: arena_hard_v2
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    test: "hf://datasets/lmarena-ai/arena-hard-auto/data/arena-hard-v2.0/question.jsonl"
+output_type: generate_until
+test_split: test
+process_docs: !function metric.filter_hard_prompt
+doc_to_text: "{{prompt}}"
+doc_to_target: ""
+process_results: !function metric.arena_hard_process
+metric_list:
+  - metric: arena_hard_score
+    aggregation: !function metric.arena_hard_agg
+    higher_is_better: true
+  - metric: avg_word_count
+    aggregation: mean
+    higher_is_better: false
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  max_new_tokens: 6100
+  until: []
+metadata:
+  version: 0.1

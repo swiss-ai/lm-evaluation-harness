@@ -1,10 +1,10 @@
-"""Arena-Hard v0.1 metric for lm-evaluation-harness.
+"""Arena-Hard v2.0 metric for lm-evaluation-harness.
 
 Implements pairwise judge evaluation using Qwen3.5—27B as judge,
 served via the CSCS SwissAI API.
 
 The evaluation follows the Arena-Hard protocol:
-  1. Model outputs are compared pairwise against GPT-4-0314 baseline responses.
+  1. Model outputs are compared pairwise against o3-mini-2025-01-31 baseline responses.
   2. A judge LLM evaluates which response is better and outputs a verdict
      in the format [[A>>B]], [[A>B]], [[A=B]], [[B>A]], or [[B>>A]].
   3. Two rounds are performed per question with positions swapped to mitigate
@@ -40,9 +40,20 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 JUDGE_MODEL = "Qwen/Qwen3.5-27B"
 
+# Restrict evaluation to a single Arena-Hard v2.0 category. The released
+# dataset bundles 500 "hard_prompt" + 250 "creative_writing" items; we only
+# evaluate the hard_prompt subset (questions and baseline answers alike).
+CATEGORY_FILTER = "hard_prompt"
+
+# HuggingFace coordinates for the Arena-Hard v2.0 question file. Kept in
+# sync with arena_hard_v2.yaml so the baseline loader can re-derive the
+# uid -> category map without depending on lm-eval's filtered dataset.
+QUESTION_REPO_ID = "lmarena-ai/arena-hard-auto"
+QUESTION_FILE = "data/arena-hard-v2.0/question.jsonl"
+
 # Number of concurrent threads hitting the judge API.
 # vLLM with continuous batching on GH200s can handle high concurrency.
-_JUDGE_MAX_WORKERS = 32 
+_JUDGE_MAX_WORKERS = 32
 
 # Number of retries for the OpenAI client (covers transient HTTP errors).
 _CLIENT_MAX_RETRIES = 8
@@ -96,7 +107,7 @@ SYSTEM_PROMPT = (
     'Example output: "My final verdict is tie: [[A=B]]".'
 )
 
-# ── Pairwise prompt template (from arena-hard-v0.1.yaml) ─────────────
+# ── Pairwise prompt template (from arena-hard-v2.0) ──────────────────
 PROMPT_TEMPLATE = (
     "<|User Prompt|>\n{QUESTION}\n\n"
     "<|The Start of Assistant A's Answer|>\n{ANSWER_A}\n"
@@ -105,7 +116,7 @@ PROMPT_TEMPLATE = (
     "<|The End of Assistant B's Answer|>"
 )
 
-# ── Regex patterns for verdict extraction (from arena-hard-v0.1.yaml) ─
+# ── Regex patterns for verdict extraction (from arena-hard-v2.0) ─────
 REGEX_PATTERNS = [
     r"\[\[([AB<>=]+)\]\]",
     r"\[([AB<>=]+)\]",
@@ -130,15 +141,53 @@ LABEL_TO_SCORE = {
 }
 
 
+# ── Dataset filter ───────────────────────────────────────────────────
+
+
+def filter_hard_prompt(dataset):
+    """Restrict the Arena-Hard v2.0 dataset to the hard_prompt category.
+
+    Wired into arena_hard_v2.yaml as `process_docs`. Drops the 250
+    creative_writing items so only the 500 hard_prompt items are evaluated.
+    """
+    return dataset.filter(lambda doc: doc.get("category") == CATEGORY_FILTER)
+
+
 # ── Baseline answer cache ────────────────────────────────────────────
 _BASELINE_CACHE = None
+_CATEGORY_UIDS_CACHE = None
+
+
+def _load_category_uids():
+    """Return the set of uids whose question category == CATEGORY_FILTER."""
+    global _CATEGORY_UIDS_CACHE
+    if _CATEGORY_UIDS_CACHE is not None:
+        return _CATEGORY_UIDS_CACHE
+
+    from huggingface_hub import hf_hub_download
+
+    path = hf_hub_download(
+        repo_id=QUESTION_REPO_ID,
+        filename=QUESTION_FILE,
+        repo_type="dataset",
+    )
+    uids = set()
+    with open(path) as f:
+        for line in f:
+            entry = json.loads(line)
+            if entry.get("category") == CATEGORY_FILTER:
+                uids.add(entry["uid"])
+    _CATEGORY_UIDS_CACHE = uids
+    return uids
 
 
 def _load_baseline_answers():
-    """Load GPT-4-0314 baseline answers from local file or HuggingFace.
+    """Load o3-mini-2025-01-31 baseline answers for the hard_prompt subset.
 
-    Checks for a local gpt-4-0314_baseline.jsonl in the task directory first.
-    Falls back to downloading from HuggingFace if not found.
+    Checks for a local o3-mini-2025-01-31_baseline.jsonl in the task directory first.
+    Falls back to downloading from HuggingFace if not found. The released baseline
+    file covers all 750 v2.0 items; entries whose uid is not in the hard_prompt
+    category are dropped so the cache only holds answers we will actually use.
 
     Returns:
         dict: Mapping from question uid to baseline answer text.
@@ -147,7 +196,7 @@ def _load_baseline_answers():
     if _BASELINE_CACHE is not None:
         return _BASELINE_CACHE
 
-    local_path = os.path.join(os.path.dirname(__file__), "gpt-4-0314_baseline.jsonl")
+    local_path = os.path.join(os.path.dirname(__file__), "o3-mini-2025-01-31_baseline.jsonl")
     if os.path.exists(local_path):
         path = local_path
         logger.info(f"Using local baseline file: {path}")
@@ -157,19 +206,27 @@ def _load_baseline_answers():
         logger.info("Local baseline not found, downloading from HuggingFace...")
         path = hf_hub_download(
             repo_id="lmarena-ai/arena-hard-auto",
-            filename="data/arena-hard-v0.1/model_answer/gpt-4-0314.jsonl",
+            filename="data/arena-hard-v2.0/model_answer/o3-mini-2025-01-31.jsonl",
             repo_type="dataset",
         )
 
+    category_uids = _load_category_uids()
     baseline = {}
+    skipped = 0
     with open(path) as f:
         for line in f:
             entry = json.loads(line)
             uid = entry["uid"]
+            if uid not in category_uids:
+                skipped += 1
+                continue
             answer = entry["messages"][-1]["content"]["answer"]
             baseline[uid] = answer
 
-    logger.info(f"Loaded {len(baseline)} GPT-4-0314 baseline answers from HuggingFace")
+    logger.info(
+        f"Loaded {len(baseline)} o3-mini-2025-01-31 baseline answers "
+        f"for category={CATEGORY_FILTER} (skipped {skipped} out-of-category entries)"
+    )
     _BASELINE_CACHE = baseline
     return baseline
 
@@ -218,7 +275,7 @@ def arena_hard_process(doc, predictions, **kwargs):
     """Per-document result collector.  Defers judge calls to aggregation.
 
     Called once per document by lm-evaluation-harness during the results
-    processing phase.  Packages the question, model completion, and GPT-4-0314
+    processing phase.  Packages the question, model completion, and o3-mini-2025-01-31
     baseline output for later batch annotation.
 
     Thinking traces (<think>...</think>) are stripped from model completions
@@ -256,7 +313,7 @@ def arena_hard_process(doc, predictions, **kwargs):
             "model_output": clean_output,
             "raw_output": raw_output,
             "baseline_output": baseline_output,
-            "category": doc.get("category", "arena-hard-v0.1"),
+            "category": doc.get("category", "arena-hard-v2.0"),
         },
         "avg_word_count": word_count,
     }
@@ -524,7 +581,7 @@ def _compute_scores_style_controlled(valid_items, results_map):
         win_rate/ci values are on 0-1 scale, or (None, None, None, N)
         if no valid judgments.
     """
-    from lm_eval.tasks.arena_hard_v01.style_utils import (
+    from lm_eval.tasks.arena_hard_v2.style_utils import (
         bootstrap_style_controlled_winrate,
         compute_relative_features,
         extract_style_features,
@@ -701,7 +758,7 @@ def _log_judgments(valid_items, results_map, win_rate):
         with open(judge_log_path, "a", encoding="utf-8") as f:
             for rec in per_item_logs:
                 out = {
-                    "metric": "arena_hard_v01",
+                    "metric": "arena_hard_v2",
                     "judge_model": JUDGE_MODEL,
                     "win_rate": win_rate,
                     **rec,
@@ -775,7 +832,7 @@ def _log_truncation(items):
         with open(truncation_log_path, "a", encoding="utf-8") as f:
             summary = {
                 "type": "summary",
-                "metric": "arena_hard_v01",
+                "metric": "arena_hard_v2",
                 "total_items": len(items),
                 "truncated_count": truncated_count,
                 "truncation_rate": (
@@ -837,7 +894,7 @@ def arena_hard_agg(items):
 
     total_calls = 2 * len(valid_items)
     logger.info(
-        f"Running Arena-Hard v0.1 judging on {len(valid_items)} items "
+        f"Running Arena-Hard v2.0 judging on {len(valid_items)} items "
         f"using {JUDGE_MODEL} as judge via CSCS API "
         f"({total_calls} judge calls with {_JUDGE_MAX_WORKERS} concurrent workers)..."
     )
@@ -874,7 +931,7 @@ def arena_hard_agg(items):
         score_entries_msg = f", total score entries: {len(all_scores)}"
 
     logger.info(
-        f"Arena-Hard v0.1 results ({SCORING_METHOD}): {win_rate:.4f} "
+        f"Arena-Hard v2.0 results ({SCORING_METHOD}): {win_rate:.4f} "
         f"(90% CI: {ci_lower:.4f} - {ci_upper:.4f})"
     )
     logger.info(
