@@ -96,7 +96,7 @@ def parse_claim_extraction(claim_extraction: List[str]):
 
 def save_eval_raw(raw_eval_list: List[str], output_file):
     with open(output_file, "w") as f:
-        for r in raw_eval_list:
+        for r in raw_eval_list: # noqa: FURB122
             f.write(json.dumps({"eval_res": r}) + "\n")
 
 

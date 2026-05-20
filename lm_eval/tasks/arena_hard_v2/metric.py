@@ -18,7 +18,7 @@ Prerequisites:
     openai
     huggingface_hub
     numpy
-    CSCS_SERVING_API environment variable (with access to Qwen3.5—27B judge endpoint. 
+    CSCS_SERVING_API environment variable (with access to Qwen3.5—27B judge endpoint.
                                 Make sure this model is served on the CSCS platform.)
 """
 
@@ -196,7 +196,9 @@ def _load_baseline_answers():
     if _BASELINE_CACHE is not None:
         return _BASELINE_CACHE
 
-    local_path = os.path.join(os.path.dirname(__file__), "o3-mini-2025-01-31_baseline.jsonl")
+    local_path = os.path.join(
+        os.path.dirname(__file__), "o3-mini-2025-01-31_baseline.jsonl"
+    )
     if os.path.exists(local_path):
         path = local_path
         logger.info(f"Using local baseline file: {path}")
@@ -341,8 +343,7 @@ def _judge_call(client, uid, round_num, user_prompt):
     """
     prompt_chars = len(user_prompt)
     logger.info(
-        f"Judge call START uid={uid} round={round_num} "
-        f"prompt_chars={prompt_chars}"
+        f"Judge call START uid={uid} round={round_num} prompt_chars={prompt_chars}"
     )
     t0 = time.time()
     try:
@@ -551,8 +552,7 @@ def _compute_scores_weighted(valid_items, results_map):
         if r1_scores is None or r2_scores is None:
             null_judgments += 1
             logger.warning(
-                f"Unknown score label for uid={uid}: "
-                f"round1={score1}, round2={score2}"
+                f"Unknown score label for uid={uid}: round1={score1}, round2={score2}"
             )
             continue
 
@@ -634,12 +634,8 @@ def _compute_scores_style_controlled(valid_items, results_map):
     # Convert to torch tensors (style_utils uses PyTorch internally,
     # matching the reference arena-hard-auto implementation)
     outcomes = torch.tensor(all_outcomes, dtype=torch.float32)
-    model_features = torch.tensor(
-        np.vstack(all_model_feats), dtype=torch.float32
-    )
-    baseline_features = torch.tensor(
-        np.vstack(all_baseline_feats), dtype=torch.float32
-    )
+    model_features = torch.tensor(np.vstack(all_model_feats), dtype=torch.float32)
+    baseline_features = torch.tensor(np.vstack(all_baseline_feats), dtype=torch.float32)
 
     # Normalize: relative features → z-score
     relative = compute_relative_features(model_features, baseline_features)
@@ -741,22 +737,24 @@ def _log_judgments(valid_items, results_map, win_rate):
                 scores = r2 + [1 - s for s in r1]
                 item_score = sum(scores) / len(scores)
 
-        per_item_logs.append({
-            "uid": uid,
-            "category": item.get("category"),
-            "round1_verdict": v1,
-            "round2_verdict": v2,
-            "round1_judgment": j1,
-            "round2_judgment": j2,
-            "item_score": item_score,
-        })
+        per_item_logs.append(
+            {
+                "uid": uid,
+                "category": item.get("category"),
+                "round1_verdict": v1,
+                "round2_verdict": v2,
+                "round1_judgment": j1,
+                "round2_judgment": j2,
+                "item_score": item_score,
+            }
+        )
 
     try:
         log_dir = os.path.dirname(judge_log_path)
         if log_dir:
             os.makedirs(log_dir, exist_ok=True)
         with open(judge_log_path, "a", encoding="utf-8") as f:
-            for rec in per_item_logs:
+            for rec in per_item_logs:  # noqa: FURB122
                 out = {
                     "metric": "arena_hard_v2",
                     "judge_model": JUDGE_MODEL,
@@ -815,15 +813,17 @@ def _log_truncation(items):
         if is_truncated:
             truncated_count += 1
 
-        truncation_records.append({
-            "uid": item["uid"],
-            "raw_output_chars": char_count,
-            "clean_output_chars": clean_char_count,
-            "raw_output_words": word_count,
-            "estimated_tokens": est_tokens,
-            "max_gen_toks": max_toks,
-            "potentially_truncated": is_truncated,
-        })
+        truncation_records.append(
+            {
+                "uid": item["uid"],
+                "raw_output_chars": char_count,
+                "clean_output_chars": clean_char_count,
+                "raw_output_words": word_count,
+                "estimated_tokens": est_tokens,
+                "max_gen_toks": max_toks,
+                "potentially_truncated": is_truncated,
+            }
+        )
 
     try:
         log_dir = os.path.dirname(truncation_log_path)
@@ -835,22 +835,18 @@ def _log_truncation(items):
                 "metric": "arena_hard_v2",
                 "total_items": len(items),
                 "truncated_count": truncated_count,
-                "truncation_rate": (
-                    truncated_count / len(items) if items else 0
-                ),
+                "truncation_rate": (truncated_count / len(items) if items else 0),
                 "max_gen_toks": max_toks,
             }
             f.write(json.dumps(summary, ensure_ascii=False) + "\n")
-            for rec in truncation_records:
+            for rec in truncation_records:  # noqa: FURB122
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
         logger.info(
             f"Wrote truncation log ({truncated_count}/{len(items)} "
             f"potentially truncated) to {truncation_log_path}"
         )
     except Exception as e:
-        logger.warning(
-            f"Failed to write truncation log {truncation_log_path}: {e}"
-        )
+        logger.warning(f"Failed to write truncation log {truncation_log_path}: {e}")
 
 
 # ── Aggregation (orchestrator) ───────────────────────────────────────
@@ -906,11 +902,9 @@ def arena_hard_agg(items):
 
     # Convert verdicts to scores and compute win rate
     if SCORING_METHOD == "style_control":
-        logger.info(
-            f"Using style-controlled scoring (features: {CONTROL_FEATURES})"
-        )
-        win_rate, ci_lower, ci_upper, null_judgments = (
-            _compute_scores_style_controlled(valid_items, results_map)
+        logger.info(f"Using style-controlled scoring (features: {CONTROL_FEATURES})")
+        win_rate, ci_lower, ci_upper, null_judgments = _compute_scores_style_controlled(
+            valid_items, results_map
         )
         if null_judgments > 0:
             logger.warning(f"Number of null/invalid judgments: {null_judgments}")
@@ -919,9 +913,7 @@ def arena_hard_agg(items):
             return 0.0
         score_entries_msg = ""
     else:
-        all_scores, null_judgments = _compute_scores_weighted(
-            valid_items, results_map
-        )
+        all_scores, null_judgments = _compute_scores_weighted(valid_items, results_map)
         if null_judgments > 0:
             logger.warning(f"Number of null/invalid judgments: {null_judgments}")
         if not all_scores:
