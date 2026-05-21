@@ -40,7 +40,13 @@ def _load_jsonl(path: Path) -> list[dict]:
         return [json.loads(line) for line in f if line.strip()]
 
 
-def _render_history(history: list[dict[str, str]]) -> str:
+def _render_history(history: list[dict[str, str]], chat_template=None) -> str:
+    if chat_template is not None:
+        try:
+            return chat_template(history, add_generation_prompt=True)
+        except TypeError:
+            return chat_template(history)
+
     lines = []
     for message in history:
         role = message["role"].capitalize()
@@ -102,7 +108,14 @@ class MTBenchTask(ConfigurableTask):
             **kwargs,
         )
 
-    def init_multiturn_state(self, doc: dict, ctx: str, gen_kwargs: dict) -> dict:
+    def init_multiturn_state(
+        self,
+        doc: dict,
+        ctx: str,
+        gen_kwargs: dict,
+        apply_chat_template: bool = False,
+        chat_template=None,
+    ) -> dict:
         gen_kwargs = deepcopy(gen_kwargs)
         if self.config.metadata.get("use_reference_temperature_config", True):
             temperature = TEMPERATURE_CONFIG.get(doc["category"], 0.7)
@@ -117,6 +130,7 @@ class MTBenchTask(ConfigurableTask):
             "awaiting_response": False,
             "responses": [],
             "done": False,
+            "chat_template": chat_template if apply_chat_template else None,
         }
 
     def multiturn_is_done(self, state: dict) -> bool:
@@ -136,7 +150,10 @@ class MTBenchTask(ConfigurableTask):
                 }
             )
             state["awaiting_response"] = True
-        return _render_history(state["history"]), deepcopy(state["gen_kwargs"])
+        return (
+            _render_history(state["history"], state["chat_template"]),
+            deepcopy(state["gen_kwargs"]),
+        )
 
     def multiturn_consume_response(self, state: dict, response: str) -> None:
         clean_response = _strip_thinking_traces(response)
@@ -174,10 +191,10 @@ class MTBenchTask(ConfigurableTask):
 
     def aggregation(self):
         from lm_eval.tasks.mt_bench.metric import (
+            mt_bench_judge_success_rate,
             mt_bench_score,
             mt_bench_turn_1_score,
             mt_bench_turn_2_score,
-            mt_bench_judge_success_rate,
         )
 
         return {

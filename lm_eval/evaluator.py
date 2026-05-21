@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import json
 import logging
@@ -12,10 +13,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import lm_eval.api.metrics
 import lm_eval.api.model
 import lm_eval.api.registry
-import lm_eval.api.task
 from lm_eval.api.instance import Instance
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
@@ -51,8 +50,23 @@ if TYPE_CHECKING:
 eval_logger = logging.getLogger(__name__)
 
 
+def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
+    parameters = inspect.signature(task.init_multiturn_state).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or any(key in parameters for key in multiturn_kwargs):
+        return task.init_multiturn_state(doc, ctx, gen_kwargs, **multiturn_kwargs)
+    return task.init_multiturn_state(doc, ctx, gen_kwargs)
+
+
 def _run_generate_until_multiturn_requests(
-    lm: LM, eval_tasks, requests: list
+    lm: LM,
+    eval_tasks,
+    requests: list,
+    apply_chat_template: bool = False,
+    chat_template=None,
 ) -> None:
     """Run interactive generation episodes in batched waves.
 
@@ -69,6 +83,10 @@ def _run_generate_until_multiturn_requests(
     task_by_name = {
         task_output.task_name: task_output.task for task_output in eval_tasks
     }
+    multiturn_kwargs = {
+        "apply_chat_template": apply_chat_template,
+        "chat_template": chat_template,
+    }
     episodes = []
     for instance in requests:
         task = task_by_name[instance.task_name]
@@ -78,16 +96,22 @@ def _run_generate_until_multiturn_requests(
                 {
                     "task": task,
                     "instance": instance,
-                    "state": task.init_multiturn_state(
-                        instance.doc, ctx, deepcopy(gen_kwargs)
+                    "state": _init_multiturn_state(
+                        task,
+                        instance.doc,
+                        ctx,
+                        deepcopy(gen_kwargs),
+                        multiturn_kwargs,
                     ),
                     "step": 0,
                 }
             )
 
-    max_steps = max(
-        getattr(episode["task"], "MAX_MULTITURN_STEPS", 64) for episode in episodes
-    ) if episodes else 0
+    max_steps = (
+        max(getattr(episode["task"], "MAX_MULTITURN_STEPS", 64) for episode in episodes)
+        if episodes
+        else 0
+    )
 
     for _ in range(max_steps):
         active = []
@@ -675,7 +699,15 @@ def evaluate(
     multiturn_requests = requests.pop("generate_until_multiturn", [])
     if multiturn_requests:
         eval_logger.info("Running generate_until_multiturn requests")
-        _run_generate_until_multiturn_requests(lm, eval_tasks, multiturn_requests)
+        _run_generate_until_multiturn_requests(
+            lm,
+            eval_tasks,
+            multiturn_requests,
+            apply_chat_template=bool(apply_chat_template),
+            chat_template=getattr(lm, "apply_chat_template", None)
+            if apply_chat_template
+            else None,
+        )
 
     for reqtype, reqs in requests.items():
         eval_logger.info(f"Running {reqtype} requests")

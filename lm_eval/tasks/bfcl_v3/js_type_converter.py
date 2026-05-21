@@ -1,5 +1,6 @@
 import re
 
+
 JS_TYPE_CONVERSION = {
     "String": str,
     "integer": int,
@@ -314,6 +315,7 @@ def test_js_type_converter_dictionary_with_arrays():
     assert complex_dict["middlewares"] == ["loggerMiddleware"]
     assert complex_dict["enhancers"] == ["applyMiddleware", "myMiddleWare"]
     print("Complex dictionary test passed successfully!")
+
 
 if __name__ == "__main__":
     test_js_type_converter()

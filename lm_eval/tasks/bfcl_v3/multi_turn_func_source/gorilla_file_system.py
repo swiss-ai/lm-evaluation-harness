@@ -1,13 +1,15 @@
 import datetime
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
-    FILE_CONTENT_EXTENSION, FILES_TAIL_USED, POPULATE_FILE_EXTENSION)
+    FILE_CONTENT_EXTENSION,
+    FILES_TAIL_USED,
+    POPULATE_FILE_EXTENSION,
+)
 
 
 class File:
-
     def __init__(self, name: str, content: str = "") -> None:
         """
         Initialize a file with a name and optional content.
@@ -59,7 +61,6 @@ class File:
 
 
 class Directory:
-
     def __init__(self, name: str, parent: Optional["Directory"] = None) -> None:
         """
         Initialize a directory with a name.
@@ -68,8 +69,8 @@ class Directory:
             name (str): The name of the directory.
         """
         self.name: str = name
-        self.parent: Optional["Directory"] = parent
-        self.contents: Dict[str, Union["File", "Directory"]] = {}
+        self.parent: Directory | None = parent
+        self.contents: dict[str, File | Directory] = {}
 
     def _add_file(self, file_name: str, content: str = "") -> None:
         """
@@ -114,7 +115,7 @@ class Directory:
             return self
         return self.contents.get(item_name)
 
-    def _list_contents(self) -> List[str]:
+    def _list_contents(self) -> list[str]:
         """
         List the names of all contents in the directory.
 
@@ -136,7 +137,6 @@ DEFAULT_STATE = {"root": Directory("/", None)}
 
 
 class GorillaFileSystem:
-
     def __init__(self) -> None:
         """
         Initialize the Gorilla file system with a root directory
@@ -201,7 +201,7 @@ class GorillaFileSystem:
         self._current_dir = self.root
 
     def _load_directory(
-        self, current: dict, parent: Optional[Directory] = None
+        self, current: dict, parent: Directory | None = None
     ) -> Directory:
         """
         Load a directory and its contents from a dictionary.
@@ -215,7 +215,6 @@ class GorillaFileSystem:
         """
         is_bottommost = True
         for dir_name, dir_data in current.items():
-
             if dir_data["type"] == "directory":
                 is_bottommost = False
                 new_dir = Directory(dir_name, parent)
@@ -264,7 +263,7 @@ class GorillaFileSystem:
             dir = dir.parent
         return {"current_working_directory": "/" + "/".join(reversed(path))}
 
-    def ls(self, a: bool = False) -> Dict[str, List[str]]:
+    def ls(self, a: bool = False) -> dict[str, list[str]]:
         """
         List the contents of the current directory.
 
@@ -279,7 +278,7 @@ class GorillaFileSystem:
             contents = [item for item in contents if not item.startswith(".")]
         return {"current_directory_content": contents}
 
-    def cd(self, folder: str) -> Union[None, Dict[str, str]]:
+    def cd(self, folder: str) -> None | dict[str, str]:
         """
         Change the current working directory to the specified folder.
 
@@ -294,7 +293,9 @@ class GorillaFileSystem:
             if self._current_dir.parent:
                 self._current_dir = self._current_dir.parent
             elif self.root == self._current_dir:
-                return {"error": "Cuurent directory is already the root. Cannot go back."}
+                return {
+                    "error": "Cuurent directory is already the root. Cannot go back."
+                }
             else:
                 return {"error": "cd: ..: No such directory"}
             return {}
@@ -313,7 +314,7 @@ class GorillaFileSystem:
             return False
         return True
 
-    def mkdir(self, dir_name: str) -> Union[None, Dict[str, str]]:
+    def mkdir(self, dir_name: str) -> None | dict[str, str]:
         """
         Create a new directory in the current directory.
 
@@ -325,12 +326,14 @@ class GorillaFileSystem:
                 "error": f"mkdir: cannot create directory '{dir_name}': Invalid character"
             }
         if dir_name in self._current_dir.contents:
-            return {"error": f"mkdir: cannot create directory '{dir_name}': File exists"}
+            return {
+                "error": f"mkdir: cannot create directory '{dir_name}': File exists"
+            }
 
         self._current_dir._add_directory(dir_name)
         return None
 
-    def touch(self, file_name: str) -> Union[None, Dict[str, str]]:
+    def touch(self, file_name: str) -> None | dict[str, str]:
         """
         Create a new file of any extension in the current directory.
 
@@ -346,9 +349,7 @@ class GorillaFileSystem:
         self._current_dir._add_file(file_name)
         return None
 
-    def echo(
-        self, content: str, file_name: Optional[str] = None
-    ) -> Union[Dict[str, str], None]:
+    def echo(self, content: str, file_name: str | None = None) -> dict[str, str] | None:
         """
         Write content to a file at current directory or display it in the terminal.
 
@@ -372,7 +373,7 @@ class GorillaFileSystem:
         else:
             return {"terminal_output": content}
 
-    def cat(self, file_name: str) -> Dict[str, str]:
+    def cat(self, file_name: str) -> dict[str, str]:
         """
         Display the contents of a file of any extension from currrent directory.
 
@@ -394,7 +395,7 @@ class GorillaFileSystem:
         else:
             return {"error": f"cat: {file_name}: No such file or directory"}
 
-    def find(self, path: str = ".", name: Optional[str] = None) -> Dict[str, List[str]]:
+    def find(self, path: str = ".", name: str | None = None) -> dict[str, list[str]]:
         """
         Find any file or directories under specific path that contain name in its file name.
 
@@ -425,7 +426,7 @@ class GorillaFileSystem:
         recursive_search(target_dir, path.rstrip("/"))
         return {"matches": matches}
 
-    def wc(self, file_name: str, mode: str = "l") -> Dict[str, Union[int, str]]:
+    def wc(self, file_name: str, mode: str = "l") -> dict[str, int | str]:
         """
         Count the number of lines, words, and characters in a file of any extension from current directory.
 
@@ -459,7 +460,7 @@ class GorillaFileSystem:
 
         return {"error": f"wc: {file_name}: No such file or directory"}
 
-    def sort(self, file_name: str) -> Dict[str, str]:
+    def sort(self, file_name: str) -> dict[str, str]:
         """
         Sort the contents of a file line by line.
 
@@ -480,7 +481,7 @@ class GorillaFileSystem:
 
         return {"error": f"sort: {file_name}: No such file or directory"}
 
-    def grep(self, file_name: str, pattern: str) -> Dict[str, List[str]]:
+    def grep(self, file_name: str, pattern: str) -> dict[str, list[str]]:
         """
         Search for lines in a file of any extension at current directory that contain the specified pattern.
 
@@ -496,13 +497,15 @@ class GorillaFileSystem:
             if isinstance(file, File):
                 content = file._read()
 
-                matching_lines = [line for line in content.splitlines() if pattern in line]
+                matching_lines = [
+                    line for line in content.splitlines() if pattern in line
+                ]
 
                 return {"matching_lines": matching_lines}
 
         return {"error": f"grep: {file_name}: No such file or directory"}
 
-    def du(self, human_readable: bool = False) -> Dict[str, str]:
+    def du(self, human_readable: bool = False) -> dict[str, str]:
         """
         Estimate the disk usage of a directory and its contents.
 
@@ -513,7 +516,7 @@ class GorillaFileSystem:
             disk_usage (str): The estimated disk usage.
         """
 
-        def get_size(item: Union[File, Directory]) -> int:
+        def get_size(item: File | Directory) -> int:
             if isinstance(item, File):
                 return len(item._read().encode("utf-8"))
             elif isinstance(item, Directory):
@@ -539,7 +542,7 @@ class GorillaFileSystem:
 
         return {"disk_usage": size_str}
 
-    def tail(self, file_name: str, lines: int = 10) -> Dict[str, str]:
+    def tail(self, file_name: str, lines: int = 10) -> dict[str, str]:
         """
         Display the last part of a file of any extension.
 
@@ -563,7 +566,7 @@ class GorillaFileSystem:
 
         return {"error": f"tail: {file_name}: No such file or directory"}
 
-    def diff(self, file_name1: str, file_name2: str) -> Dict[str, str]:
+    def diff(self, file_name1: str, file_name2: str) -> dict[str, str]:
         """
         Compare two files of any extension line by line at the current directory.
 
@@ -593,9 +596,11 @@ class GorillaFileSystem:
 
                 return {"diff_lines": "\n".join(diff_lines)}
 
-        return {"error": f"diff: {file_name1} or {file_name2}: No such file or directory"}
+        return {
+            "error": f"diff: {file_name1} or {file_name2}: No such file or directory"
+        }
 
-    def mv(self, source: str, destination: str) -> Dict[str, str]:
+    def mv(self, source: str, destination: str) -> dict[str, str]:
         """
         Move a file or directory from one location to another. so
 
@@ -651,7 +656,7 @@ class GorillaFileSystem:
                 self._current_dir.contents[destination].contents = item.contents
             return {"result": f"'{source}' moved to '{destination}'"}
 
-    def rm(self, file_name: str) -> Dict[str, str]:
+    def rm(self, file_name: str) -> dict[str, str]:
         """
         Remove a file or directory.
 
@@ -671,9 +676,11 @@ class GorillaFileSystem:
                     "error": f"rm: cannot remove '{file_name}': Not a file or directory"
                 }
         else:
-            return {"error": f"rm: cannot remove '{file_name}': No such file or directory"}
+            return {
+                "error": f"rm: cannot remove '{file_name}': No such file or directory"
+            }
 
-    def rmdir(self, dir_name: str) -> Dict[str, str]:
+    def rmdir(self, dir_name: str) -> dict[str, str]:
         """
         Remove a directory at current directory.
 
@@ -700,7 +707,7 @@ class GorillaFileSystem:
                 "error": f"rmdir: cannot remove '{dir_name}': No such file or directory"
             }
 
-    def cp(self, source: str, destination: str) -> Dict[str, str]:
+    def cp(self, source: str, destination: str) -> dict[str, str]:
         """
         Copy a file or directory from one location to another.
 
@@ -760,9 +767,7 @@ class GorillaFileSystem:
                 self._current_dir.contents[destination].contents = item.contents.copy()
             return {"result": f"'{source}' copied to '{destination}'"}
 
-    def _navigate_to_directory(
-        self, path: Optional[str]
-    ) -> Union[Directory, Dict[str, str]]:
+    def _navigate_to_directory(self, path: str | None) -> Directory | dict[str, str]:
         """
         Navigate to a specified directory path from the current directory.
 
@@ -789,7 +794,7 @@ class GorillaFileSystem:
 
         return temp_dir
 
-    def _parse_positions(self, positions: str) -> List[int]:
+    def _parse_positions(self, positions: str) -> list[int]:
         """
         Helper function to parse position strings, e.g., '1,3,5', '1-5', '-3', or '3-'.
 

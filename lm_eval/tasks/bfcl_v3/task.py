@@ -187,7 +187,9 @@ def _resolve_ast_call(elem: ast.Call) -> dict:
     if isinstance(func_part, ast.Name):
         func_parts.append(func_part.id)
     func_name = ".".join(reversed(func_parts))
-    return {func_name: {arg.arg: _resolve_ast_value(arg.value) for arg in elem.keywords}}
+    return {
+        func_name: {arg.arg: _resolve_ast_value(arg.value) for arg in elem.keywords}
+    }
 
 
 def _resolve_ast_value(value: ast.AST):
@@ -387,17 +389,15 @@ class BFCLV3Task(ConfigurableTask):
                 state["done"] = True
                 return
             messages = state["doc"]["question"][state["turn_idx"]]
-            holdout_functions = state["doc"].get("missed_function", {}).get(
-                str(state["turn_idx"])
+            holdout_functions = (
+                state["doc"].get("missed_function", {}).get(str(state["turn_idx"]))
             )
             if holdout_functions is not None:
                 state["functions"].extend(holdout_functions)
                 messages = [
                     {
                         "role": "user",
-                        "content": json.dumps(
-                            holdout_functions, ensure_ascii=False
-                        )
+                        "content": json.dumps(holdout_functions, ensure_ascii=False)
                         + "\n"
                         + DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC,
                     }

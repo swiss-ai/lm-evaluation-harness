@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+
 
 DEFAULT_STATE = {
     "ticket_queue": [],
@@ -27,9 +27,9 @@ class TicketAPI:
         """
         Initialize the TicketAPI instance.
         """
-        self.ticket_queue: List[Dict[str, Union[int, str]]]
+        self.ticket_queue: list[dict[str, int | str]]
         self.ticket_counter: int
-        self.current_user: Optional[str]
+        self.current_user: str | None
         self._api_description = "This tool belongs to the ticketing system that is part of a company, which allows users to create, view, and manage support business tickets."
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
@@ -40,15 +40,19 @@ class TicketAPI:
             scenario (Dict): A dictionary containing ticket data.
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self.ticket_queue = scenario.get("ticket_queue", DEFAULT_STATE_COPY["ticket_queue"])
+        self.ticket_queue = scenario.get(
+            "ticket_queue", DEFAULT_STATE_COPY["ticket_queue"]
+        )
         self.ticket_counter = scenario.get(
             "ticket_counter", DEFAULT_STATE_COPY["ticket_counter"]
         )
-        self.current_user = scenario.get("current_user", DEFAULT_STATE_COPY["current_user"])
+        self.current_user = scenario.get(
+            "current_user", DEFAULT_STATE_COPY["current_user"]
+        )
 
     def create_ticket(
         self, title: str, description: str = "", priority: int = 1
-    ) -> Dict[str, Union[int, str]]:
+    ) -> dict[str, int | str]:
         """
         Create a ticket in the system and queue it.
 
@@ -65,7 +69,9 @@ class TicketAPI:
             priority (int): Priority level of the ticket.
         """
         if not self.current_user:
-            return {"error": "User not authenticated. Please log in to create a ticket."}
+            return {
+                "error": "User not authenticated. Please log in to create a ticket."
+            }
         if priority < 1 or priority > 5:
             return {"error": "Invalid priority. Priority must be between 1 and 5."}
         ticket = {
@@ -80,7 +86,7 @@ class TicketAPI:
         self.ticket_counter += 1
         return ticket
 
-    def get_ticket(self, ticket_id: int) -> Dict[str, Union[int, str]]:
+    def get_ticket(self, ticket_id: int) -> dict[str, int | str]:
         """
         Get a specific ticket by its ID.
 
@@ -100,7 +106,7 @@ class TicketAPI:
             return {"error": f"Ticket with ID {ticket_id} not found."}
         return ticket
 
-    def close_ticket(self, ticket_id: int) -> Dict[str, str]:
+    def close_ticket(self, ticket_id: int) -> dict[str, str]:
         """
         Close a ticket.
 
@@ -118,7 +124,7 @@ class TicketAPI:
         ticket["status"] = "Closed"
         return {"status": f"Ticket {ticket_id} has been closed successfully."}
 
-    def resolve_ticket(self, ticket_id: int, resolution: str) -> Dict[str, str]:
+    def resolve_ticket(self, ticket_id: int, resolution: str) -> dict[str, str]:
         """
         Resolve a ticket with a resolution.
 
@@ -139,8 +145,8 @@ class TicketAPI:
         return {"status": f"Ticket {ticket_id} has been resolved successfully."}
 
     def edit_ticket(
-        self, ticket_id: int, updates: Dict[str, Optional[Union[str, int]]]
-    ) -> Dict[str, str]:
+        self, ticket_id: int, updates: dict[str, str | int | None]
+    ) -> dict[str, str]:
         """
         Modify the details of an existing ticket.
 
@@ -170,7 +176,7 @@ class TicketAPI:
 
         return {"status": f"Ticket {ticket_id} has been updated successfully."}
 
-    def _find_ticket(self, ticket_id: int) -> Optional[Dict[str, Union[int, str]]]:
+    def _find_ticket(self, ticket_id: int) -> dict[str, int | str] | None:
         """
         Find a ticket by its ID.
 
@@ -190,7 +196,7 @@ class TicketAPI:
                 return ticket
         return None
 
-    def ticket_login(self, username: str, password: str) -> Dict[str, bool]:
+    def ticket_login(self, username: str, password: str) -> dict[str, bool]:
         """
         Authenticate a user for ticket system.
 
@@ -207,7 +213,7 @@ class TicketAPI:
             return {"success": True}
         return {"success": False}
 
-    def ticket_get_login_status(self) -> Dict[str, bool]:
+    def ticket_get_login_status(self) -> dict[str, bool]:
         """
         Get the username of the currently authenticated user.
 
@@ -217,7 +223,7 @@ class TicketAPI:
         """
         return {"username": bool(self.current_user)}
 
-    def logout(self) -> Dict[str, bool]:
+    def logout(self) -> dict[str, bool]:
         """
         Log out the current user.
 
@@ -229,9 +235,7 @@ class TicketAPI:
             return {"success": True}
         return {"success": False}
 
-    def get_user_tickets(
-        self, status: Optional[str] = None
-    ) -> List[Dict[str, Union[int, str]]]:
+    def get_user_tickets(self, status: str | None = None) -> list[dict[str, int | str]]:
         """
         Get all tickets created by the current user, optionally filtered by status.
 

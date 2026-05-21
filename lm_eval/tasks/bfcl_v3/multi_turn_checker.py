@@ -41,12 +41,10 @@ def multi_turn_checker(
         single_turn_model_execution_results = []
         single_turn_model_execution_results_uncombined = []
         for single_step_model_response in single_turn_model_response_list:
-            single_step_model_execution_results, _ = (
-                execute_multi_turn_func_call(
-                    func_call_list=single_step_model_response,
-                    instances=model_instances,
-                    long_context=long_context,
-                )
+            single_step_model_execution_results, _ = execute_multi_turn_func_call(
+                func_call_list=single_step_model_response,
+                instances=model_instances,
+                long_context=long_context,
             )
             single_turn_model_execution_results.extend(
                 single_step_model_execution_results
@@ -55,12 +53,10 @@ def multi_turn_checker(
                 single_step_model_execution_results
             )
 
-        single_turn_ground_truth_execution_results, _ = (
-            execute_multi_turn_func_call(
-                func_call_list=single_turn_ground_truth_list,
-                instances=ground_truth_instances,
-                long_context=long_context,
-            )
+        single_turn_ground_truth_execution_results, _ = execute_multi_turn_func_call(
+            func_call_list=single_turn_ground_truth_list,
+            instances=ground_truth_instances,
+            long_context=long_context,
         )
 
         all_turn_model_execution_results.extend(single_turn_model_execution_results)
@@ -135,7 +131,9 @@ def state_checker(model_instances: dict, ground_truth_instances: dict):
     return {"valid": True}
 
 
-def response_checker(model_response_list: list, ground_truth_response_list: list, turn_index: int):
+def response_checker(
+    model_response_list: list, ground_truth_response_list: list, turn_index: int
+):
     is_subsequence, missing_items = _is_subsequence_unordered(
         ground_truth_response_list, model_response_list
     )

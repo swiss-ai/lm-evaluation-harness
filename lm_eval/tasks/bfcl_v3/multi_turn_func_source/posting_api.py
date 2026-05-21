@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+
 
 DEFAULT_STATE = {
     "username": "john",
@@ -18,10 +18,10 @@ class TwitterAPI:
         self.username: str
         self.password: str
         self.authenticated: bool
-        self.tweets: Dict[int, Dict[str, Union[int, str, List[str]]]]
-        self.comments: Dict[int, List[Dict[str, str]]]
-        self.retweets: Dict[str, List[int]]
-        self.following_list: List[str]
+        self.tweets: dict[int, dict[str, int | str | list[str]]]
+        self.comments: dict[int, list[dict[str, str]]]
+        self.retweets: dict[str, list[int]]
+        self.following_list: list[str]
         # tweet_counter is used to assign unique IDs to tweets, it might not be the same as the length of the tweets list for different scenarios
         self.tweet_counter: int
         self._api_description = "This tool belongs to the TwitterAPI, which provides core functionality for posting tweets, retweeting, commenting, and following users on Twitter."
@@ -39,7 +39,9 @@ class TwitterAPI:
             "authenticated", DEFAULT_STATE_COPY["authenticated"]
         )
         self.tweets = scenario.get("tweets", DEFAULT_STATE_COPY["tweets"])
-        self.tweets = {int(k): v for k, v in self.tweets.items()} # Convert tweet keys from string to int from loaded scenario
+        self.tweets = {
+            int(k): v for k, v in self.tweets.items()
+        }  # Convert tweet keys from string to int from loaded scenario
         self.comments = scenario.get("comments", DEFAULT_STATE_COPY["comments"])
         self.retweets = scenario.get("retweets", DEFAULT_STATE_COPY["retweets"])
         self.following_list = scenario.get(
@@ -49,7 +51,7 @@ class TwitterAPI:
             "tweet_counter", DEFAULT_STATE_COPY["tweet_counter"]
         )
 
-    def authenticate_twitter(self, username: str, password: str) -> Dict[str, bool]:
+    def authenticate_twitter(self, username: str, password: str) -> dict[str, bool]:
         """
         Authenticate a user with username and password.
 
@@ -64,7 +66,7 @@ class TwitterAPI:
             return {"authentication_status": True}
         return {"authentication_status": False}
 
-    def posting_get_login_status(self) -> Dict[str, Union[bool, str]]:
+    def posting_get_login_status(self) -> dict[str, bool | str]:
         """
         Get the login status of the current user.
 
@@ -74,8 +76,8 @@ class TwitterAPI:
         return {"login_status": bool(self.authenticated)}
 
     def post_tweet(
-        self, content: str, tags: List[str] = [], mentions: List[str] = []
-    ) -> Dict[str, Union[int, str, List[str]]]:
+        self, content: str, tags: list[str] = [], mentions: list[str] = []
+    ) -> dict[str, int | str | list[str]]:
         """
         Post a tweet for the authenticated user.
 
@@ -91,7 +93,9 @@ class TwitterAPI:
             mentions (List[str]): List of users mentioned in the tweet.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please authenticate before posting."}
+            return {
+                "error": "User not authenticated. Please authenticate before posting."
+            }
 
         tweet = {
             "id": self.tweet_counter,
@@ -104,7 +108,7 @@ class TwitterAPI:
         self.tweet_counter += 1
         return tweet
 
-    def retweet(self, tweet_id: int) -> Dict[str, str]:
+    def retweet(self, tweet_id: int) -> dict[str, str]:
         """
         Retweet a tweet for the authenticated user.
 
@@ -114,8 +118,10 @@ class TwitterAPI:
             retweet_status (str): Status of the retweet action.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please authenticate before retweeting."}
-                
+            return {
+                "error": "User not authenticated. Please authenticate before retweeting."
+            }
+
         if tweet_id not in self.tweets:
             return {"error": f"Tweet with ID {tweet_id} not found."}
 
@@ -128,7 +134,7 @@ class TwitterAPI:
         self.retweets[self.username].append(tweet_id)
         return {"retweet_status": "Successfully retweeted"}
 
-    def comment(self, tweet_id: int, comment_content: str) -> Dict[str, str]:
+    def comment(self, tweet_id: int, comment_content: str) -> dict[str, str]:
         """
         Comment on a tweet for the authenticated user.
 
@@ -139,8 +145,9 @@ class TwitterAPI:
             comment_status (str): Status of the comment action.
         """
         if not self.authenticated:
-            raise {"error": "User not authenticated. Please authenticate before commenting."}
-
+            raise {
+                "error": "User not authenticated. Please authenticate before commenting."
+            }
 
         if tweet_id not in self.tweets:
             return {"error": f"Tweet with ID {tweet_id} not found."}
@@ -153,7 +160,7 @@ class TwitterAPI:
         )
         return {"comment_status": "Comment added successfully"}
 
-    def mention(self, tweet_id: int, mentioned_usernames: List[str]) -> Dict[str, str]:
+    def mention(self, tweet_id: int, mentioned_usernames: list[str]) -> dict[str, str]:
         """
         Mention specified users in a tweet.
 
@@ -171,7 +178,7 @@ class TwitterAPI:
 
         return {"mention_status": "Users mentioned successfully"}
 
-    def follow_user(self, username_to_follow: str) -> Dict[str, bool]:
+    def follow_user(self, username_to_follow: str) -> dict[str, bool]:
         """
         Follow a user for the authenticated user.
 
@@ -181,7 +188,9 @@ class TwitterAPI:
             follow_status (bool): True if followed, False if already following.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please authenticate before following."}
+            return {
+                "error": "User not authenticated. Please authenticate before following."
+            }
 
         if username_to_follow in self.following_list:
             return {"follow_status": False}
@@ -189,7 +198,7 @@ class TwitterAPI:
         self.following_list.append(username_to_follow)
         return {"follow_status": True}
 
-    def list_all_following(self) -> List[str]:
+    def list_all_following(self) -> list[str]:
         """
         List all users that the authenticated user is following.
 
@@ -197,11 +206,13 @@ class TwitterAPI:
             following_list (List[str]): List of all users that the authenticated user is following.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please authenticate before listing following."}
+            return {
+                "error": "User not authenticated. Please authenticate before listing following."
+            }
 
         return self.following_list
 
-    def unfollow_user(self, username_to_unfollow: str) -> Dict[str, bool]:
+    def unfollow_user(self, username_to_unfollow: str) -> dict[str, bool]:
         """
         Unfollow a user for the authenticated user.
 
@@ -211,7 +222,9 @@ class TwitterAPI:
             unfollow_status (bool): True if unfollowed, False if not following.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please authenticate before unfollowing."}
+            return {
+                "error": "User not authenticated. Please authenticate before unfollowing."
+            }
 
         if username_to_unfollow not in self.following_list:
             return {"unfollow_status": False}
@@ -219,7 +232,7 @@ class TwitterAPI:
         self.following_list.remove(username_to_unfollow)
         return {"unfollow_status": True}
 
-    def get_tweet(self, tweet_id: int) -> Dict[str, Union[int, str, List[str]]]:
+    def get_tweet(self, tweet_id: int) -> dict[str, int | str | list[str]]:
         """
         Retrieve a specific tweet.
 
@@ -237,7 +250,7 @@ class TwitterAPI:
 
         return self.tweets[tweet_id]
 
-    def get_user_tweets(self, username: str) -> List[Dict[str, Union[int, str, List[str]]]]:
+    def get_user_tweets(self, username: str) -> list[dict[str, int | str | list[str]]]:
         """
         Retrieve all tweets from a specific user.
 
@@ -251,9 +264,11 @@ class TwitterAPI:
                 - tags (List[str]): List of tags associated with the tweet.
                 - mentions (List[str]): List of users mentioned in the tweet.
         """
-        return [tweet for tweet in self.tweets.values() if tweet["username"] == username]
+        return [
+            tweet for tweet in self.tweets.values() if tweet["username"] == username
+        ]
 
-    def search_tweets(self, keyword: str) -> List[Dict[str, Union[int, str, List[str]]]]:
+    def search_tweets(self, keyword: str) -> list[dict[str, int | str | list[str]]]:
         """
         Search for tweets containing a specific keyword.
 
@@ -274,7 +289,7 @@ class TwitterAPI:
             or keyword.lower() in [tag.lower() for tag in tweet["tags"]]
         ]
 
-    def get_tweet_comments(self, tweet_id: int) -> List[Dict[str, str]]:
+    def get_tweet_comments(self, tweet_id: int) -> list[dict[str, str]]:
         """
         Retrieve all comments for a specific tweet.
 
@@ -289,7 +304,7 @@ class TwitterAPI:
             return {"error": f"Tweet with ID {tweet_id} not found."}
         return self.comments.get(tweet_id, [])
 
-    def get_user_stats(self, username: str) -> Dict[str, int]:
+    def get_user_stats(self, username: str) -> dict[str, int]:
         """
         Get statistics for a specific user.
 

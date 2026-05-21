@@ -114,7 +114,11 @@ def _build_judge_prompt(
             "ref_answer_1": _reference(item, 0),
             "ref_answer_2": _reference(item, 1),
         }
-    return prompt["system_prompt"], prompt["prompt_template"].format(**kwargs), prompt_name
+    return (
+        prompt["system_prompt"],
+        prompt["prompt_template"].format(**kwargs),
+        prompt_name,
+    )
 
 
 def _parse_score(judgment: str) -> float:
@@ -220,7 +224,10 @@ def _run_judging(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_judge_one, client, model, item, turn, prompts): (item, turn)
+            executor.submit(_judge_one, client, model, item, turn, prompts): (
+                item,
+                turn,
+            )
             for item, turn in tasks
         }
         for future in concurrent.futures.as_completed(futures):

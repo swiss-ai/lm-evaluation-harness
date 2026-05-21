@@ -61,9 +61,7 @@ class ToyMultiturnTask(ConfigurableTask):
         return state["responses"]
 
     def process_results(self, doc, results):
-        return {
-            "acc": int(results[0] == ["response to first", "response to second"])
-        }
+        return {"acc": int(results[0] == ["response to first", "response to second"])}
 
     def aggregation(self):
         return {"acc": np.mean}

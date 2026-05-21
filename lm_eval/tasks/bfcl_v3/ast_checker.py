@@ -3,6 +3,7 @@ import re
 from .java_type_converter import java_type_converter
 from .js_type_converter import js_type_converter
 
+
 JAVA_TYPE_CONVERSION = {
     "byte": int,
     "short": int,
@@ -61,12 +62,12 @@ def ast_checker(
         return parallel_function_checker_no_order(
             func_description, model_output, possible_answer, language, model_name
         )
-        
+
     elif "multiple" in test_category:
         return multiple_function_checker(
             func_description, model_output, possible_answer, language, model_name
         )
-        
+
     else:
         if len(model_output) != 1:
             return {
@@ -76,7 +77,11 @@ def ast_checker(
             }
 
         return simple_function_checker(
-            func_description[0], model_output[0], possible_answer[0], language, model_name
+            func_description[0],
+            model_output[0],
+            possible_answer[0],
+            language,
+            model_name,
         )
 
 
@@ -252,7 +257,6 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
 
     result = {"valid": False, "error": [], "error_type": "dict_checker:unclear"}
     for i in range(len(possible_answers)):
-
         if possible_answers[i] == "":
             continue
 
@@ -262,7 +266,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
 
         possible_answer = possible_answers[i]
         # possible_anwer is a single dictionary
-        
+
         for key, value in model_output.items():
             if key not in possible_answer:
                 result["valid"] = False
@@ -275,7 +279,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
             # If the value is a string, we need to standardize it
             if type(value) == str:
                 standardize_value = standardize_string(value)
-                
+
             # We also need to standardize the possible answers if they are string
             standardize_possible_answer = []
             for i in range(len(possible_answer[key])):
@@ -294,7 +298,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
                 result["error_type"] = "value_error:dict_value"
                 flag = False
                 break
-        
+
         for key, value in possible_answer.items():
             if key not in model_output and "" not in value:
                 result["valid"] = False
@@ -302,7 +306,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
                 result["error_type"] = "value_error:dict_key"
                 flag = False
                 break
-            
+
         if flag:
             return {"valid": True, "error": []}
 
@@ -547,7 +551,7 @@ def parallel_function_checker_enforce_order(
 
     for i in range(len(possible_answers_list)):
         func_description = find_description(func_descriptions, func_name_list[i])
-        
+
         result = simple_function_checker(
             func_description,
             model_output[i],
@@ -583,7 +587,6 @@ def parallel_function_checker_no_order(
         # possible_answers[i] is a dictionary with only one key
         func_name_expected = list(possible_answers[i].keys())[0]
         func_description = find_description(func_descriptions, func_name_expected)
-
 
         all_errors = []
 

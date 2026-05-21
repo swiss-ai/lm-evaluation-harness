@@ -323,7 +323,9 @@ class Task(abc.ABC):
     def doc_to_prefix(self, doc):
         return ""
 
-    def init_multiturn_state(self, doc: dict, ctx: str, gen_kwargs: dict) -> Any:
+    def init_multiturn_state(
+        self, doc: dict, ctx: str, gen_kwargs: dict, **kwargs
+    ) -> Any:
         """Initialize per-document state for ``generate_until_multiturn`` tasks."""
         raise NotImplementedError(
             f"Task {self.config.task} must implement init_multiturn_state() "

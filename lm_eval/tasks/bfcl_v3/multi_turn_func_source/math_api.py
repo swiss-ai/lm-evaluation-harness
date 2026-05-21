@@ -1,6 +1,5 @@
 import math
 from decimal import Decimal, InvalidOperation, getcontext
-from typing import Dict, List, Optional, Union
 
 import mpmath
 
@@ -8,10 +7,8 @@ import mpmath
 class MathAPI:
     def __init__(self):
         self._api_description = "This tool belongs to the Math API, which provides various mathematical operations."
-        
-    def logarithm(
-        self, value: float, base: float, precision: int
-    ) -> Dict[str, float]:
+
+    def logarithm(self, value: float, base: float, precision: int) -> dict[str, float]:
         """
         Compute the logarithm of a number with adjustable precision using mpmath.
 
@@ -34,7 +31,7 @@ class MathAPI:
         except Exception as e:
             return {"error": str(e)}
 
-    def mean(self, numbers: List[float]) -> Dict[str, float]:
+    def mean(self, numbers: list[float]) -> dict[str, float]:
         """
         Calculate the mean of a list of numbers.
 
@@ -51,7 +48,7 @@ class MathAPI:
         except TypeError:
             return {"error": "All elements in the list must be numbers"}
 
-    def standard_deviation(self, numbers: List[float]) -> Dict[str, float]:
+    def standard_deviation(self, numbers: list[float]) -> dict[str, float]:
         """
         Calculate the standard deviation of a list of numbers.
 
@@ -72,7 +69,7 @@ class MathAPI:
 
     def si_unit_conversion(
         self, value: float, unit_in: str, unit_out: str
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Convert a value from one SI unit to another.
 
@@ -84,7 +81,14 @@ class MathAPI:
         Returns:
             result (float): Converted value in the new unit.
         """
-        to_meters = {"km": 1000, "m": 1, "cm": 0.01, "mm": 0.001, "um": 1e-6, "nm": 1e-9}
+        to_meters = {
+            "km": 1000,
+            "m": 1,
+            "cm": 0.01,
+            "mm": 0.001,
+            "um": 1e-6,
+            "nm": 1e-9,
+        }
         from_meters = {unit: 1 / factor for unit, factor in to_meters.items()}
 
         if not isinstance(value, (int, float)):
@@ -104,7 +108,7 @@ class MathAPI:
 
     def imperial_si_conversion(
         self, value: float, unit_in: str, unit_out: str
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Convert a value between imperial and SI units.
 
@@ -155,7 +159,7 @@ class MathAPI:
         except OverflowError:
             return {"error": "Conversion resulted in a value too large to represent"}
 
-    def add(self, a: float, b: float) -> Dict[str, float]:
+    def add(self, a: float, b: float) -> dict[str, float]:
         """
         Add two numbers.
 
@@ -171,7 +175,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def subtract(self, a: float, b: float) -> Dict[str, float]:
+    def subtract(self, a: float, b: float) -> dict[str, float]:
         """
         Subtract one number from another.
 
@@ -187,7 +191,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def multiply(self, a: float, b: float) -> Dict[str, float]:
+    def multiply(self, a: float, b: float) -> dict[str, float]:
         """
         Multiply two numbers.
 
@@ -206,7 +210,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def divide(self, a: float, b: float) -> Dict[str, float]:
+    def divide(self, a: float, b: float) -> dict[str, float]:
         """
         Divide one number by another.
 
@@ -224,7 +228,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def power(self, base: float, exponent: float) -> Dict[str, float]:
+    def power(self, base: float, exponent: float) -> dict[str, float]:
         """
         Raise a number to a power.
 
@@ -240,7 +244,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def square_root(self, number: float, precision: int) -> Dict[str, float]:
+    def square_root(self, number: float, precision: int) -> dict[str, float]:
         """
         Calculate the square root of a number with adjustable precision using the decimal module.
 
@@ -268,7 +272,7 @@ class MathAPI:
                 "error": "Input must be a number or computation resulted in an invalid operation"
             }
 
-    def absolute_value(self, number: float) -> Dict[str, float]:
+    def absolute_value(self, number: float) -> dict[str, float]:
         """
         Calculate the absolute value of a number.
 
@@ -283,9 +287,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Input must be a number"}
 
-    def round_number(
-        self, number: float, decimal_places: int = 0
-    ) -> Dict[str, float]:
+    def round_number(self, number: float, decimal_places: int = 0) -> dict[str, float]:
         """
         Round a number to a specified number of decimal places.
 
@@ -303,7 +305,7 @@ class MathAPI:
                 "error": "First input must be a number, second input must be an integer"
             }
 
-    def percentage(self, part: float, whole: float) -> Dict[str, float]:
+    def percentage(self, part: float, whole: float) -> dict[str, float]:
         """
         Calculate the percentage of a part relative to a whole.
 
@@ -321,7 +323,7 @@ class MathAPI:
         except TypeError:
             return {"error": "Both inputs must be numbers"}
 
-    def min_value(self, numbers: List[float]) -> Dict[str, float]:
+    def min_value(self, numbers: list[float]) -> dict[str, float]:
         """
         Find the minimum value in a list of numbers.
 
@@ -338,7 +340,7 @@ class MathAPI:
         except TypeError:
             return {"error": "All elements in the list must be numbers"}
 
-    def max_value(self, numbers: List[float]) -> Dict[str, float]:
+    def max_value(self, numbers: list[float]) -> dict[str, float]:
         """
         Find the maximum value in a list of numbers.
 
@@ -355,7 +357,7 @@ class MathAPI:
         except TypeError:
             return {"error": "All elements in the list must be numbers"}
 
-    def sum_values(self, numbers: List[float]) -> Dict[str, float]:
+    def sum_values(self, numbers: list[float]) -> dict[str, float]:
         """
         Calculate the sum of a list of numbers.
 

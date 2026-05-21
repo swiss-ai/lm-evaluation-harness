@@ -1,7 +1,6 @@
 import random
 from copy import deepcopy
 from datetime import datetime, time, timedelta
-from typing import Dict, List, Optional, Union
 
 from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
     AUTOMOBILE_EXTENSION,
@@ -12,6 +11,7 @@ from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
     TRANSACTION_HISTORY_EXTENSION,
     WATCH_LIST_EXTENSION,
 )
+
 
 CURRENT_TIME = datetime(2024, 9, 1, 10, 30)
 
@@ -146,14 +146,14 @@ class TradingBot:
         """
         Initialize the TradingBot instance.
         """
-        self.orders: Dict[int, Dict[str, Union[str, float, int]]]
-        self.account_info: Dict[str, Union[int, float]]
+        self.orders: dict[int, dict[str, str | float | int]]
+        self.account_info: dict[str, int | float]
         self.authenticated: bool
         self.market_status: str
         self.order_counter: int
-        self.stocks: Dict[str, Dict[str, Union[float, int]]]
-        self.watch_list: List[str]
-        self.transaction_history: List[Dict[str, Union[str, float, int]]]
+        self.stocks: dict[str, dict[str, float | int]]
+        self.watch_list: list[str]
+        self.transaction_history: list[dict[str, str | float | int]]
         self._api_description = "This tool belongs to the trading system, which allows users to trade stocks, manage their account, and view stock information."
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
@@ -170,7 +170,9 @@ class TradingBot:
             int(k) if isinstance(k, str) and k.isdigit() else k: v
             for k, v in self.orders.items()
         }
-        self.account_info = scenario.get("account_info", DEFAULT_STATE_COPY["account_info"])
+        self.account_info = scenario.get(
+            "account_info", DEFAULT_STATE_COPY["account_info"]
+        )
         self.authenticated = scenario.get(
             "authenticated", DEFAULT_STATE_COPY["authenticated"]
         )
@@ -187,7 +189,7 @@ class TradingBot:
         )
         self.long_context = long_context
         self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
+            scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
         )
 
     def _generate_transaction_timestamp(self) -> str:
@@ -212,7 +214,7 @@ class TradingBot:
 
         return random_date.strftime("%Y-%m-%d %H:%M:%S")
 
-    def get_current_time(self) -> Dict[str, str]:
+    def get_current_time(self) -> dict[str, str]:
         """
         Get the current time.
 
@@ -221,7 +223,7 @@ class TradingBot:
         """
         return {"current_time": CURRENT_TIME.strftime("%I:%M %p")}
 
-    def update_market_status(self, current_time_str: str) -> Dict[str, str]:
+    def update_market_status(self, current_time_str: str) -> dict[str, str]:
         """
         Update the market status based on the current time.
 
@@ -243,7 +245,7 @@ class TradingBot:
             self.market_status = "Closed"
             return {"status": "Closed"}
 
-    def get_symbol_by_name(self, name: str) -> Dict[str, str]:
+    def get_symbol_by_name(self, name: str) -> dict[str, str]:
         """
         Get the symbol of a stock by company name.
 
@@ -270,7 +272,7 @@ class TradingBot:
 
         return {"symbol": symbol_map.get(name, "Stock not found")}
 
-    def get_stock_info(self, symbol: str) -> Dict[str, Union[float, int, str]]:
+    def get_stock_info(self, symbol: str) -> dict[str, float | int | str]:
         """
         Get the details of a stock.
 
@@ -293,7 +295,7 @@ class TradingBot:
             return stock
         return self.stocks[symbol]
 
-    def get_order_details(self, order_id: int) -> Dict[str, Union[str, float, int]]:
+    def get_order_details(self, order_id: int) -> dict[str, str | float | int]:
         """
         Get the details of an order.
 
@@ -332,7 +334,7 @@ class TradingBot:
 
         return self.orders[order_id]
 
-    def cancel_order(self, order_id: int) -> Dict[str, Union[int, str]]:
+    def cancel_order(self, order_id: int) -> dict[str, int | str]:
         """
         Cancel an order.
 
@@ -346,13 +348,15 @@ class TradingBot:
         if order_id not in self.orders:
             return {"error": f"Order with ID {order_id} not found."}
         if self.orders[order_id]["status"] == "Completed":
-            return {"error": f"Can't cancel order {order_id}. Order is already completed."}
+            return {
+                "error": f"Can't cancel order {order_id}. Order is already completed."
+            }
         self.orders[order_id]["status"] = "Cancelled"
         return {"order_id": order_id, "status": "Cancelled"}
 
     def place_order(
         self, order_type: str, symbol: str, price: float, amount: int
-    ) -> Dict[str, Union[int, str, float]]:
+    ) -> dict[str, int | str | float]:
         """
         Place an order.
 
@@ -399,7 +403,7 @@ class TradingBot:
 
     def make_transaction(
         self, account_id: int, xact_type: str, amount: float
-    ) -> Dict[str, Union[str, float]]:
+    ) -> dict[str, str | float]:
         """
         Make a deposit or withdrawal based on specified amount.
 
@@ -413,7 +417,9 @@ class TradingBot:
             new_balance (float): Updated account balance after the transaction.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please log in to make a transaction."}
+            return {
+                "error": "User not authenticated. Please log in to make a transaction."
+            }
         if self.market_status != "Open":
             return {"error": "Market is closed. Transactions are not allowed."}
         if account_id != self.account_info["account_id"]:
@@ -451,7 +457,7 @@ class TradingBot:
             }
         return {"error": "Invalid transaction type. Use 'deposit' or 'withdrawal'."}
 
-    def get_account_info(self) -> Dict[str, Union[int, float]]:
+    def get_account_info(self) -> dict[str, int | float]:
         """
         Get account information.
 
@@ -466,7 +472,7 @@ class TradingBot:
             }
         return self.account_info
 
-    def trading_login(self, username: str, password: str) -> Dict[str, str]:
+    def trading_login(self, username: str, password: str) -> dict[str, str]:
         """
         Handle user login.
 
@@ -483,7 +489,7 @@ class TradingBot:
         self.authenticated = True
         return {"status": "Logged in successfully"}
 
-    def trading_get_login_status(self) -> Dict[str, bool]:
+    def trading_get_login_status(self) -> dict[str, bool]:
         """
         Get the login status.
 
@@ -493,7 +499,7 @@ class TradingBot:
 
         return {"status": bool(self.authenticated)}
 
-    def trading_logout(self) -> Dict[str, str]:
+    def trading_logout(self) -> dict[str, str]:
         """
         Handle user logout for trading system.
 
@@ -505,7 +511,7 @@ class TradingBot:
         self.authenticated = False
         return {"status": "Logged out successfully"}
 
-    def fund_account(self, amount: float) -> Dict[str, Union[str, float]]:
+    def fund_account(self, amount: float) -> dict[str, str | float]:
         """
         Fund the account with the specified amount.
 
@@ -517,19 +523,25 @@ class TradingBot:
             new_balance (float): Updated account balance after funding.
         """
         if not self.authenticated:
-            return {"error": "User not authenticated. Please log in to fund the account."}
+            return {
+                "error": "User not authenticated. Please log in to fund the account."
+            }
         if amount <= 0:
             return {"error": "Funding amount must be positive."}
         self.account_info["balance"] += amount
         self.transaction_history.append(
-            {"type": "deposit", "amount": amount, "timestamp": self._generate_transaction_timestamp()}
+            {
+                "type": "deposit",
+                "amount": amount,
+                "timestamp": self._generate_transaction_timestamp(),
+            }
         )
         return {
             "status": "Account funded successfully",
             "new_balance": self.account_info["balance"],
         }
 
-    def remove_stock_from_watchlist(self, symbol: str) -> Dict[str, str]:
+    def remove_stock_from_watchlist(self, symbol: str) -> dict[str, str]:
         """
         Remove a stock from the watchlist.
 
@@ -548,7 +560,7 @@ class TradingBot:
         self.watch_list.remove(symbol)
         return {"status": f"Stock {symbol} removed from watchlist successfully."}
 
-    def get_watchlist(self) -> Dict[str, List[str]]:
+    def get_watchlist(self) -> dict[str, list[str]]:
         """
         Get the watchlist.
 
@@ -556,7 +568,9 @@ class TradingBot:
             watchlist (List[str]): List of stock symbols in the watchlist.
         """
         if not self.authenticated:
-            return ["Error: User not authenticated. Please log in to view the watchlist."]
+            return [
+                "Error: User not authenticated. Please log in to view the watchlist."
+            ]
 
         if self.long_context:
             watch_list = self.watch_list.copy()
@@ -564,7 +578,7 @@ class TradingBot:
             return watch_list
         return {"watchlist": self.watch_list}
 
-    def get_order_history(self) -> Dict[str, List[Dict[str, Union[str, int, float]]]]:
+    def get_order_history(self) -> dict[str, list[dict[str, str | int | float]]]:
         """
         Get the stock order ID history.
 
@@ -581,8 +595,8 @@ class TradingBot:
         return {"history": list(self.orders.keys())}
 
     def get_transaction_history(
-        self, start_date: Optional[str] = None, end_date: Optional[str] = None
-    ) -> Dict[str, List[Dict[str, Union[str, float]]]]:
+        self, start_date: str | None = None, end_date: str | None = None
+    ) -> dict[str, list[dict[str, str | float]]]:
         """
         Get the transaction history within a specified date range.
 
@@ -628,7 +642,7 @@ class TradingBot:
 
     def update_stock_price(
         self, symbol: str, new_price: float
-    ) -> Dict[str, Union[str, float]]:
+    ) -> dict[str, str | float]:
         """
         Update the price of a stock.
 
@@ -648,12 +662,14 @@ class TradingBot:
 
         old_price = self.stocks[symbol]["price"]
         self.stocks[symbol]["price"] = new_price
-        self.stocks[symbol]["percent_change"] = ((new_price - old_price) / old_price) * 100
+        self.stocks[symbol]["percent_change"] = (
+            (new_price - old_price) / old_price
+        ) * 100
 
         return {"symbol": symbol, "old_price": old_price, "new_price": new_price}
 
     # below contains a list of functions to be nested
-    def get_available_stocks(self, sector: str) -> Dict[str, List[str]]:
+    def get_available_stocks(self, sector: str) -> dict[str, list[str]]:
         """
         Get a list of stock symbols in the given sector.
 
@@ -674,8 +690,8 @@ class TradingBot:
         return {"stock_list": sector_map.get(sector, [])}
 
     def filter_stocks_by_price(
-        self, stocks: List[str], min_price: float, max_price: float
-    ) -> Dict[str, List[str]]:
+        self, stocks: list[str], min_price: float, max_price: float
+    ) -> dict[str, list[str]]:
         """
         Filter stocks based on a price range.
 
@@ -695,7 +711,7 @@ class TradingBot:
         ]
         return {"filtered_stocks": filtered_stocks}
 
-    def add_to_watchlist(self, stock: str) -> Dict[str, List[str]]:
+    def add_to_watchlist(self, stock: str) -> dict[str, list[str]]:
         """
         Add a stock to the watchlist.
 
@@ -710,7 +726,9 @@ class TradingBot:
                 self.watch_list.append(stock)
         return {"symbol": self.watch_list}
 
-    def notify_price_change(self, stocks: List[str], threshold: float) -> Dict[str, str]:
+    def notify_price_change(
+        self, stocks: list[str], threshold: float
+    ) -> dict[str, str]:
         """
         Notify if there is a significant price change in the stocks.
 
@@ -729,6 +747,10 @@ class TradingBot:
         ]
 
         if changed_stocks:
-            return {"notification": f"Stocks {', '.join(changed_stocks)} have significant price changes."}
+            return {
+                "notification": f"Stocks {', '.join(changed_stocks)} have significant price changes."
+            }
         else:
-            return {"notification": "No significant price changes in the selected stocks."}
+            return {
+                "notification": "No significant price changes in the selected stocks."
+            }

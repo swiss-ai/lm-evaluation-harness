@@ -1,6 +1,5 @@
 import random
 from copy import deepcopy
-from typing import Dict, List, Union
 
 from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
     CAR_STATUS_METADATA_EXTENSION,
@@ -8,6 +7,7 @@ from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
     LONG_WEATHER_EXTENSION,
     PARKING_BRAKE_INSTRUCTION,
 )
+
 
 MAX_FUEL_LEVEL = 50
 MIN_FUEL_LEVEL = 0.0
@@ -48,7 +48,6 @@ DEFAULT_STATE = {
 
 
 class VehicleControlAPI:
-
     def __init__(self):
         """
         Initializes the vehicle control API with default values.
@@ -57,7 +56,7 @@ class VehicleControlAPI:
         self.batteryVoltage: float
         self.engine_state: str
         self.remainingUnlockedDoors: int
-        self.doorStatus: Dict[str, str]
+        self.doorStatus: dict[str, str]
 
         self.acTemperature: float
         self.fanSpeed: int
@@ -86,7 +85,7 @@ class VehicleControlAPI:
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
         self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
+            scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
         )
         self.fuelLevel = scenario.get(
             "fuelLevel", DEFAULT_STATE_COPY["fuelLevel"]
@@ -110,7 +109,9 @@ class VehicleControlAPI:
         self.acTemperature = scenario.get(
             "acTemperature", DEFAULT_STATE_COPY["acTemperature"]
         )  # in degree Celsius
-        self.fanSpeed = scenario.get("fanSpeed", DEFAULT_STATE_COPY["fanSpeed"])  # 0 to 100
+        self.fanSpeed = scenario.get(
+            "fanSpeed", DEFAULT_STATE_COPY["fanSpeed"]
+        )  # 0 to 100
         self.acMode = scenario.get(
             "acMode", DEFAULT_STATE_COPY["acMode"]
         )  # auto, cool, heat, defrost
@@ -141,7 +142,9 @@ class VehicleControlAPI:
         self.cruiseStatus = scenario.get(
             "cruiseStatus", DEFAULT_STATE_COPY["cruiseStatus"]
         )  # active, inactive
-        self.destination = scenario.get("destination", DEFAULT_STATE_COPY["destination"])
+        self.destination = scenario.get(
+            "destination", DEFAULT_STATE_COPY["destination"]
+        )
         self.frontLeftTirePressure = scenario.get(
             "frontLeftTirePressure", DEFAULT_STATE_COPY["frontLeftTirePressure"]
         )
@@ -172,7 +175,7 @@ class VehicleControlAPI:
 
         return True
 
-    def startEngine(self, ignitionMode: str) -> Dict[str, Union[str, float]]:
+    def startEngine(self, ignitionMode: str) -> dict[str, str | float]:
         """
         Starts the engine of the vehicle.
         Args:
@@ -196,7 +199,9 @@ class VehicleControlAPI:
                 )
             }
         if self.brakePedalStatus != "pressed":
-            return {"error": "Brake pedal needs to be pressed when starting the engine."}
+            return {
+                "error": "Brake pedal needs to be pressed when starting the engine."
+            }
         if self._brakePedalForce != 1000.0:
             return {"error": "Must press the brake fully before starting the engine."}
         if self.fuelLevel < MIN_FUEL_LEVEL:
@@ -212,7 +217,7 @@ class VehicleControlAPI:
             "batteryVoltage": self.batteryVoltage,
         }
 
-    def fillFuelTank(self, fuelAmount: float) -> Dict[str, Union[str, float]]:
+    def fillFuelTank(self, fuelAmount: float) -> dict[str, str | float]:
         """
         Fills the fuel tank of the vehicle. The fuel tank can hold up to 50 gallons.
         Args:
@@ -229,7 +234,7 @@ class VehicleControlAPI:
         self.fuelLevel += fuelAmount
         return {"fuelLevel": self.fuelLevel}
 
-    def lockDoors(self, unlock: bool, door: list[str]) -> Dict[str, Union[str, int]]:
+    def lockDoors(self, unlock: bool, door: list[str]) -> dict[str, str | int]:
         """
         Locks the doors of the vehicle.
         Args:
@@ -266,7 +271,7 @@ class VehicleControlAPI:
         unit: str = "celsius",
         fanSpeed: int = 50,
         mode: str = "auto",
-    ) -> Dict[str, Union[str, float]]:
+    ) -> dict[str, str | float]:
         """
         Adjusts the climate control of the vehicle.
         Args:
@@ -292,18 +297,20 @@ class VehicleControlAPI:
             "humidityLevel": self.humidityLevel,
         }
 
-    def get_outside_temperature_from_google(self) -> Dict[str, float]:
+    def get_outside_temperature_from_google(self) -> dict[str, float]:
         """
         Gets the outside temperature.
         Returns:
             outsideTemperature (float): The outside temperature in degree Celsius.
         """
         if self.long_context:
-            LONG_WEATHER_EXTENSION["outsideTemperature"] = self._random.uniform(-10.0, 40.0)
+            LONG_WEATHER_EXTENSION["outsideTemperature"] = self._random.uniform(
+                -10.0, 40.0
+            )
             return LONG_WEATHER_EXTENSION
         return {"outsideTemperature": self._random.uniform(-10.0, 40.0)}
 
-    def get_outside_temperature_from_weather_com(self) -> Dict[str, float]:
+    def get_outside_temperature_from_weather_com(self) -> dict[str, float]:
         """
         Gets the outside temperature.
         Returns:
@@ -311,7 +318,7 @@ class VehicleControlAPI:
         """
         return {"error": 404}
 
-    def setHeadlights(self, mode: str) -> Dict[str, str]:
+    def setHeadlights(self, mode: str) -> dict[str, str]:
         """
         Sets the headlights of the vehicle.
         Args:
@@ -328,7 +335,7 @@ class VehicleControlAPI:
             self.headLightStatus = "off"
             return {"headlightStatus": "off"}
 
-    def displayCarStatus(self, option: str) -> Dict[str, Union[str, float, Dict[str, str]]]:
+    def displayCarStatus(self, option: str) -> dict[str, str | float | dict[str, str]]:
         """
         Displays the status of the vehicle based on the provided display option.
         Args:
@@ -384,7 +391,7 @@ class VehicleControlAPI:
             status["error"] = "Invalid option"
         return status
 
-    def activateParkingBrake(self, mode: str) -> Dict[str, Union[str, float]]:
+    def activateParkingBrake(self, mode: str) -> dict[str, str | float]:
         """
         Activates the parking brake of the vehicle.
         Args:
@@ -407,7 +414,11 @@ class VehicleControlAPI:
                     "_parkingBrakeForce": 500.0,
                     "_slopeAngle": 10.0,
                 }
-            return {"parkingBrakeStatus": "engaged", "_parkingBrakeForce": 500.0, "_slopeAngle": 10.0}
+            return {
+                "parkingBrakeStatus": "engaged",
+                "_parkingBrakeForce": 500.0,
+                "_slopeAngle": 10.0,
+            }
         else:
             self.parkingBrakeStatus = "released"
             self._parkingBrakeForce = 0.0
@@ -419,9 +430,13 @@ class VehicleControlAPI:
                     "_parkingBrakeForce": 0.0,
                     "_slopeAngle": 10.0,
                 }
-            return {"parkingBrakeStatus": "released", "_parkingBrakeForce": 0.0, "_slopeAngle": 10.0}
+            return {
+                "parkingBrakeStatus": "released",
+                "_parkingBrakeForce": 0.0,
+                "_slopeAngle": 10.0,
+            }
 
-    def pressBrakePedal(self, pedalPosition: float) -> Dict[str, Union[str, float]]:
+    def pressBrakePedal(self, pedalPosition: float) -> dict[str, str | float]:
         """
         Presses the brake pedal based on pedal position. The brake pedal will be kept pressed until released.
 
@@ -450,7 +465,7 @@ class VehicleControlAPI:
         self._brakePedalForce = force
         return {"brakePedalStatus": "pressed", "brakePedalForce": float(force)}
 
-    def releaseBrakePedal(self) -> Dict[str, Union[str, float]]:
+    def releaseBrakePedal(self) -> dict[str, str | float]:
         """
         Releases the brake pedal of the vehicle.
         Returns:
@@ -463,7 +478,7 @@ class VehicleControlAPI:
 
     def setCruiseControl(
         self, speed: float, activate: bool, distanceToNextVehicle: float
-    ) -> Dict[str, Union[str, float]]:
+    ) -> dict[str, str | float]:
         """
         Sets the cruise control of the vehicle.
         Args:
@@ -499,7 +514,7 @@ class VehicleControlAPI:
                 "distanceToNextVehicle": distanceToNextVehicle,
             }
 
-    def get_current_speed(self) -> Dict[str, float]:
+    def get_current_speed(self) -> dict[str, float]:
         """
         Gets the current speed of the vehicle.
         Returns:
@@ -507,7 +522,7 @@ class VehicleControlAPI:
         """
         return {"currentSpeed": self._random.uniform(0.0, 120.0)}
 
-    def display_log(self, messages: List[str]):
+    def display_log(self, messages: list[str]):
         """
         Displays the log messages.
         Args:
@@ -517,7 +532,7 @@ class VehicleControlAPI:
         """
         return {"log": messages}
 
-    def estimate_drive_feasibility_by_mileage(self, distance: float) -> Dict[str, bool]:
+    def estimate_drive_feasibility_by_mileage(self, distance: float) -> dict[str, bool]:
         """
         Estimates the milage of the vehicle given the distance needed to drive.
         Args:
@@ -530,7 +545,7 @@ class VehicleControlAPI:
         else:
             return {"canDrive": True}
 
-    def liter_to_gallon(self, liter: float) -> Dict[str, float]:
+    def liter_to_gallon(self, liter: float) -> dict[str, float]:
         """
         Converts the liter to gallon.
         Args:
@@ -540,7 +555,7 @@ class VehicleControlAPI:
         """
         return {"gallon": liter * 0.264172}
 
-    def gallon_to_liter(self, gallon: float) -> Dict[str, float]:
+    def gallon_to_liter(self, gallon: float) -> dict[str, float]:
         """
         Converts the gallon to liter.
         Args:
@@ -550,7 +565,7 @@ class VehicleControlAPI:
         """
         return {"liter": gallon * 3.78541}
 
-    def estimate_distance(self, cityA: str, cityB: str) -> Dict[str, float]:
+    def estimate_distance(self, cityA: str, cityB: str) -> dict[str, float]:
         """
         Estimates the distance between two cities.
         Args:
@@ -615,7 +630,7 @@ class VehicleControlAPI:
             distance["intermediaryCities"] = INTERMEDIARY_CITIES
         return distance
 
-    def get_zipcode_based_on_city(self, city: str) -> Dict[str, str]:
+    def get_zipcode_based_on_city(self, city: str) -> dict[str, str]:
         """
         Gets the zipcode based on the city.
         Args:
@@ -648,7 +663,7 @@ class VehicleControlAPI:
         else:
             return {"zipcode": "00000"}
 
-    def set_navigation(self, destination: str) -> Dict[str, str]:
+    def set_navigation(self, destination: str) -> dict[str, str]:
         """
         Navigates to the destination.
         Args:
@@ -673,12 +688,15 @@ class VehicleControlAPI:
         """
         # This is the healthy standard the vehicle use, though the user might have different preferences
         healthy_tire_pressure = (
-            30 <= (
+            30
+            <= (
                 self.frontLeftTirePressure
                 + self.frontRightTirePressure
                 + self.rearLeftTirePressure
                 + self.rearRightTirePressure
-            ) / 4 <= 35
+            )
+            / 4
+            <= 35
         )
 
         tire_status = {
@@ -694,7 +712,7 @@ class VehicleControlAPI:
             tire_status["car_info"] = CAR_STATUS_METADATA_EXTENSION
         return tire_status
 
-    def find_nearest_tire_shop(self) -> Dict[str, str]:
+    def find_nearest_tire_shop(self) -> dict[str, str]:
         """
         Finds the nearest tire shop.
         Returns:

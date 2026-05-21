@@ -1,5 +1,6 @@
-from tree_sitter import Language, Parser
 import tree_sitter_java
+from tree_sitter import Language, Parser
+
 
 JAVA_LANGUAGE = Language(tree_sitter_java.language(), "java")
 

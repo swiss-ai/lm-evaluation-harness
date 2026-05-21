@@ -1,10 +1,12 @@
 import random
 from copy import deepcopy
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
 
 from lm_eval.tasks.bfcl_v3.multi_turn_func_source.long_context import (
-    BOOKING_RECORD_EXTENSION, CREDIT_CARD_EXTENSION)
+    BOOKING_RECORD_EXTENSION,
+    CREDIT_CARD_EXTENSION,
+)
+
 
 DEFAULT_STATE = {
     "random_seed": 141053,
@@ -24,21 +26,21 @@ class TravelAPI:
     # Adapted from source : https://developer.concur.com/api-reference/
     def __init__(self):
         super().__init__()
-        self.credit_card_list: Dict[str, Dict[str, Union[str, int, float]]]
-        self.booking_record: Dict[str, Dict[str, Union[str, float]]]
-        self.access_token: Optional[str]
-        self.token_type: Optional[str]
-        self.token_expires_in: Optional[int]
-        self.token_scope: Optional[str]
-        self.user_first_name: Optional[str]
-        self.user_last_name: Optional[str]
-        self.budget_limit: Optional[float]
+        self.credit_card_list: dict[str, dict[str, str | int | float]]
+        self.booking_record: dict[str, dict[str, str | float]]
+        self.access_token: str | None
+        self.token_type: str | None
+        self.token_expires_in: int | None
+        self.token_scope: str | None
+        self.user_first_name: str | None
+        self.user_last_name: str | None
+        self.budget_limit: float | None
         self._api_description = "This tool belongs to the travel system, which allows users to book flights, manage credit cards, and view budget information."
-        self._flight_cost_lookup: Dict[str, Dict[str, float]] = {}
+        self._flight_cost_lookup: dict[str, dict[str, float]] = {}
 
     def _load_scenario(
         self,
-        scenario: Dict[str, Union[Dict, str, int, float]],
+        scenario: dict[str, dict | str | int | float],
         long_context: bool = False,
     ) -> None:
         """
@@ -48,7 +50,7 @@ class TravelAPI:
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
         self._random = random.Random(
-            (scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"]))
+            scenario.get("random_seed", DEFAULT_STATE_COPY["random_seed"])
         )
         self.credit_card_list = scenario.get(
             "credit_card_list", DEFAULT_STATE_COPY["credit_card_list"]
@@ -56,19 +58,25 @@ class TravelAPI:
         self.booking_record = scenario.get(
             "booking_record", DEFAULT_STATE_COPY["booking_record"]
         )
-        self.access_token = scenario.get("access_token", DEFAULT_STATE_COPY["access_token"])
+        self.access_token = scenario.get(
+            "access_token", DEFAULT_STATE_COPY["access_token"]
+        )
         self.token_type = scenario.get("token_type", DEFAULT_STATE_COPY["token_type"])
         self.token_expires_in = scenario.get(
             "token_expires_in", DEFAULT_STATE_COPY["token_expires_in"]
         )
-        self.token_scope = scenario.get("token_scope", DEFAULT_STATE_COPY["token_scope"])
+        self.token_scope = scenario.get(
+            "token_scope", DEFAULT_STATE_COPY["token_scope"]
+        )
         self.user_first_name = scenario.get(
             "user_first_name", DEFAULT_STATE_COPY["user_first_name"]
         )
         self.user_last_name = scenario.get(
             "user_last_name", DEFAULT_STATE_COPY["user_last_name"]
         )
-        self.budget_limit = scenario.get("budget_limit", DEFAULT_STATE_COPY["budget_limit"])
+        self.budget_limit = scenario.get(
+            "budget_limit", DEFAULT_STATE_COPY["budget_limit"]
+        )
         self.long_context = long_context
 
         if self.long_context:
@@ -108,11 +116,11 @@ class TravelAPI:
             if booking_id not in self.booking_record:
                 self.booking_record[booking_id] = booking_info
 
-    def _cache_flight_cost_entry(self, travel_from, travel_to, cost, travel_class, travel_date):
+    def _cache_flight_cost_entry(
+        self, travel_from, travel_to, cost, travel_class, travel_date
+    ):
         key = f"{travel_from}|{travel_to}|{travel_class}|{travel_date}"
-        self._flight_cost_lookup[key] = {
-            "cost": cost
-        }
+        self._flight_cost_lookup[key] = {"cost": cost}
 
     def authenticate_travel(
         self,
@@ -122,7 +130,7 @@ class TravelAPI:
         grant_type: str,
         user_first_name: str,
         user_last_name: str,
-    ) -> Dict[str, Union[int, str]]:
+    ) -> dict[str, int | str]:
         """
         Authenticate the user with the travel API
 
@@ -152,7 +160,7 @@ class TravelAPI:
             "scope": grant_type,
         }
 
-    def travel_get_login_status(self) -> Dict[str, bool]:
+    def travel_get_login_status(self) -> dict[str, bool]:
         """
         Get the status of the login
 
@@ -164,9 +172,9 @@ class TravelAPI:
 
     def get_budget_fiscal_year(
         self,
-        lastModifiedAfter: Optional[str] = None,
-        includeRemoved: Optional[str] = None,
-    ) -> Dict[str, str]:
+        lastModifiedAfter: str | None = None,
+        includeRemoved: str | None = None,
+    ) -> dict[str, str]:
         """
         Get the budget fiscal year
 
@@ -185,7 +193,7 @@ class TravelAPI:
         expiration_date: str,
         cardholder_name: str,
         card_verification_number: int,
-    ) -> Dict[str, Union[str, Dict[str, str]]]:
+    ) -> dict[str, str | dict[str, str]]:
         """
         Register a credit card
 
@@ -230,7 +238,7 @@ class TravelAPI:
 
     def get_flight_cost(
         self, travel_from: str, travel_to: str, travel_date: str, travel_class: str
-    ) -> Dict[str, List[float]]:
+    ) -> dict[str, list[float]]:
         """
         Get the list of cost of a flight in USD based on location, date, and class
 
@@ -242,7 +250,7 @@ class TravelAPI:
         Returns:
             travel_cost_list (List[float]): The list of cost of the travel
         """
-        base_costs: Dict[Tuple[str, str], int] = {
+        base_costs: dict[tuple[str, str], int] = {
             ("SFO", "LAX"): 200,
             ("SFO", "JFK"): 500,
             ("SFO", "ORD"): 400,
@@ -395,7 +403,7 @@ class TravelAPI:
             ("ATV", "GFD"): 240,
             ("PHV", "GFD"): 220,
             ("LHR", "CDG"): 100,
-            ("OKD", "LAX"): 220
+            ("OKD", "LAX"): 220,
         }
 
         # Ensure the travel_from and travel_to is a tuple in the correct order (from, to)
@@ -415,7 +423,9 @@ class TravelAPI:
         elif travel_class == "first":
             factor = 5
         else:
-            raise ValueError("Invalid travel class. Options are: economy, business, first.")
+            raise ValueError(
+                "Invalid travel class. Options are: economy, business, first."
+            )
 
         # Determine the multiplier based on the travel date
         digit_sum = sum(int(char) for char in travel_date if char.isdigit())
@@ -435,14 +445,16 @@ class TravelAPI:
             cost = float(base_costs[travel_pair] * factor * travel_date_multiplier)
             travel_cost_list = [cost]
             self._flight_cost_lookup = {
-                f"{travel_from}|{travel_to}|{travel_class}|{travel_date}": {"cost": cost}
+                f"{travel_from}|{travel_to}|{travel_class}|{travel_date}": {
+                    "cost": cost
+                }
             }
 
         return {"travel_cost_list": travel_cost_list}
 
     def get_credit_card_balance(
         self, access_token: str, card_id: str
-    ) -> Dict[str, Union[float, str]]:
+    ) -> dict[str, float | str]:
         """
         Get the balance of a credit card
         Args:
@@ -471,7 +483,7 @@ class TravelAPI:
         travel_from: str,
         travel_to: str,
         travel_class: str,
-    ) -> Dict[str, Union[str, bool]]:
+    ) -> dict[str, str | bool]:
         """
         Book a flight given the travel information. From and To should be the airport codes in the IATA format.
 
@@ -504,33 +516,48 @@ class TravelAPI:
             return {"booking_status": False, "error": "Card not registered"}
         if "balance" not in self.credit_card_list[card_id]:
             return {"booking_status": False, "error": "Balance not found"}
-        
+
         all_airports = self.list_all_airports()
         if travel_from not in all_airports:
-            return {"booking_status": False, "error": f"Invalid departure airport code: {travel_from}"}
+            return {
+                "booking_status": False,
+                "error": f"Invalid departure airport code: {travel_from}",
+            }
         if travel_to not in all_airports:
-            return {"booking_status": False, "error": f"Invalid destination airport code: {travel_to}"}
+            return {
+                "booking_status": False,
+                "error": f"Invalid destination airport code: {travel_to}",
+            }
 
         try:
             datetime.strptime(travel_date, "%Y-%m-%d")
         except ValueError:
-            return {"booking_status": False, "error": "Invalid date format. Use YYYY-MM-DD."}
+            return {
+                "booking_status": False,
+                "error": "Invalid date format. Use YYYY-MM-DD.",
+            }
 
         valid_classes = {"economy", "business", "first"}
         if travel_class not in valid_classes:
-            return {"booking_status": False, "error": f"Invalid travel class. Must be one of {valid_classes}"}
+            return {
+                "booking_status": False,
+                "error": f"Invalid travel class. Must be one of {valid_classes}",
+            }
 
         try:
             self.get_flight_cost(
                 travel_from=travel_from,
                 travel_to=travel_to,
                 travel_date=travel_date,
-                travel_class=travel_class
+                travel_class=travel_class,
             )
             key = f"{travel_from}|{travel_to}|{travel_class}|{travel_date}"
             travel_cost_entry = self._flight_cost_lookup.get(key)
             if travel_cost_entry is None:
-                return {"booking_status": False, "error": "No available route for the given parameters"}
+                return {
+                    "booking_status": False,
+                    "error": "No available route for the given parameters",
+                }
             travel_cost = travel_cost_entry["cost"]
         except ValueError as e:
             return {"booking_status": False, "error": str(e)}
@@ -575,9 +602,9 @@ class TravelAPI:
     def retrieve_invoice(
         self,
         access_token: str,
-        booking_id: Optional[str] = None,
-        insurance_id: Optional[str] = None,
-    ) -> Dict[str, Union[Dict[str, Union[str, float]], str]]:
+        booking_id: str | None = None,
+        insurance_id: str | None = None,
+    ) -> dict[str, dict[str, str | float] | str]:
         """
         Retrieve the invoice for a booking
 
@@ -613,7 +640,7 @@ class TravelAPI:
         }
         return {"invoice": invoice}
 
-    def list_all_airports(self) -> List[str]:
+    def list_all_airports(self) -> list[str]:
         """
         List all available airports
 
@@ -648,7 +675,7 @@ class TravelAPI:
 
     def cancel_booking(
         self, access_token: str, booking_id: str
-    ) -> Dict[str, Union[bool, str]]:
+    ) -> dict[str, bool | str]:
         """
         Cancel a booking
 
@@ -695,7 +722,7 @@ class TravelAPI:
             ("USD", "INR"): 70,
             ("USD", "RUB"): 60,
             ("USD", "BRL"): 3.8,
-            ("USD", "MXN"): 20
+            ("USD", "MXN"): 20,
         }
         for key, val in exchange_rates.items():
             if base_currency == key[0] and target_currency == key[1]:
@@ -706,7 +733,7 @@ class TravelAPI:
 
     def verify_traveler_information(
         self, first_name: str, last_name: str, date_of_birth: str, passport_number: str
-    ) -> Dict[str, Union[bool, str]]:
+    ) -> dict[str, bool | str]:
         """
         Verify the traveler information
 
@@ -760,7 +787,7 @@ class TravelAPI:
 
     def set_budget_limit(
         self, access_token: str, budget_limit: float
-    ) -> Dict[str, Union[float, str]]:
+    ) -> dict[str, float | str]:
         """
         Set the budget limit for the user
 
@@ -779,7 +806,7 @@ class TravelAPI:
         self.budget_limit = budget_limit
         return {"budget_limit": budget_limit}
 
-    def get_nearest_airport_by_city(self, location: str) -> Dict[str, str]:
+    def get_nearest_airport_by_city(self, location: str) -> dict[str, str]:
         """
         Get the nearest airport to the given location
 
@@ -823,7 +850,7 @@ class TravelAPI:
         booking_id: str,
         insurance_cost: float,
         card_id: str,
-    ) -> Dict[str, Union[str, bool]]:
+    ) -> dict[str, str | bool]:
         """
         Purchase insurance
 
@@ -854,7 +881,7 @@ class TravelAPI:
             "insurance_status": True,
         }
 
-    def contact_customer_support(self, booking_id: str, message: str) -> Dict[str, str]:
+    def contact_customer_support(self, booking_id: str, message: str) -> dict[str, str]:
         """
         Contact travel booking customer support, get immediate support on an issue with an online call.
 
@@ -871,7 +898,7 @@ class TravelAPI:
             "customer_support_message": "Thank you for contacting customer support. Your message has been received and we will get back to you shortly."
         }
 
-    def get_all_credit_cards(self) -> Dict[str, Dict[str, Union[str, int, float]]]:
+    def get_all_credit_cards(self) -> dict[str, dict[str, str | int | float]]:
         """
         Get all registered credit cards
 

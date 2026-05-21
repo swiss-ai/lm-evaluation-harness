@@ -1,6 +1,6 @@
 import random
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+
 
 DEFAULT_STATE = {
     "generated_ids": set(),
@@ -60,10 +60,10 @@ class MessageAPI:
         """
         self.generated_ids: set
         self.user_count: int
-        self.user_map: Dict[str, str]
-        self.inbox: List[Dict[str, str]]
+        self.user_map: dict[str, str]
+        self.inbox: list[dict[str, str]]
         self.message_count: int
-        self.current_user: Optional[str]
+        self.current_user: str | None
         self._api_description = "This tool belongs to the Message API, which is used to manage user interactions in a workspace."
 
     def _load_scenario(self, scenario: dict, long_context=False) -> None:
@@ -74,7 +74,7 @@ class MessageAPI:
             scenario (Dict): A dictionary containing message data.
         """
         DEFAULT_STATE_COPY = deepcopy(DEFAULT_STATE)
-        self._random = random.Random((scenario.get("random_seed", 200191)))
+        self._random = random.Random(scenario.get("random_seed", 200191))
         self.generated_ids = scenario.get(
             "generated_ids", DEFAULT_STATE_COPY["generated_ids"]
         )
@@ -84,7 +84,9 @@ class MessageAPI:
         self.message_count = scenario.get(
             "message_count", DEFAULT_STATE_COPY["message_count"]
         )
-        self.current_user = scenario.get("current_user", DEFAULT_STATE_COPY["current_user"])
+        self.current_user = scenario.get(
+            "current_user", DEFAULT_STATE_COPY["current_user"]
+        )
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, MessageAPI):
@@ -116,7 +118,7 @@ class MessageAPI:
         self.generated_ids.add(new_id)
         return {"new_id": new_id}
 
-    def list_users(self) -> Dict[str, List[str]]:
+    def list_users(self) -> dict[str, list[str]]:
         """
         List all users in the workspace.
 
@@ -125,7 +127,7 @@ class MessageAPI:
         """
         return {"user_list": list(self.user_map.keys())}
 
-    def get_user_id(self, user: str) -> Dict[str, Optional[str]]:
+    def get_user_id(self, user: str) -> dict[str, str | None]:
         """
         Get user ID from user name.
 
@@ -139,7 +141,7 @@ class MessageAPI:
             return {"error": f"User '{user}' not found in the workspace."}
         return {"user_id": self.user_map.get(user)}
 
-    def message_login(self, user_id: str) -> Dict[str, Union[str, bool]]:
+    def message_login(self, user_id: str) -> dict[str, str | bool]:
         """
         Log in a user with the given user ID to messeage application.
 
@@ -158,7 +160,7 @@ class MessageAPI:
             "message": f"User '{user_id}' logged in successfully.",
         }
 
-    def message_get_login_status(self) -> Dict[str, bool]:
+    def message_get_login_status(self) -> dict[str, bool]:
         """
         Get the login status of the current user.
 
@@ -167,7 +169,7 @@ class MessageAPI:
         """
         return {"login_status": bool(self.current_user)}
 
-    def send_message(self, receiver_id: str, message: str) -> Dict[str, Union[str, bool]]:
+    def send_message(self, receiver_id: str, message: str) -> dict[str, str | bool]:
         """
         Send a message to a user.
         Args:
@@ -195,7 +197,7 @@ class MessageAPI:
             "message": f"Message sent to '{receiver_id}' successfully.",
         }
 
-    def delete_message(self, receiver_id: str) -> Dict[str, Union[bool, str]]:
+    def delete_message(self, receiver_id: str) -> dict[str, bool | str]:
         """
         Delete the latest message sent to a receiver.
         Args:
@@ -221,7 +223,7 @@ class MessageAPI:
                 }
         return {"error": f"Receiver ID {receiver_id} not found."}
 
-    def view_messages_sent(self) -> Dict[str, Union[Dict[str, List[str]], str]]:
+    def view_messages_sent(self) -> dict[str, dict[str, list[str]] | str]:
         """
         View all historical messages sent by the current user.
 
@@ -242,7 +244,7 @@ class MessageAPI:
                 sent_messages[receiver].append(message_content)
         return {"messages": sent_messages}
 
-    def add_contact(self, user_name: str) -> Dict[str, Union[bool, str]]:
+    def add_contact(self, user_name: str) -> dict[str, bool | str]:
         """
         Add a contact to the workspace.
         Args:
@@ -267,7 +269,7 @@ class MessageAPI:
 
     def search_messages(
         self, keyword: str
-    ) -> Dict[str, Union[List[Dict[str, Union[str, List[str]]]], str]]:
+    ) -> dict[str, list[dict[str, str | list[str]]] | str]:
         """
         Search for messages containing a specific keyword.
         Args:
@@ -294,7 +296,7 @@ class MessageAPI:
                 )
         return {"results": results}
 
-    def get_message_stats(self) -> Dict[str, Union[Dict[str, int], str]]:
+    def get_message_stats(self) -> dict[str, dict[str, int] | str]:
         """
         Get statistics about messages for the current user.
         Returns:

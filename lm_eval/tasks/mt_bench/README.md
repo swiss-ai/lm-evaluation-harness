@@ -3,6 +3,9 @@
 This task integrates the FastChat MT-Bench question set in single-model scoring
 mode. It uses the harness `generate_until_multiturn` output type to collect two
 assistant turns per question, then defers LLM-as-judge scoring to aggregation.
+When `--apply_chat_template` is enabled, each turn is rendered with the evaluated
+model's chat template; otherwise the task falls back to a simple plain-text
+transcript.
 
 The reported scores mirror the reference single-answer judgment flow:
 
@@ -28,6 +31,9 @@ export MT_BENCH_JUDGE_LOG_PATH='mt_bench_judge.jsonl'
 
 lm_eval --tasks mt_bench ...
 ```
+
+For chat models, prefer running with `--apply_chat_template` so the two-turn
+conversation is formatted with the model's native template.
 
 If `MT_BENCH_JUDGE_API_KEY` is unset, the task also accepts `CSCS_SERVING_API`
 or `OPENAI_API_KEY`. When `CSCS_SERVING_API` is used without an explicit base

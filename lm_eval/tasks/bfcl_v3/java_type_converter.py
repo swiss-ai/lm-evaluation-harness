@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Union
+
 
 JAVA_TYPE_CONVERSION = {
     "byte": int,
@@ -75,7 +75,7 @@ def parse_java_boolean(value):
 
 def parse_java_collection(
     input_str: str, type_str: str, nested_type=None
-) -> Union[List, Dict]:
+) -> list | dict:
     if type_str == "ArrayList":
         return parse_arraylist(input_str, nested_type)
     elif type_str == "Array":
@@ -86,7 +86,7 @@ def parse_java_collection(
         raise ValueError(f"Unsupported type: {type_str}")
 
 
-def parse_arraylist(input_str: str, nested_type=None) -> List:
+def parse_arraylist(input_str: str, nested_type=None) -> list:
     match_asList = re.search(
         r"new\s+ArrayList<\w*>\(Arrays\.asList\((.+?)\)\)", input_str
     )
@@ -137,7 +137,7 @@ def parse_arraylist(input_str: str, nested_type=None) -> List:
     return input_str  # default to string
 
 
-def parse_array(input_str: str, nested_type=None) -> List:
+def parse_array(input_str: str, nested_type=None) -> list:
     match = re.search(r"new\s+\w+\[\]\s*\{(.*?)\}", input_str)
     if match:
         elements_str = match.group(1)
@@ -159,7 +159,7 @@ def parse_array(input_str: str, nested_type=None) -> List:
         return input_str  # default to string
 
 
-def parse_hashmap(input_str: str) -> Dict:
+def parse_hashmap(input_str: str) -> dict:
     elements = {}
     match = re.search(
         r"new\s+HashMap<.*?>\s*\(\)\s*\{\s*\{?\s*(.*?)\s*\}?\s*\}", input_str, re.DOTALL
