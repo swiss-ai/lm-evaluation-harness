@@ -129,9 +129,9 @@ class TaskConfig(dict):
 
     def __post_init__(self) -> None:
         if self.generation_kwargs is not None:
-            if self.output_type != "generate_until":
+            if self.output_type not in {"generate_until", "generate_until_multiturn"}:
                 eval_logger.warning(
-                    f"[{self.task}] passed `generation_kwargs`, but not using `output_type: generate_until`!"
+                    f"[{self.task}] passed `generation_kwargs`, but not using a generative output_type!"
                 )
 
             if "temperature" in self.generation_kwargs:
@@ -145,7 +145,7 @@ class TaskConfig(dict):
                 )
                 self.generation_kwargs["until"] = [self.fewshot_delimiter]
         else:
-            if self.output_type == "generate_until":
+            if self.output_type in {"generate_until", "generate_until_multiturn"}:
                 # ensure that we greedily generate in absence of explicit arguments otherwise
                 self.generation_kwargs = default_gen_kwargs(self.fewshot_delimiter)
                 eval_logger.warning(

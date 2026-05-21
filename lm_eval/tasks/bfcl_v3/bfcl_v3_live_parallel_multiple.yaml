@@ -1,0 +1,7 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_live_parallel_multiple
+class: !function task.BFCLV3Task
+metadata:
+  version: 3
+  bfcl_category: live_parallel_multiple
+  bfcl_language: Python

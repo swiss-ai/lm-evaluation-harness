@@ -73,6 +73,7 @@ sparsify = ["sparsify"]
 # Task specific dependencies
 acpbench = ["lark>=1.1.9", "tarski[clingo]==0.8.2", "pddl==0.4.2", "kstar-planner==1.4.2"]
 audiolm_qwen = ["librosa", "soundfile"]
+bfcl = ["tree_sitter==0.21.3", "tree-sitter-java==0.21.0", "tree-sitter-javascript==0.21.4", "mpmath"]
 swiss_ai_charter_alignment = ["openai"]
 alpaca_eval = ["alpaca-eval>=0.6.2"]
 arena_hard = ["openai", "tiktoken"]
@@ -96,6 +97,7 @@ zeno = ["pandas", "zeno-client"]
 tasks = [
     "lm_eval[alpaca_eval]",
     "lm_eval[arena_hard]",
+    "lm_eval[bfcl]",
     "lm_eval[discrim_eval]",
     "lm_eval[ifeval]",
     "lm_eval[japanese_leaderboard]",

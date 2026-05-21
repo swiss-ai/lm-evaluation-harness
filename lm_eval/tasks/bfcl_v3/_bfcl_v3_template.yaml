@@ -1,0 +1,16 @@
+output_type: generate_until
+test_split: test
+num_fewshot: 0
+metric_list:
+  - metric: acc
+    aggregation: mean
+    higher_is_better: true
+generation_kwargs:
+  until:
+    - "\n\n"
+    - "<|eot_id|>"
+    - "</s>"
+  max_gen_toks: 512
+  do_sample: false
+metadata:
+  version: 3

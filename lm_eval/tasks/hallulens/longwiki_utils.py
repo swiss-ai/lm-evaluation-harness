@@ -5,11 +5,8 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
 import json
-from lm_eval.tasks.hallulens.utils import generate
-from typing import List
-from tqdm.contrib.concurrent import thread_map
+import os
 
 
 def print_all_metrics(final_results_df, k=32):
@@ -80,7 +77,7 @@ def remove_prefix(text: str, prefix: str):
     return text
 
 
-def parse_claim_extraction(claim_extraction: List[str]):
+def parse_claim_extraction(claim_extraction: list[str]):
     res = []
     for claim in claim_extraction:
         if not claim.startswith("- ") or remove_prefix(claim, "- ").strip() == "":
@@ -94,16 +91,16 @@ def parse_claim_extraction(claim_extraction: List[str]):
     return res
 
 
-def save_eval_raw(raw_eval_list: List[str], output_file):
+def save_eval_raw(raw_eval_list: list[str], output_file):
     with open(output_file, "w") as f:
-        for r in raw_eval_list: # noqa: FURB122
+        for r in raw_eval_list:  # noqa: FURB122
             f.write(json.dumps({"eval_res": r}) + "\n")
 
 
 def read_eval_raw(eval_raw_file):
     eval_raw_res = []
     if os.path.exists(eval_raw_file):
-        with open(eval_raw_file, "r") as f:
+        with open(eval_raw_file) as f:
             eval_raw_res = [json.loads(line)["eval_res"] for line in f]
     return eval_raw_res
 

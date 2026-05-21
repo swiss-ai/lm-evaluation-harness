@@ -1,0 +1,8 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_multi_turn_miss_func
+class: !function task.BFCLV3Task
+output_type: generate_until_multiturn
+metadata:
+  version: 3
+  bfcl_category: multi_turn_miss_func
+  bfcl_language: Python

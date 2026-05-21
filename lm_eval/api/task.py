@@ -54,6 +54,7 @@ ALL_OUTPUT_TYPES = [
     "multiple_choice",
     "loglikelihood_rolling",
     "generate_until",
+    "generate_until_multiturn",
 ]
 
 eval_logger = logging.getLogger(__name__)
@@ -321,6 +322,29 @@ class Task(abc.ABC):
 
     def doc_to_prefix(self, doc):
         return ""
+
+    def init_multiturn_state(self, doc: dict, ctx: str, gen_kwargs: dict) -> Any:
+        """Initialize per-document state for ``generate_until_multiturn`` tasks."""
+        raise NotImplementedError(
+            f"Task {self.config.task} must implement init_multiturn_state() "
+            "to use output_type='generate_until_multiturn'."
+        )
+
+    def multiturn_next_request(self, state: Any) -> tuple[str, dict] | None:
+        """Return the next ``generate_until`` arguments for an active episode."""
+        raise NotImplementedError
+
+    def multiturn_consume_response(self, state: Any, response: str) -> None:
+        """Advance an episode after a model response."""
+        raise NotImplementedError
+
+    def multiturn_is_done(self, state: Any) -> bool:
+        """Return whether an episode has no more model requests."""
+        raise NotImplementedError
+
+    def multiturn_result(self, state: Any) -> Any:
+        """Return the object passed to ``process_results`` for this episode."""
+        return state
 
     def build_all_requests(
         self,
@@ -1515,7 +1539,7 @@ class ConfigurableTask(Task):
 
                 arguments.extend(aux_arguments)
 
-        elif self.OUTPUT_TYPE == "generate_until":
+        elif self.OUTPUT_TYPE in {"generate_until", "generate_until_multiturn"}:
             arguments = (ctx, deepcopy(self.config.generation_kwargs))
 
         multimodal_arg = {}
@@ -1692,7 +1716,7 @@ class ConfigurableTask(Task):
                     [gold, pred_text]
                 )
 
-        elif self.OUTPUT_TYPE == "generate_until":
+        elif self.OUTPUT_TYPE in {"generate_until", "generate_until_multiturn"}:
             gold = self.doc_to_target(doc)
             result = results[0]
             if self.config.doc_to_choice is not None:
@@ -1766,7 +1790,8 @@ class ConfigurableTask(Task):
         else:
             raise ValueError(
                 f"Passed invalid output_type '{self.OUTPUT_TYPE}' ! Please use one of ",
-                "'loglikelihood', 'loglikelihood_rolling', 'generate_until' or 'multiple_choice'",
+                "'loglikelihood', 'loglikelihood_rolling', 'generate_until', "
+                "'generate_until_multiturn' or 'multiple_choice'",
             )
 
         return result_dict
