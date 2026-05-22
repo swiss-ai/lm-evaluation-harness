@@ -49,14 +49,18 @@ def answer_type_text(answer_type: str, is_chinese: bool, multiple_answer: bool) 
         answer_text = single_type_text(answer_type)
         if is_chinese:
             return f"，题目有多个答案，答案类型均为{answer_text}"
-        return f"The problem has multiple answers, each of them should be {answer_text}. "
+        return (
+            f"The problem has multiple answers, each of them should be {answer_text}. "
+        )
 
     answer_types = [single_type_text(item) for item in answer_type.split(",")]
     if len(set(answer_types)) == 1:
         answer_text = answer_types[0]
         if is_chinese:
             return f"，题目有多个答案，答案类型均为{answer_text}"
-        return f"The problem has multiple answers, each of them should be {answer_text}. "
+        return (
+            f"The problem has multiple answers, each of them should be {answer_text}. "
+        )
 
     if is_chinese:
         return f"题目有多个答案，答案类型分别为{'、'.join(answer_types)}"
@@ -116,7 +120,9 @@ def make_prompt(doc: dict[str, Any], subset: str) -> str:
     unit_text = ""
     if doc.get("unit"):
         boxed_text += "(unit)"
-        unit_text = ", note that the unit of the answer should not be included in \\boxed{}"
+        unit_text = (
+            ", note that the unit of the answer should not be included in \\boxed{}"
+        )
     answer_text = answer_type_text(
         doc.get("answer_type", ""),
         is_chinese=False,
@@ -281,7 +287,11 @@ class OlympiadBenchScorer:
     ) -> bool:
         reference = float(ground_truth)
         predicted = float(prediction)
-        gt_result = [reference / 100, reference, reference * 100] if include_percentage else [reference]
+        gt_result = (
+            [reference / 100, reference, reference * 100]
+            if include_percentage
+            else [reference]
+        )
         return any(abs(item - predicted) <= self.precision * 1.01 for item in gt_result)
 
     def expression_equal(self, exp1: str, exp2: str) -> bool:
@@ -412,7 +422,9 @@ def scorer() -> OlympiadBenchScorer:
     return _SCORER
 
 
-def process_results(doc: dict[str, Any], prediction: str, subset: str) -> dict[str, int]:
+def process_results(
+    doc: dict[str, Any], prediction: str, subset: str
+) -> dict[str, int]:
     final_answer = doc.get("final_answer") or []
     gold = str(final_answer[0]) if final_answer else ""
     answer = extract_answer(prediction, is_chinese="_zh_" in subset)
