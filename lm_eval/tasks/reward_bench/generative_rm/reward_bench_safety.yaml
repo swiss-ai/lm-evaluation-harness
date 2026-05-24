@@ -1,0 +1,32 @@
+group: reward_bench_safety
+task:
+- reward_bench_ron_Latn_safety
+- reward_bench_rus_Cyrl_safety
+- reward_bench_spa_Latn_safety
+- reward_bench_tur_Latn_safety
+- reward_bench_ukr_Cyrl_safety
+- reward_bench_vie_Latn_safety
+- reward_bench_zho_Hans_safety
+- reward_bench_zho_Hant_safety
+- reward_bench_arb_Arab_safety
+- reward_bench_fra_Latn_safety
+- reward_bench_ita_Latn_safety
+- reward_bench_jpn_Jpan_safety
+- reward_bench_kor_Hang_safety
+- reward_bench_deu_Latn_safety
+- reward_bench_ell_Grek_safety
+- reward_bench_hin_Deva_safety
+- reward_bench_ces_Latn_safety
+- reward_bench_en_Latn_safety
+- reward_bench_ind_Latn_safety
+- reward_bench_pes_Arab_safety
+- reward_bench_pol_Latn_safety
+- reward_bench_por_Latn_safety
+- reward_bench_heb_Hebr_safety
+- reward_bench_nld_Latn_safety
+aggregate_metric_list:
+- metric: exact_match
+  weight_by_size: true
+  filter_list: "extract-answer"
+metadata:
+  version: 0.1.0
