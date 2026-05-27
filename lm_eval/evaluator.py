@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import json
 import logging
@@ -7,14 +8,14 @@ import os
 import random
 import time
 from collections import defaultdict
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-import lm_eval.api.metrics
 import lm_eval.api.model
 import lm_eval.api.registry
-import lm_eval.api.task
+from lm_eval.api.instance import Instance
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
 from lm_eval.evaluator_utils import (
@@ -47,6 +48,121 @@ if TYPE_CHECKING:
     from lm_eval.loggers import EvaluationTracker
 
 eval_logger = logging.getLogger(__name__)
+
+
+def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
+    parameters = inspect.signature(task.init_multiturn_state).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or any(key in parameters for key in multiturn_kwargs):
+        return task.init_multiturn_state(doc, ctx, gen_kwargs, **multiturn_kwargs)
+    return task.init_multiturn_state(doc, ctx, gen_kwargs)
+
+
+def _run_generate_until_multiturn_requests(
+    lm: LM,
+    eval_tasks,
+    requests: list,
+    apply_chat_template: bool = False,
+    chat_template=None,
+) -> None:
+    """Run interactive generation episodes in batched waves.
+
+    A ``generate_until_multiturn`` task still uses the model's regular
+    ``generate_until`` method. The task owns episode state and decides which prompt
+    to issue next after each response.
+    """
+    if lm.world_size > 1:
+        raise NotImplementedError(
+            "generate_until_multiturn does not currently support distributed "
+            "evaluation. Please run with world_size=1."
+        )
+
+    task_by_name = {
+        task_output.task_name: task_output.task for task_output in eval_tasks
+    }
+    multiturn_kwargs = {
+        "apply_chat_template": apply_chat_template,
+        "chat_template": chat_template,
+    }
+    episodes = []
+    for instance in requests:
+        task = task_by_name[instance.task_name]
+        ctx, gen_kwargs = instance.arguments
+        for _ in range(instance.repeats):
+            episodes.append(
+                {
+                    "task": task,
+                    "instance": instance,
+                    "state": _init_multiturn_state(
+                        task,
+                        instance.doc,
+                        ctx,
+                        deepcopy(gen_kwargs),
+                        multiturn_kwargs,
+                    ),
+                    "step": 0,
+                }
+            )
+
+    max_steps = (
+        max(getattr(episode["task"], "MAX_MULTITURN_STEPS", 64) for episode in episodes)
+        if episodes
+        else 0
+    )
+
+    for _ in range(max_steps):
+        active = []
+        wave_requests = []
+        for episode in episodes:
+            task = episode["task"]
+            if task.multiturn_is_done(episode["state"]):
+                continue
+            next_args = task.multiturn_next_request(episode["state"])
+            if next_args is None:
+                continue
+            request = Instance(
+                request_type="generate_until",
+                doc=episode["instance"].doc,
+                arguments=next_args,
+                idx=episode["step"],
+                metadata=(
+                    episode["instance"].task_name,
+                    episode["instance"].doc_id,
+                    1,
+                ),
+            )
+            active.append((episode, request))
+            wave_requests.append(request)
+
+        if not wave_requests:
+            break
+
+        eval_logger.info(
+            f"Running generate_until_multiturn wave with {len(wave_requests)} requests"
+        )
+        responses = lm.generate_until(wave_requests)
+        for response, (episode, request) in zip(responses, active, strict=True):
+            request.resps.append(response)
+            episode["task"].multiturn_consume_response(episode["state"], response)
+            episode["step"] += 1
+    else:
+        unfinished = sum(
+            not episode["task"].multiturn_is_done(episode["state"])
+            for episode in episodes
+        )
+        if unfinished:
+            eval_logger.warning(
+                f"{unfinished} generate_until_multiturn episodes reached the "
+                f"maximum step limit ({max_steps})."
+            )
+
+    for episode in episodes:
+        episode["instance"].resps.append(
+            episode["task"].multiturn_result(episode["state"])
+        )
 
 
 @positional_deprecated
@@ -580,6 +696,19 @@ def evaluate(
 
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
+    multiturn_requests = requests.pop("generate_until_multiturn", [])
+    if multiturn_requests:
+        eval_logger.info("Running generate_until_multiturn requests")
+        _run_generate_until_multiturn_requests(
+            lm,
+            eval_tasks,
+            multiturn_requests,
+            apply_chat_template=bool(apply_chat_template),
+            chat_template=getattr(lm, "apply_chat_template", None)
+            if apply_chat_template
+            else None,
+        )
+
     for reqtype, reqs in requests.items():
         eval_logger.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`

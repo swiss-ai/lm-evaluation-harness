@@ -31,6 +31,10 @@ data/
 !lm_eval/tasks/swiss_ai_charter_alignment/data/
 !lm_eval/tasks/swiss_ai_charter_alignment/data/reference/
 !lm_eval/tasks/swiss_ai_charter_alignment/data/reference/swiss_ai_charter_llama33_70b_references.jsonl
+!lm_eval/tasks/bfcl_v3/data/
+!lm_eval/tasks/bfcl_v3/data/**
+!lm_eval/tasks/mt_bench/data/
+!lm_eval/tasks/mt_bench/data/**
 temp/
 test_logs/
 
