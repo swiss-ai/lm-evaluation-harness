@@ -1,17 +1,16 @@
-import json
-import re
-from typing import List
-import torch
 import gc
-import requests
-from requests.adapters import HTTPAdapter
+import json
 import os
 import time
-import aiohttp
+
+import requests
+import torch
+
 
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "Qwen/Qwen3.5-27B"
+
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
     """
@@ -32,25 +31,31 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
             }
 
             resp = requests.post(
-                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
+                f"{API_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=2000,
             )
 
             if resp.status_code == 200:
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]
 
-            print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
+            print(
+                f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}"
+            )
 
         except Exception as e:
             print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2 ** attempt, 60)
+            wait = min(2**attempt, 60)
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
 
     print(f"Failed after {max_retries} attempts")
     return None
+
 
 def clear_memory():
     """
@@ -73,7 +78,7 @@ def generate(prompt, model=None, tokenizer=None, temperature=0.0, max_tokens=512
             # remote generation
             result = try_remote_generate(
                 prompt, temperature=temperature, max_tokens=max_tokens
-            )            
+            )
             if result is not None:
                 break
             number_of_retries += 1
@@ -175,13 +180,12 @@ def generate_batch(
         return result
 
 
-
 def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
     def check_validity(gen):
-        if '{{"{}":false}}'.format(key) in gen.lower():
-            return '{{"{}":false}}'.format(key)
-        elif '{{"{}":true}}'.format(key) in gen.lower():
-            return '{{"{}":true}}'.format(key)
+        if f'{{"{key}":false}}' in gen.lower():
+            return f'{{"{key}":false}}'
+        elif f'{{"{key}":true}}' in gen.lower():
+            return f'{{"{key}":true}}'
         else:
             return -1
 
@@ -194,7 +198,7 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
             r = r.split("\n")[0]
             try:
                 jsonifyed_res.append(json.loads(r))
-            except:
+            except Exception:
                 error = True
                 error_count = 0
 
@@ -215,25 +219,30 @@ def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
                             json_res = json.loads(re_eval)
                         error = False
 
-                    except:
+                    except Exception:
                         error = True
                     error_count += 1
 
                     if error_count > 3:
-                        print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
+                        print(
+                            f'Error count exceeded 3. Skipping this prompt. Could not find {{"{key}":true}} or {{"{key}":false}} in the response. The response was: {re_eval}'
+                        )
                         jsonifyed_res.append(
                             {"error": "Error count exceeded 3. Skipping this prompt."}
                         )
                         return []
                 jsonifyed_res.append(json_res)
-    
+
     # print percentage of valid responses
     valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
     total_count = len(jsonifyed_res)
+    print(
+        f"Valid responses: {valid_count}/{total_count} ({(valid_count / total_count) * 100:.2f}%)"
+    )
     return jsonifyed_res
 
 
-def parse_claim_extraction(claim_extraction: List[str]):
+def parse_claim_extraction(claim_extraction: list[str]):
     res = []
 
     for claim in claim_extraction.split("\n"):
@@ -299,14 +308,14 @@ def f1_score(g):
 
 
 def jsonify_ans(
-    raw_response: List[str], eval_prompt: List[str], key: str, model, tokenizer
+    raw_response: list[str], eval_prompt: list[str], key: str, model, tokenizer
 ):
     def check_validity(gen):
         gen_nospace = gen.replace(" ", "")
-        if '{{"{}":false}}'.format(key) in gen_nospace:
-            return '{{"{}":false}}'.format(key)
-        elif '{{"{}":true}}'.format(key) in gen_nospace:
-            return '{{"{}":true}}'.format(key)
+        if f'{{"{key}":false}}' in gen_nospace:
+            return f'{{"{key}":false}}'
+        elif f'{{"{key}":true}}' in gen_nospace:
+            return f'{{"{key}":true}}'
         else:
             return -1
 
@@ -319,7 +328,7 @@ def jsonify_ans(
         raw_response = raw_response.split("\n")[0]
         try:
             jsonifyed_res.append(json.loads(raw_response))
-        except:
+        except Exception:
             error = True
             error_count = 0
 
@@ -333,18 +342,26 @@ def jsonify_ans(
                         json_res = json.loads(re_eval.split("\n")[0])
                     error = False
 
-                except:
+                except Exception as e:
+                    print(f"Error occurred: {e}")
                     error = True
                 error_count += 1
 
                 if error_count > 3:
-                    print("Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response. The response was: {}".format(key, key, re_eval))
+                    print(
+                        f'Error count exceeded 3. Skipping this prompt. Could not find {{"{key}":true}} or {{"{key}":false}} in the response. The response was: {re_eval}'
+                    )
                     jsonifyed_res.append(
-                        {"error": "Error count exceeded 3. Skipping this prompt. Could not find {{\"{}\":true}} or {{\"{}\":false}} in the response.".format(key, key)}
+                        {
+                            "error": f'Error count exceeded 3. Skipping this prompt. Could not find {{"{key}":true}} or {{"{key}":false}} in the response.'
+                        }
                     )
                     return []
             jsonifyed_res.append(json_res)
     # print percentage of valid responses
     valid_count = sum(1 for r in jsonifyed_res if "error" not in r)
     total_count = len(jsonifyed_res)
+    print(
+        f"Valid responses: {valid_count}/{total_count} ({(valid_count / total_count) * 100:.2f}%)"
+    )
     return jsonifyed_res
