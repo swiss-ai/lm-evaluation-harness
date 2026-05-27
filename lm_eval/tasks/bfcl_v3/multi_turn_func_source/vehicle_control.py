@@ -666,8 +666,10 @@ class VehicleControlAPI:
     def set_navigation(self, destination: str) -> dict[str, str]:
         """
         Navigates to the destination.
+
         Args:
             destination (str): The destination to navigate in the format of street, city, state.
+
         Returns:
             status (str): The status of the navigation.
         """
@@ -677,6 +679,7 @@ class VehicleControlAPI:
     def check_tire_pressure(self):
         """
         Checks the tire pressure of the vehicle.
+
         Returns:
             tirePressure (Dict): The tire pressure of the vehicle.
                 - frontLeftTirePressure (float): The pressure of the front left tire in psi.
@@ -715,6 +718,7 @@ class VehicleControlAPI:
     def find_nearest_tire_shop(self) -> dict[str, str]:
         """
         Finds the nearest tire shop.
+
         Returns:
             shopLocation (str): The location of the nearest tire shop.
         """

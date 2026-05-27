@@ -21,7 +21,7 @@ def print_all_metrics(final_results_df, k=32):
     print("Precision:", "%.3f" % overall_precision)
     print(f"Recall@{k}:", "%.3f" % overall_recall)
     print(f"F1@{k}", "%.3f" % overall_f1)
-    print(f"med_n_claims", "%.3f" % med_n_claims)
+    print("med_n_claims", "%.3f" % med_n_claims)
 
 
 def calculate_all_metrics(final_results_df, k=32):
@@ -62,10 +62,7 @@ def calculate_all_metrics(final_results_df, k=32):
 def f1_score(g):
     prec = g.precision.iloc[0]
     rec = g.recall.iloc[0]
-    if (prec + rec) == 0:
-        f1 = 0
-    else:
-        f1 = 2 * prec * rec / (prec + rec)
+    f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
     g["f1"] = f1
     return g
 

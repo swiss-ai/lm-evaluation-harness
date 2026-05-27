@@ -293,10 +293,7 @@ def calculate_all_metrics(final_results_df, k=32):
 def f1_score(g):
     prec = g.precision.iloc[0]
     rec = g.recall.iloc[0]
-    if (prec + rec) == 0:
-        f1 = 0
-    else:
-        f1 = 2 * prec * rec / (prec + rec)
+    f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
     g["f1"] = f1
     return g
 

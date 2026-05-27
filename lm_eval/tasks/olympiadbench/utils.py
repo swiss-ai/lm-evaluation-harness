@@ -4,10 +4,6 @@ import math
 import re
 from typing import Any
 
-import sympy as sp
-from sympy import Eq, Pow, simplify, sympify
-from sympy.parsing.latex import parse_latex
-
 from lm_eval.api.metrics import is_degenerating_text
 
 
@@ -24,6 +20,14 @@ ENGLISH_ANSWER_TYPE = {
     "Equation": "an equation",
     "Interval": "an interval",
 }
+
+
+def _sympy_latex_tools():
+    import sympy as sp
+    from sympy import Eq, Pow, simplify, sympify
+    from sympy.parsing.latex import parse_latex
+
+    return sp, Eq, Pow, simplify, sympify, parse_latex
 
 
 def answer_type_text(answer_type: str, is_chinese: bool, multiple_answer: bool) -> str:
@@ -180,7 +184,7 @@ class OlympiadBenchScorer:
             "^\\circ": "",
             "%": "",
         }
-        self.pi = parse_latex("\\pi")
+        self.pi = None
         self.precision = 1e-8
 
     def judge(self, ground_truth, prediction, precision=1e-8) -> bool:
@@ -247,6 +251,9 @@ class OlympiadBenchScorer:
         return expr.startswith(("(", "[")) and expr.endswith((")", "]"))
 
     def sympy_sub_pi(self, expression_sympy):
+        _, _, _, _, _, parse_latex = _sympy_latex_tools()
+        if self.pi is None:
+            self.pi = parse_latex("\\pi")
         return expression_sympy.subs(self.pi, math.pi)
 
     def is_equal(self, ground_truth: str, prediction: str) -> bool:
@@ -295,6 +302,8 @@ class OlympiadBenchScorer:
         return any(abs(item - predicted) <= self.precision * 1.01 for item in gt_result)
 
     def expression_equal(self, exp1: str, exp2: str) -> bool:
+        sp, _, _, simplify, sympify, parse_latex = _sympy_latex_tools()
+
         def extract_expression(expression: str) -> str:
             if "=" in expression:
                 expression = expression.split("=")[1]
@@ -324,6 +333,8 @@ class OlympiadBenchScorer:
         return abs(simplified_expr.evalf()) < 1e-3
 
     def equation_equal(self, expression1: str, expression2: str) -> bool:
+        _, Eq, _, simplify, _, parse_latex = _sympy_latex_tools()
+
         def simplify_equation(latex_eq: str):
             lhs, rhs = latex_eq.split("=")
             equation = Eq(parse_latex(lhs), parse_latex(rhs))
@@ -404,6 +415,7 @@ class OlympiadBenchScorer:
         return re.sub(r"\\(?:mathrm|mathbf)\{~?([^}]*)\}", r"\1", expression)
 
     def can_compute_power(self, expr) -> bool:
+        _, _, Pow, _, _, _ = _sympy_latex_tools()
         if not isinstance(expr, Pow):
             return True
         base, exponent = expr.as_base_exp()
