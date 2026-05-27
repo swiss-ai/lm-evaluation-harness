@@ -83,16 +83,10 @@ def parse_js_collection(code, type_str, nested_type=None):
             if array_match:
                 if array_match.group(1) is not None:
                     elements_str = array_match.group(1).strip()
-                    if elements_str:
-                        elements = elements_str.split(",")
-                    else:
-                        elements = []
+                    elements = elements_str.split(",") if elements_str else []
                 elif array_match.group(2) is not None:
                     elements_str = array_match.group(2).strip()
-                    if elements_str:
-                        elements = elements_str.split(",")
-                    else:
-                        elements = []
+                    elements = elements_str.split(",") if elements_str else []
                 else:
                     elements = []
                 if nested_type:
@@ -109,7 +103,7 @@ def parse_js_collection(code, type_str, nested_type=None):
                 return elements
             else:
                 return code
-        except:
+        except Exception:
             return code
 
     elif type_str == "dict":
@@ -166,8 +160,8 @@ def parse_js_value(value_str: str):
 
 # Write tests for the `js_type_converter` function
 def test_js_type_converter():
-    assert js_type_converter("true", "Boolean") == True
-    assert js_type_converter("false", "Boolean") == False
+    assert js_type_converter("true", "Boolean") is True
+    assert js_type_converter("false", "Boolean") is False
     assert js_type_converter("123", "integer") == 123
     assert js_type_converter("3.14", "float") == 3.14
     assert js_type_converter("123n", "Bigint") == 123

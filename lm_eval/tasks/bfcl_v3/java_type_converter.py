@@ -212,8 +212,8 @@ def parse_java_value(value_str: str):
 # Write tests for the `java_type_converter` function
 def test_java_type_converter():
     # Test valid conversions
-    assert java_type_converter("true", "boolean") == True
-    assert java_type_converter("false", "boolean") == False
+    assert java_type_converter("true", "boolean") is True
+    assert java_type_converter("false", "boolean") is False
     assert java_type_converter("123", "integer") == 123
     assert java_type_converter("-123", "integer") == -123
     assert java_type_converter("3.14f", "float") == 3.14

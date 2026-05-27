@@ -622,10 +622,7 @@ class TradingBot:
         else:
             start = datetime.min
 
-        if end_date:
-            end = datetime.strptime(end_date, "%Y-%m-%d")
-        else:
-            end = datetime.max
+        end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.max
 
         filtered_history = [
             transaction
@@ -721,9 +718,8 @@ class TradingBot:
         Returns:
             symbol (str): the symbol that were successfully added to the watchlist.
         """
-        if stock not in self.watch_list:
-            if stock in self.stocks:  # Ensure symbol is valid
-                self.watch_list.append(stock)
+        if stock not in self.watch_list and stock in self.stocks:
+            self.watch_list.append(stock)
         return {"symbol": self.watch_list}
 
     def notify_price_change(

@@ -310,9 +310,7 @@ class GorillaFileSystem:
         return {"current_working_directory": target_dir.name}
 
     def _validate_file_or_directory_name(self, dir_name: str) -> bool:
-        if any(c in dir_name for c in '|/\\?%*:"><'):
-            return False
-        return True
+        return not any(c in dir_name for c in '|/\\?%*:"><')
 
     def mkdir(self, dir_name: str) -> None | dict[str, str]:
         """
@@ -590,7 +588,7 @@ class GorillaFileSystem:
 
                 diff_lines = [
                     f"- {line1}\n+ {line2}"
-                    for line1, line2 in zip(content1, content2)
+                    for line1, line2 in zip(content1, content2, strict=False)
                     if line1 != line2
                 ]
 
@@ -621,7 +619,7 @@ class GorillaFileSystem:
 
         if "/" in destination:
             return {
-                "error": f"mv: no path allowed in destination. Only file name and folder name is supported for this operation."
+                "error": "mv: no path allowed in destination. Only file name and folder name is supported for this operation."
             }
 
         # Check if the destination is an existing directory
@@ -668,7 +666,7 @@ class GorillaFileSystem:
         """
         if file_name in self._current_dir.contents:
             item = self._current_dir._get_item(file_name)
-            if isinstance(item, File) or isinstance(item, Directory):
+            if isinstance(item, (File, Directory)):
                 self._current_dir.contents.pop(file_name)
                 return {"result": f"'{file_name}' removed"}
             else:
@@ -735,7 +733,7 @@ class GorillaFileSystem:
 
         if "/" in destination:
             return {
-                "error": f"cp: don't allow path in destination. Only file name and folder name is supported for this operation."
+                "error": "cp: don't allow path in destination. Only file name and folder name is supported for this operation."
             }
         # Check if the destination is an existing directory
         if destination in self._current_dir.contents:

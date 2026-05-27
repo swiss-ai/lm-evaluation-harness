@@ -306,7 +306,6 @@ class MessageAPI:
         """
         if not self.current_user:
             return {"error": "No user is currently logged in."}
-        sent_count = 0
         received_count = 0
         contacts = set()
         # Loop through the inbox to calculate stats

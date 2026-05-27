@@ -67,16 +67,16 @@ def multi_turn_checker(
             }
         )
 
-        if len(single_turn_ground_truth_list) > 0:
-            if not single_turn_model_response_list or is_empty_execute_response(
-                single_turn_model_response_list
-            ):
-                return {
-                    "valid": False,
-                    "error_message": f"Model response list is empty for turn {turn_index}",
-                    "error_type": "multi_turn:empty_turn_model_response",
-                    "details": {"execution_result": execution_results},
-                }
+        if len(single_turn_ground_truth_list) > 0 and (
+            not single_turn_model_response_list
+            or is_empty_execute_response(single_turn_model_response_list)
+        ):
+            return {
+                "valid": False,
+                "error_message": f"Model response list is empty for turn {turn_index}",
+                "error_type": "multi_turn:empty_turn_model_response",
+                "details": {"execution_result": execution_results},
+            }
 
         if not single_turn_ground_truth_list:
             continue

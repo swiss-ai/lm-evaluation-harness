@@ -409,10 +409,8 @@ class TravelAPI:
         # Ensure the travel_from and travel_to is a tuple in the correct order (from, to)
         travel_pair = (travel_from, travel_to)
 
-        # Get the base cost, raise an error if the route is not available
-        if travel_pair in base_costs:
-            base_cost = base_costs[travel_pair]
-        else:
+        # Raise an error if the route is not available
+        if travel_pair not in base_costs:
             raise ValueError("No available route for the given airports.")
 
         # Determine the multiplier based on the travel class
@@ -430,9 +428,6 @@ class TravelAPI:
         # Determine the multiplier based on the travel date
         digit_sum = sum(int(char) for char in travel_date if char.isdigit())
         travel_date_multiplier = 2 if digit_sum % 2 == 0 else 1
-
-        # Calculate the total cost
-        travel_cost = float(base_cost * factor * travel_date_multiplier)
 
         travel_cost_list = []
         if self.long_context:

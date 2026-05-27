@@ -87,7 +87,7 @@ def ast_checker(
 
 #### Helper functions for AST ####
 def find_description(func_descriptions, name):
-    if type(func_descriptions) == list:
+    if type(func_descriptions) is list:
         for func_description in func_descriptions:
             if func_description["name"] == name:
                 return func_description
@@ -131,23 +131,25 @@ def type_checker(
     # use the type in possible_answer as the expected type
     possible_answer_type = get_possible_answer_type(possible_answer)
     # if possible_answer only contains optional parameters, we can't determine the type
-    if possible_answer_type != None:
+    if (
+        possible_answer_type is not None
+        and possible_answer_type is not expected_type_converted
+    ):
         # we are being precise here.
         # in fact, possible_answer_type should always be string, as that's how we treat varibale in possible_answer
-        if possible_answer_type != expected_type_converted:
-            is_variable = True
+        is_variable = True
 
     # value is the same type as in function description
-    if type(value) == expected_type_converted:
+    if type(value) is expected_type_converted:
         # We don't need to do recursive check for simple types
-        if nested_type_converted == None:
+        if nested_type_converted is None:
             result["is_variable"] = is_variable
             return result
         else:
             for possible_answer_item in possible_answer:
                 flag = True  # Each parameter should match to at least one possible answer type.
                 # Here, we assume that each item should be the same type. We could also relax it.
-                if type(possible_answer_item) == list:
+                if type(possible_answer_item) is list:
                     for value_item in value:
                         checker_result = type_checker(
                             param,
@@ -174,12 +176,11 @@ def type_checker(
     # use the type in possible_answer as the expected type
     possible_answer_type = get_possible_answer_type(possible_answer)
     # if possible_answer only contains optional parameters, we can't determine the type
-    if possible_answer_type != None:
+    if possible_answer_type is not None and type(value) is possible_answer_type:
         # we are being precise here.
         # in fact, possible_answer_type should always be string, as that's how we treat varibale in possible_answer
-        if type(value) == possible_answer_type:
-            result["is_variable"] = True
-            return result
+        result["is_variable"] = True
+        return result
 
     result["valid"] = False
     result["error"].append(
@@ -202,7 +203,7 @@ def string_checker(param: str, model_output: str, possible_answer: list):
     standardize_possible_answer = []
     standardize_model_output = standardize_string(model_output)
     for i in range(len(possible_answer)):
-        if type(possible_answer[i]) == str:
+        if type(possible_answer[i]) is str:
             standardize_possible_answer.append(standardize_string(possible_answer[i]))
 
     if standardize_model_output not in standardize_possible_answer:
@@ -224,7 +225,7 @@ def list_checker(param: str, model_output: list, possible_answer: list):
 
     # If the element in the list is a string, we need to standardize it
     for i in range(len(standardize_model_output)):
-        if type(standardize_model_output[i]) == str:
+        if type(standardize_model_output[i]) is str:
             standardize_model_output[i] = standardize_string(model_output[i])
 
     standardize_possible_answer = []
@@ -232,7 +233,7 @@ def list_checker(param: str, model_output: list, possible_answer: list):
     for i in range(len(possible_answer)):
         standardize_possible_answer.append([])
         for j in range(len(possible_answer[i])):
-            if type(possible_answer[i][j]) == str:
+            if type(possible_answer[i][j]) is str:
                 standardize_possible_answer[i].append(
                     standardize_string(possible_answer[i][j])
                 )
@@ -277,13 +278,13 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
 
             standardize_value = value
             # If the value is a string, we need to standardize it
-            if type(value) == str:
+            if type(value) is str:
                 standardize_value = standardize_string(value)
 
             # We also need to standardize the possible answers if they are string
             standardize_possible_answer = []
             for i in range(len(possible_answer[key])):
-                if type(possible_answer[key][i]) == str:
+                if type(possible_answer[key][i]) is str:
                     standardize_possible_answer.append(
                         standardize_string(possible_answer[key][i])
                     )
@@ -403,7 +404,7 @@ def simple_function_checker(
             expected_type_converted = JAVA_TYPE_CONVERSION[expected_type_description]
 
             if expected_type_description in JAVA_TYPE_CONVERSION:
-                if type(value) != str:
+                if type(value) is not str:
                     result["valid"] = False
                     result["error"].append(
                         f"Incorrect type for parameter {repr(param)}. Expected type String, got {type(value).__name__}. Parameter value: {repr(value)}."
@@ -424,7 +425,7 @@ def simple_function_checker(
             expected_type_converted = JS_TYPE_CONVERSION[expected_type_description]
 
             if expected_type_description in JS_TYPE_CONVERSION:
-                if type(value) != str:
+                if type(value) is not str:
                     result["valid"] = False
                     result["error"].append(
                         f"Incorrect type for parameter {repr(param)}. Expected type String, got {type(value).__name__}. Parameter value: {repr(value)}."
@@ -450,14 +451,14 @@ def simple_function_checker(
         # We convert all tuple value to list when the expected type is tuple.
         # The conversion is necessary because any tuple in the possible answer would become a list after being processed through json.dump() and json.load().
         # This does introduce some false positive (eg, when the model provides a list value instead of tuple). We hope to find a better solution in the future.
-        if expected_type_description == "tuple" and type(value) == tuple:
+        if expected_type_description == "tuple" and type(value) is tuple:
             value = list(value)
 
         # Allow python auto conversion from int to float
         if (
             language == "Python"
             and expected_type_description == "float"
-            and type(value) == int
+            and type(value) is int
         ):
             value = float(value)
 
@@ -480,28 +481,28 @@ def simple_function_checker(
         # We can just treat the variable as a string and use the normal flow.
         if not is_variable:
             # Special handle for dictionaries
-            if expected_type_converted == dict:
+            if expected_type_converted is dict:
                 result = dict_checker(param, value, possible_answer[param])
                 if not result["valid"]:
                     return result
                 continue
 
             # Special handle for list of dictionaries
-            elif expected_type_converted == list and nested_type_converted == dict:
+            elif expected_type_converted is list and nested_type_converted is dict:
                 result = list_dict_checker(param, value, possible_answer[param])
                 if not result["valid"]:
                     return result
                 continue
 
             # Special handle for strings
-            elif expected_type_converted == str:
+            elif expected_type_converted is str:
                 # We don't check for case sensitivity for string, as long as it's not a variable
                 result = string_checker(param, value, possible_answer[param])
                 if not result["valid"]:
                     return result
                 continue
 
-            elif expected_type_converted == list:
+            elif expected_type_converted is list:
                 result = list_checker(param, value, possible_answer[param])
                 if not result["valid"]:
                     return result

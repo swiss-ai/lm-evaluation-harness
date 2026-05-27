@@ -196,6 +196,13 @@ ignore = [
     "F403",   # undefined-local-with-import-star
     "F405",   # undefined-local-with-import-star-usage
 ]
+"lm_eval/tasks/bfcl_v3/multi_turn_func_source/*.py" = [
+    "B006",   # mutable-argument-default
+    "D410",   # missing-blank-line-after-section
+    "D411",   # missing-blank-line-before-section
+    "S105",   # possible-hardcoded-password
+    "S311",   # suspicious-non-cryptographic-random-usage
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

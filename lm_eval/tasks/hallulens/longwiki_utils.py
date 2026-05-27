@@ -18,10 +18,10 @@ def print_all_metrics(final_results_df, k=32):
     final_results_df["overall_f1"] = overall_f1
 
     med_n_claims = final_results_df.groupby("prompt").n_claims.first().median()
-    print("Precision:", "%.3f" % overall_precision)
-    print(f"Recall@{k}:", "%.3f" % overall_recall)
-    print(f"F1@{k}", "%.3f" % overall_f1)
-    print("med_n_claims", "%.3f" % med_n_claims)
+    print("Precision:", f"{overall_precision:.3f}")
+    print(f"Recall@{k}:", f"{overall_recall:.3f}")
+    print(f"F1@{k}", f"{overall_f1:.3f}")
+    print("med_n_claims", f"{med_n_claims:.3f}")
 
 
 def calculate_all_metrics(final_results_df, k=32):
@@ -51,10 +51,10 @@ def calculate_all_metrics(final_results_df, k=32):
 
     med_n_claims = final_results_df.groupby("prompt").n_claims.first().median()
 
-    print("Precision:", "%.3f" % overall_precision)
-    print(f"Recall@{k}:", "%.3f" % overall_recall)
-    print(f"F1@{k}", "%.3f" % overall_f1)
-    print(f"med_n_claims", "%.3f" % med_n_claims)
+    print("Precision:", f"{overall_precision:.3f}")
+    print(f"Recall@{k}:", f"{overall_recall:.3f}")
+    print(f"F1@{k}", f"{overall_f1:.3f}")
+    print("med_n_claims", f"{med_n_claims:.3f}")
 
     return final_results_df
 

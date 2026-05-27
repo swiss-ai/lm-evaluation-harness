@@ -55,7 +55,7 @@ def parse_javascript_function_call(source_code):
                         function_name = sub_child.children[0].text.decode("utf8")
                         arguments_node = sub_child.children[1]
                         parameters = extract_arguments(arguments_node)
-                        for key, value in parameters.items():
+                        for value in parameters.values():
                             if isinstance(value, list):
                                 raise Exception(
                                     "Error: Multiple arguments with the same name are not supported."

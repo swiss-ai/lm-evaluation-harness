@@ -638,30 +638,20 @@ class VehicleControlAPI:
         Returns:
             zipcode (str): The zipcode of the city.
         """
-        if city == "Rivermist":
-            return {"zipcode": "83214"}
-        elif city == "Stonebrook":
-            return {"zipcode": "74532"}
-        elif city == "Maplecrest":
-            return {"zipcode": "56108"}
-        elif city == "Silverpine":
-            return {"zipcode": "62947"}
-        elif city == "Shadowridge":
-            return {"zipcode": "71354"}
-        elif city == "Sunset Valley":
-            return {"zipcode": "83462"}
-        elif city == "Oakendale":
-            return {"zipcode": "47329"}
-        elif city == "Willowbend":
-            return {"zipcode": "52013"}
-        elif city == "Crescent Hollow":
-            return {"zipcode": "69238"}
-        elif city == "Autumnville":
-            return {"zipcode": "51479"}
-        elif city == "San Francisco":
-            return {"zipcode": "94016"}
-        else:
-            return {"zipcode": "00000"}
+        zipcodes = {
+            "Rivermist": "83214",
+            "Stonebrook": "74532",
+            "Maplecrest": "56108",
+            "Silverpine": "62947",
+            "Shadowridge": "71354",
+            "Sunset Valley": "83462",
+            "Oakendale": "47329",
+            "Willowbend": "52013",
+            "Crescent Hollow": "69238",
+            "Autumnville": "51479",
+            "San Francisco": "94016",
+        }
+        return {"zipcode": zipcodes.get(city, "00000")}
 
     def set_navigation(self, destination: str) -> dict[str, str]:
         """

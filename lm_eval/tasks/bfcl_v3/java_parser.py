@@ -119,7 +119,7 @@ def parse_java_function_call(source_code):
             arguments_node = node.child_by_field_name("arguments")
             if arguments_node:
                 arguments = extract_arguments(arguments_node)
-                for key, value in arguments.items():
+                for value in arguments.values():
                     if isinstance(value, list):
                         raise Exception(
                             "Error: Multiple arguments with the same name are not supported."
