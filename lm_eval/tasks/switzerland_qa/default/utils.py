@@ -1,5 +1,6 @@
 from functools import partial
 
+
 CATEGORIES = ["geography", "history", "political_life", "social_life", "insurance"]
 
 

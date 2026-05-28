@@ -1,5 +1,3 @@
-from lm_eval.api.filter import Filter
-from lm_eval.api.registry import register_filter
 
 
 alpha = ["A", "B", "C"]

@@ -13,7 +13,7 @@ Additionally, group configurations are created to run all tasks in each subset.
 """
 
 from pathlib import Path
-from typing import Dict, List
+
 
 LANGUAGE_NAMES = {
     "de": "german",
@@ -61,7 +61,7 @@ test_split: {test_split}
 """
 
 
-def create_group_yaml_content(group_name: str, task_list: List[str]) -> str:
+def create_group_yaml_content(group_name: str, task_list: list[str]) -> str:
     """Create YAML content for a group configuration."""
     tasks_yaml = "\n".join([f"  - {task}" for task in task_list])
     return f"""group: {group_name}
@@ -87,7 +87,7 @@ def create_directory_structure() -> Path:
     return base_dir
 
 
-def generate_configs_for_type(config_type: str, base_dir: Path) -> List[str]:
+def generate_configs_for_type(config_type: str, base_dir: Path) -> list[str]:
     """Generate YAML configs for a specific configuration type (full, small, wildchat)."""
     config_def = CONFIG_DEFINITIONS[config_type]
     folder = config_def["folder"]
@@ -113,7 +113,7 @@ def generate_configs_for_type(config_type: str, base_dir: Path) -> List[str]:
     return task_names
 
 
-def generate_group_configs(base_dir: Path, task_lists: Dict[str, List[str]]):
+def generate_group_configs(base_dir: Path, task_lists: dict[str, list[str]]):
     """Generate group YAML configurations."""
     for config_type, task_list in task_lists.items():
         config_def = CONFIG_DEFINITIONS[config_type]

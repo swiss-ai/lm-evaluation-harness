@@ -6,52 +6,47 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
-import time
-import json
-import numpy as np
-
 from dataclasses import dataclass
-from typing import List, Optional, Dict
 
+import numpy as np
 import pandas as pd
+from segtok.segmenter import split_single
 from tqdm import tqdm
 
-import lm_eval.tasks.hallulens.prompt_templates as prompt_templates
-from segtok.segmenter import split_single
-
-import lm_eval.tasks.hallulens.utils as base_utils
-from lm_eval.tasks.hallulens.longwiki_retrieval import LongWikiRetrieval, LongWikiDB
 import lm_eval.tasks.hallulens.longwiki_utils as utils
+import lm_eval.tasks.hallulens.prompt_templates as prompt_templates
+import lm_eval.tasks.hallulens.utils as base_utils
+from lm_eval.tasks.hallulens.longwiki_retrieval import LongWikiDB, LongWikiRetrieval
 
 
 @dataclass
 class Claim:
     claim: str
     sentence: object
-    refernce: Optional[str] = None
-    topic: Optional[str] = None
-    search_results: Optional[List[Dict[str, str]]] = None
-    prompt: Optional[str] = None
-    is_supported: Optional[bool] = None
-    question: Optional[str] = None  # same as generation.prompt
+    refernce: str | None = None
+    topic: str | None = None
+    search_results: list[dict[str, str]] | None = None
+    prompt: str | None = None
+    is_supported: bool | None = None
+    question: str | None = None  # same as generation.prompt
 
 
 @dataclass
 class Sentence:
     sentence: str
     generation: object
-    prompt: Optional[str]
-    claims: Optional[List[Claim]] = None
+    prompt: str | None
+    claims: list[Claim] | None = None
 
 
 @dataclass
 class Generation:
     generation: str
     prompt: str
-    sentences: Optional[List[Sentence]] = None
-    abstain: Optional[bool] = None
-    reference: Optional[str] = None
-    topic: Optional[str] = None
+    sentences: list[Sentence] | None = None
+    abstain: bool | None = None
+    reference: str | None = None
+    topic: str | None = None
 
     def __hash__(self) -> int:
         return hash(self.generation + self.prompt)
@@ -172,10 +167,16 @@ class FactHalu:
         if not all_claims_tuples:
             return
         questions = list(set([q for _, _, q in all_claims_tuples]))
-        print(f"Prewarming NER cache for {len(all_claims_tuples)} claims across {len(questions)} unique questions...", flush=True)
+        print(
+            f"Prewarming NER cache for {len(all_claims_tuples)} claims across {len(questions)} unique questions...",
+            flush=True,
+        )
         self.retrieval.make_ner_cache(questions)
 
-        print(f"Prewarming retrieval cache with {len(all_claims_tuples)} claim tuples...", flush=True)
+        print(
+            f"Prewarming retrieval cache with {len(all_claims_tuples)} claim tuples...",
+            flush=True,
+        )
         self.retrieval.prewarm(all_claims_tuples)
 
     def verify_and_score_phase(self, _generation, all_claims, final_result):
@@ -187,7 +188,10 @@ class FactHalu:
             return final_result
 
         ### [[STEP #3]] Verify claims (retrieval should be cache hits after bulk prewarm)
-        print(f"Verifying {len(all_claims)} claims for current document, this should be cache hits...", flush=True)
+        print(
+            f"Verifying {len(all_claims)} claims for current document, this should be cache hits...",
+            flush=True,
+        )
         all_verification_responses = self._verify_claims_no_prewarm(all_claims)
 
         for claim, verification_response in zip(all_claims, all_verification_responses):
@@ -292,7 +296,9 @@ class FactHalu:
                 sentence.claims = []
                 continue
 
-            parsed_claim_extraction = base_utils.parse_claim_extraction(claim_extraction)
+            parsed_claim_extraction = base_utils.parse_claim_extraction(
+                claim_extraction
+            )
 
             sentence_claims = []
             for claim_text in parsed_claim_extraction:
@@ -316,7 +322,7 @@ class FactHalu:
 
         return all_claims
 
-    def verify_claims(self, all_claims: List[Claim]):
+    def verify_claims(self, all_claims: list[Claim]):
         """Original verify_claims with built-in prewarm. Kept for backward compatibility."""
         questions = list(set([claim.question for claim in all_claims]))
         self.retrieval.make_ner_cache(questions)
@@ -327,7 +333,7 @@ class FactHalu:
 
         return self._verify_claims_no_prewarm(all_claims)
 
-    def _verify_claims_no_prewarm(self, all_claims: List[Claim]):
+    def _verify_claims_no_prewarm(self, all_claims: list[Claim]):
         """Verify claims assuming NER cache and prewarm are already done."""
         # 1. Build retrieval prompts
         for claim in tqdm(all_claims):
@@ -423,12 +429,17 @@ def make_claim_extraction_prompts(generation, prompt, tokenizer):
                     )
 
                     if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
-                        prompt_text = prompt_templates.EXTRACT_CLAIMS_MINIMAL_TEMPLATE.format(snippet=snippet, sentence=sentence)
-                    
+                        prompt_text = (
+                            prompt_templates.EXTRACT_CLAIMS_MINIMAL_TEMPLATE.format(
+                                snippet=snippet, sentence=sentence
+                            )
+                        )
+
                         if len(tokenizer.encode(prompt_text)) > MAX_PROMPT_LENGTH:
-                            print(f"WARNING: Skipping sentence that exceeds MAX_PROMPT_LENGTH even with minimal template: {target_sentence[:80]}... Prompt length: {len(tokenizer.encode(prompt_text))}")
+                            print(
+                                f"WARNING: Skipping sentence that exceeds MAX_PROMPT_LENGTH even with minimal template: {target_sentence[:80]}... Prompt length: {len(tokenizer.encode(prompt_text))}"
+                            )
                             continue
-        
 
         sentences.append(
             Sentence(

@@ -249,8 +249,8 @@ code_to_language_name = lambda code: Language.make(
     language=Language.get(code)["language"]
 ).display_name()
 code_to_short_name = lambda code: Language.get(code)["language"]
-jinja_var = (
-    lambda s: "{{" + s + "}}"
+jinja_var = lambda s: (
+    "{{" + s + "}}"
 )  # wrapper to avoid having to escape { } in format strings
 
 

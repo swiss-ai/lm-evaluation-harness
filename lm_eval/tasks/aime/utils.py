@@ -1,4 +1,5 @@
 import re
+
 from datasets import Dataset
 
 
@@ -49,12 +50,11 @@ def process_2024(dataset: Dataset) -> Dataset:
     return dataset.filter(filter_by_year)
 
 
-from typing import Dict, List
 
 from lm_eval.api.metrics import is_degenerating_text
 
 
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
+def process_results(doc: dict, results: list[str]) -> dict[str, int]:
     retval = 0
     response = results[0]
 
@@ -189,7 +189,7 @@ def fix_a_slash_b(string):
     try:
         a = int(a)
         b = int(b)
-        assert string == "{}/{}".format(a, b)
+        assert string == f"{a}/{b}"
         new_string = "\\frac{" + str(a) + "}{" + str(b) + "}"
         return new_string
     except AssertionError:

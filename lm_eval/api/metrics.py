@@ -4,17 +4,19 @@ import os
 import random
 import re
 import string
-from collections.abc import Iterable
-from typing import Callable, List, Optional, Sequence, TypeVar
+from collections.abc import Callable, Iterable, Sequence
+from typing import TypeVar
 
 import numpy as np
 import sacrebleu
 
 from lm_eval.api.registry import register_aggregation, register_metric
 
+
 T = TypeVar("T")
 
 eval_logger = logging.getLogger(__name__)
+
 
 def is_degenerating_chunk(
     chunk: list,
@@ -23,10 +25,11 @@ def is_degenerating_chunk(
 ) -> bool:
     if len(chunk) < n:
         return False
-    ngrams = [tuple(chunk[i:i + n]) for i in range(len(chunk) - n + 1)]
+    ngrams = [tuple(chunk[i : i + n]) for i in range(len(chunk) - n + 1)]
     if not ngrams:
         return False
     return (1 - len(set(ngrams)) / len(ngrams)) > threshold
+
 
 def is_degenerating_text(
     text: str,
@@ -36,11 +39,12 @@ def is_degenerating_text(
 ) -> bool:
     words = text.split()
     for start in range(0, len(words), chunk_size):
-        chunk = words[start:start + chunk_size]
+        chunk = words[start : start + chunk_size]
         for n in list_n:
             if is_degenerating_chunk(chunk, n=n, threshold=threshold):
                 return True
     return False
+
 
 # Register Aggregations First
 @register_aggregation("bypass")
@@ -427,6 +431,7 @@ def acc_all(items):
     acc = np.mean([int(all(x)) for x in question_scoring_dict.values()])
     return acc
 
+
 @register_metric(
     metric="degeneration",
     higher_is_better=False,
@@ -440,6 +445,7 @@ def degeneration(items):
             return 0.0
         return sum(int(is_degenerating_text(p.lower())) for p in pred) / len(pred)
     return int(is_degenerating_text(pred.lower()))
+
 
 def acc_all_stderr(items):
     # Only count as correct if all answers are labeled correctly for each question
@@ -591,7 +597,7 @@ def bootstrap_stderr(
 
 def stderr_for_metric(
     metric: Callable[[Sequence[T]], float], bootstrap_iters: int
-) -> Optional[Callable[[Sequence[T]], float]]:
+) -> Callable[[Sequence[T]], float] | None:
     """
     Return a function that estimates the standard error of `metric(xs)`.
 
@@ -624,7 +630,7 @@ def stderr_for_metric(
     return stderr.get(metric, None)
 
 
-def pooled_sample_stderr(stderrs: List[float], sizes: List[int]):
+def pooled_sample_stderr(stderrs: list[float], sizes: list[int]):
     # Used to aggregate bootstrapped stderrs across subtasks in a group,
     # when we are weighting by the size of each subtask.
     #
@@ -642,7 +648,7 @@ def pooled_sample_stderr(stderrs: List[float], sizes: List[int]):
     return np.sqrt(pooled_sample_var / sum(sizes))
 
 
-def combined_sample_stderr(stderrs: List[float], sizes: List[int], metrics=None):
+def combined_sample_stderr(stderrs: list[float], sizes: list[int], metrics=None):
     assert metrics is not None, (
         "Need to pass a list of each subtask's metric for this stderr aggregation"
     )

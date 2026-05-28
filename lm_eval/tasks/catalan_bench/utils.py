@@ -111,8 +111,9 @@ def process_docs_paraphrases(dataset):
             return doc
 
     return dataset.filter(
-        lambda doc: doc["sentence1"] not in [None, ""]
-        and doc["sentence2"] not in [None, ""]
+        lambda doc: (
+            doc["sentence1"] not in [None, ""] and doc["sentence2"] not in [None, ""]
+        )
     ).map(_process_doc)
 
 

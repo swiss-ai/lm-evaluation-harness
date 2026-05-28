@@ -1,9 +1,7 @@
 import re
-from typing import Union
 
 import evaluate as hf_evaluate
 
-import re
 
 try:
     pass_at_k = hf_evaluate.load("code_eval")
@@ -17,7 +15,7 @@ except Exception as e:
 
 
 def pass_at_1(
-    references: Union[str, list[str]], predictions: Union[str, list[list[str]]]
+    references: str | list[str], predictions: str | list[list[str]]
 ) -> float:
     if isinstance(references, str):
         references = [references]

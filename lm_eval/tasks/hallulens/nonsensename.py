@@ -5,10 +5,9 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from lm_eval.tasks.hallulens.utils import generate, jsonify_ans
+
 import lm_eval.tasks.hallulens.prompt_template_nonsense as prompt_templates
-import os
-import json
+from lm_eval.tasks.hallulens.utils import generate, jsonify_ans
 
 
 class NonsenseNameEval:

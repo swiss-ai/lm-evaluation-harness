@@ -14,6 +14,7 @@ from lm_eval.api.metrics import (
 from lm_eval.api.task import Task
 from lm_eval.utils import positional_deprecated
 
+
 eval_logger = logging.getLogger(__name__)
 
 
@@ -489,10 +490,8 @@ def consolidate_group_results(
                         elif metric_config["aggregation"] == "dwacc":
                             from lm_eval.api.metrics import dwacc_aggregation
 
-                            aggregate_fn = (
-                                lambda metrics,
-                                sizes,
-                                weight_by_size: dwacc_aggregation(metrics)
+                            aggregate_fn = lambda metrics, sizes, weight_by_size: (
+                                dwacc_aggregation(metrics)
                             )
                         elif callable(metric_config["aggregation"]):
                             aggregate_fn = metric_config["aggregation"]

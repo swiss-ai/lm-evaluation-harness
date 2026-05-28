@@ -13,12 +13,13 @@ You can refer to https://github.com/shmsw25/FActScore/blob/main/factscore/retrie
 """
 
 import json
-import time
 import os
-
-import sqlite3
-import numpy as np
 import pickle as pkl
+import sqlite3
+import time
+
+import numpy as np
+
 
 # from rank_bm25 import BM25Okapi
 
@@ -26,7 +27,7 @@ SPECIAL_SEPARATOR = "####SPECIAL####SEPARATOR####"
 MAX_LENGTH = 256
 
 
-class DocDB(object):
+class DocDB:
     """Sqlite backed document storage.
 
     Implements get_doc_text(doc_id).
@@ -73,7 +74,7 @@ class DocDB(object):
         c = self.connection.cursor()
         c.execute("CREATE TABLE documents (title PRIMARY KEY, text);")
 
-        with open(data_path, "r") as f:
+        with open(data_path) as f:
             for line in f:
                 dp = json.loads(line)
                 title = dp["title"]
@@ -144,7 +145,7 @@ class DocDB(object):
         return results
 
 
-class Retrieval(object):
+class Retrieval:
     def __init__(
         self,
         db,
@@ -176,7 +177,7 @@ class Retrieval(object):
 
     def load_cache(self):
         if os.path.exists(self.cache_path):
-            with open(self.cache_path, "r") as f:
+            with open(self.cache_path) as f:
                 self.cache = json.load(f)
         else:
             self.cache = {}
@@ -189,7 +190,7 @@ class Retrieval(object):
     def save_cache(self):
         if self.add_n > 0:
             if os.path.exists(self.cache_path):
-                with open(self.cache_path, "r") as f:
+                with open(self.cache_path) as f:
                     new_cache = json.load(f)
                 self.cache.update(new_cache)
 

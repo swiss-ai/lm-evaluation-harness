@@ -1,9 +1,11 @@
+import concurrent.futures
 import logging
 import os
-import numpy as np
-import concurrent.futures
-import requests
 import time
+
+import numpy as np
+import requests
+
 
 MODEL_NAME = "meta-llama/Llama-Guard-4-12B"
 MAX_OUTPUT_TOKENS = 50
@@ -17,7 +19,9 @@ eval_logger = logging.getLogger(__name__)
 _CONTEXT_TOO_LONG = object()
 
 
-def try_remote_generate(messages, temperature=0.0, max_tokens=MAX_OUTPUT_TOKENS, max_retries=10):
+def try_remote_generate(
+    messages, temperature=0.0, max_tokens=MAX_OUTPUT_TOKENS, max_retries=10
+):
     """Call Llama Guard via /v1/chat/completions with list-of-dicts content."""
     for attempt in range(max_retries):
         try:
@@ -52,13 +56,15 @@ def try_remote_generate(messages, temperature=0.0, max_tokens=MAX_OUTPUT_TOKENS,
                 except Exception:
                     pass
 
-            eval_logger.error(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
+            eval_logger.error(
+                f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}"
+            )
 
         except Exception as e:
             eval_logger.error(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2 ** attempt, 60)
+            wait = min(2**attempt, 60)
             eval_logger.info(f"Retrying in {wait}s...")
             time.sleep(wait)
 
@@ -82,19 +88,26 @@ def evaluate_llama_guard(response):
 def _call_judge(prompt, completion):
     shrink_factor = 1.0
     while True:
-        current_completion = completion[:max(1, int(len(completion) * shrink_factor))]
+        current_completion = completion[: max(1, int(len(completion) * shrink_factor))]
         messages = [
             {"role": "user", "content": [{"type": "text", "text": prompt}]},
-            {"role": "assistant", "content": [{"type": "text", "text": current_completion}]},
+            {
+                "role": "assistant",
+                "content": [{"type": "text", "text": current_completion}],
+            },
         ]
         result = try_remote_generate(messages)
 
         if result is _CONTEXT_TOO_LONG:
             shrink_factor -= 0.1
             if shrink_factor < 0.05:
-                eval_logger.error("Context still too long after 95% reduction, giving up")
+                eval_logger.error(
+                    "Context still too long after 95% reduction, giving up"
+                )
                 return np.nan
-            eval_logger.info(f"Context too long, shortening completion to {shrink_factor * 100:.0f}% of original")
+            eval_logger.info(
+                f"Context too long, shortening completion to {shrink_factor * 100:.0f}% of original"
+            )
             continue
 
         return evaluate_llama_guard(result)

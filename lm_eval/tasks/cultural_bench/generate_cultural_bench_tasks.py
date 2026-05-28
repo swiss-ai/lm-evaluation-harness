@@ -3,8 +3,8 @@
 Script to generate CulturalBench task files for all countries.
 """
 
-import os
 from pathlib import Path
+
 
 # List of all countries in CulturalBench dataset
 COUNTRIES = [

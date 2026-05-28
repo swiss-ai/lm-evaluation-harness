@@ -220,10 +220,10 @@ def alpaca_eval_agg(items):
     )
 
     from alpaca_eval import evaluate
-     
-    annotation_kwargs={
-    "n_retries": 10,
-    "client_kwargs": {"max_retries": 15},
+
+    annotation_kwargs = {
+        "n_retries": 10,
+        "client_kwargs": {"max_retries": 15},
     }
 
     with tempfile.TemporaryDirectory() as tmpdir:

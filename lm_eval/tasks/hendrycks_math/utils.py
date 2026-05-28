@@ -2,7 +2,6 @@ import logging
 import re
 import signal
 from importlib.metadata import version
-from typing import Dict, List, Optional
 
 import datasets
 
@@ -81,7 +80,7 @@ def list_fewshot_samples() -> list[dict]:
     ]
 
 
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
+def process_results(doc: dict, results: list[str]) -> dict[str, int]:
     candidates = results[0]
 
     unnormalized_answer = get_unnormalized_answer(candidates)
@@ -103,7 +102,7 @@ def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
     return results
 
 
-def last_boxed_only_string(string: str) -> Optional[str]:
+def last_boxed_only_string(string: str) -> str | None:
     idx = string.rfind("\\boxed")
     if "\\boxed " in string:
         return "\\boxed " + string.split("\\boxed ")[-1].split("$")[0]

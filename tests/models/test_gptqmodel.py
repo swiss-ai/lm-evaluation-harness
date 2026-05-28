@@ -1,4 +1,3 @@
-from typing import List
 
 import pytest
 
@@ -24,7 +23,7 @@ class Test_GPTQModel:
 
         model_args = f"pretrained={self.MODEL_ID},gptqmodel=True"
 
-        tasks: List[str] = [task]
+        tasks: list[str] = [task]
 
         results = lm_eval.simple_evaluate(
             model="hf",
