@@ -1,4 +1,3 @@
-
 import pytest
 
 import lm_eval
@@ -44,10 +43,10 @@ class Test_GPTQModel:
                     continue
 
                 if m == acc:
-                    acc_value = "%.4f" % v if isinstance(v, float) else v
+                    acc_value = f"{v:.4f}" if isinstance(v, float) else v
 
                 if m == acc_norm:
-                    acc_norm_value = "%.4f" % v if isinstance(v, float) else v
+                    acc_norm_value = f"{v:.4f}" if isinstance(v, float) else v
 
             assert_less_than(acc_value, 0.43, "acc")
             assert_less_than(acc_norm_value, 0.39, "acc_norm")

@@ -356,9 +356,7 @@ class AnthropicChat(LocalCompletionsAPI):
             out["system"] = system
         return out
 
-    def parse_generations(
-        self, outputs: dict | list[dict], **kwargs
-    ) -> list[str]:
+    def parse_generations(self, outputs: dict | list[dict], **kwargs) -> list[str]:
         res = []
         if not isinstance(outputs, list):
             outputs = [outputs]

@@ -50,7 +50,6 @@ def process_2024(dataset: Dataset) -> Dataset:
     return dataset.filter(filter_by_year)
 
 
-
 from lm_eval.api.metrics import is_degenerating_text
 
 

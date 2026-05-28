@@ -177,6 +177,8 @@ ignore = [
     "D200", # unnecessary line
     "D202", # blank-line-after-function
 
+    "B905", # zip-strict
+
     "E111",   # indentation-with-invalid-multiple
     "E114",   # indentation-with-invalid-multiple-comment
     "E117",   # over-indented
@@ -187,6 +189,7 @@ ignore = [
     "E741",   # ambiguous-variable-name
     "SIM118", # dict-in-keys
     "S101",   # assert-used
+    "S311",   # cryptographic random generator
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]

@@ -1,5 +1,3 @@
-
-
 def doc_to_text(doc):
     output = """You are an NLP assistant whose purpose is to solve Natural Language Inference (NLI) problems
 

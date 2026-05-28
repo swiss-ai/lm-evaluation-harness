@@ -50,7 +50,7 @@ class GroupConfig(dict):
             ]
 
     def to_dict(self, keep_callable: bool = False) -> dict:
-        """dumps the current config as a dictionary object, as a printable format.
+        """Dumps the current config as a dictionary object, as a printable format.
         null fields will not be printed.
         Used for dumping results alongside full task configuration
 

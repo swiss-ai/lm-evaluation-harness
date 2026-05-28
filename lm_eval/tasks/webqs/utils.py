@@ -1,5 +1,3 @@
-
-
 def doc_to_choice(doc: dict) -> list[str]:
     """Return all of the accepted answers as choices."""
     return _remove_prefixes(doc["answers"])

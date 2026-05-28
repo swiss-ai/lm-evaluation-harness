@@ -208,9 +208,10 @@ def generate_dataset(
             + "\n".join([f"- {y[1]}" for y in x["arguments"]])
             for x in data
         ]
-    elif config["output_type"] == "loglikelihood_rolling":
-        instance = [x["arguments"]["gen_args_0"]["arg_0"] for x in data]
-    elif config["output_type"] == "generate_until":
+    elif (
+        config["output_type"] == "loglikelihood_rolling"
+        or config["output_type"] == "generate_until"
+    ):
         instance = [x["arguments"]["gen_args_0"]["arg_0"] for x in data]
 
     return pd.DataFrame(

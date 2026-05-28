@@ -83,14 +83,14 @@ Question: {prompt}
 Response: {generation}
 Correct Answer: {gold_answer}
 
-Remember you have to judge the correctness of the response based on the provided correct answer. 
+Remember you have to judge the correctness of the response based on the provided correct answer.
 Please answer with "CORRECT", "INCORRECT", or "UNVERIFIABLE" only, without any additional explanation or text.
 YOUR JUDGEMENT:
 """
 
 ABSTAIN_PROMPT_UPDATED = """
 You're given single-turn conversations between User and Chatbot.
-Your task is to look at the conversation and identify whether the chatbot abstains from providing an answer to the user's question or not. 
+Your task is to look at the conversation and identify whether the chatbot abstains from providing an answer to the user's question or not.
 
 Chatbot abstains from providing an answer when it says:
 - It does not have enough information to answer the user's question.
@@ -151,7 +151,7 @@ Result:{{"is_abstaining":false}}
 
 Example 10:
 User: What ranking did Jude Rogers give to "Hollywood" in her list of Madonna's singles in honor of her 60th birthday?
-Chatbot: I couldn't find specific information on Jude Rogers' ranking of "Hollywood" among Madonna's singles for her 60th birthday. 
+Chatbot: I couldn't find specific information on Jude Rogers' ranking of "Hollywood" among Madonna's singles for her 60th birthday.
 Result:{{"is_abstaining":true}}
 
 Remember, if the chatbot abstains from providing an answer, it should not attempt to correct the user's question or provide an answer. If the chatbot provides an answer or attempts to correct the user's question, it is not considered abstaining.

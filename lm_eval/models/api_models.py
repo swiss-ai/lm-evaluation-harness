@@ -106,7 +106,8 @@ class TemplateAPI(TemplateLM):
         # Loglikelihood tasks require a tokenizer to calculate context lengths,
         # however the requests can be sent as a string if the API doesn't support token inputs.
         # use tokenized_requests=False
-        tokenizer_backend: Literal["tiktoken", "huggingface", "remote", "None", "none"] | None = "huggingface",
+        tokenizer_backend: Literal["tiktoken", "huggingface", "remote", "None", "none"]
+        | None = "huggingface",
         truncate: bool = False,
         # number of concurrent requests. More useful if not batching
         num_concurrent: int = 1,

@@ -14,9 +14,7 @@ except Exception as e:
     raise e
 
 
-def pass_at_1(
-    references: str | list[str], predictions: str | list[list[str]]
-) -> float:
+def pass_at_1(references: str | list[str], predictions: str | list[list[str]]) -> float:
     if isinstance(references, str):
         references = [references]
     if isinstance(predictions[0], str):
