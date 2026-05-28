@@ -264,9 +264,8 @@ class SteeredModel(HFLM):
         return clamped
 
     def forward(self, *args, **kwargs):
-        with torch.no_grad():
-            with steer(self.model, self.hook_to_steer):
-                return self.model.forward(*args, **kwargs)
+        with torch.no_grad(), steer(self.model, self.hook_to_steer):
+            return self.model.forward(*args, **kwargs)
 
     def _model_call(self, *args, **kwargs):
         with steer(self.model, self.hook_to_steer):

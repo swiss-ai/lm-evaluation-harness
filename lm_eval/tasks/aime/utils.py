@@ -7,7 +7,7 @@ def extract_year_from_url(url: str) -> str:
     """Extract the year from an AIME problem URL."""
     match = re.search(r"index\.php/(\d{4})_", url)
     if not match:
-        raise ValueError(f"Could not extract year from URL: {{url}}")
+        raise ValueError(f"Could not extract year from URL: {url}")
     return match.group(1)
 
 
@@ -262,9 +262,8 @@ def strip_string(string):
         string = "0" + string
 
     # to consider: get rid of e.g. "k = " or "q = " at beginning
-    if len(string.split("=")) == 2:
-        if len(string.split("=")[0]) <= 2:
-            string = string.split("=")[1]
+    if len(string.split("=")) == 2 and len(string.split("=")[0]) <= 2:
+        string = string.split("=")[1]
 
     # fix sqrt3 --> sqrt{3}
     string = fix_sqrt(string)

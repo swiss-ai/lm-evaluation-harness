@@ -83,7 +83,7 @@ class GroupConfig(dict):
                 return str(value)
 
 
-class ConfigurableGroup(abc.ABC):
+class ConfigurableGroup(abc.ABC):  # noqa: B024
     def __init__(
         self,
         config: dict | None = None,

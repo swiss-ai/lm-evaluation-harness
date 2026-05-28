@@ -55,8 +55,7 @@ def initial_process_docs(doc: Dataset) -> Dataset:
     def __process(_doc, idx):
         if "question" not in _doc:
             question = _doc[QUESTION_KEY].split(" Answer Choices:")[0]
-            if question.startswith("Q: "):
-                question = question[3:]
+            question = question.removeprefix("Q: ")
             _doc["question"] = question
         if "question_id" not in _doc:
             _doc["question_id"] = idx

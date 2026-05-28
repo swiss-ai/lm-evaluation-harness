@@ -69,7 +69,7 @@ def schema_conform_with_format_checker(
     try:
         validator.validate(instance)
     except ValidationError as e:
-        raise ValidationError(e.message)
+        raise ValidationError(e.message) from e
     return True
 
 
@@ -85,7 +85,7 @@ def schema_compliance(references: list[str], predictions: list[str]) -> bool:
 
     json_schema = json.loads(reference.strip())
     try:
-        json_obj = json.loads(prediction.strip().strip("```").strip("json"))
+        json_obj = json.loads(prediction.strip().strip("```").strip("json"))  # noqa: B005
     except json.JSONDecodeError:
         return False
 
@@ -104,7 +104,7 @@ def json_validity(references: list[str], predictions: list[str]) -> bool:
     )
     prediction = predictions[0]  # Since predictions is a list of lists
     try:
-        json.loads(prediction.strip().strip("```").strip("json").strip())
+        json.loads(prediction.strip().strip("```").strip("json").strip())  # noqa: B005
     except json.JSONDecodeError:
         return False
     return True

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import importlib
 import logging
 import pathlib
@@ -47,7 +48,7 @@ def _patch_pretrained_cfg(
             "Attempted to use 'nemo_lm' model type, but package `nemo` is not installed"
             "Please install nemo following the instructions in the README: either with a NVIDIA PyTorch or NeMo container, "
             "or installing nemo following https://github.com/NVIDIA/NeMo.",
-        )
+        ) from exception
 
     omegaconf.OmegaConf.set_struct(pretrained_cfg, True)
     with omegaconf.open_dict(pretrained_cfg):
@@ -87,7 +88,7 @@ def load_model(
             "Attempted to use 'nemo_lm' model type, but package `nemo` is not installed"
             "Please install nemo following the instructions in the README: either with a NVIDIA PyTorch or NeMo container, "
             "or installing nemo following https://github.com/NVIDIA/NeMo.",
-        )
+        ) from exception
     model_path = pathlib.Path(model_path)
 
     save_restore_connector = NLPSaveRestoreConnector()
@@ -113,7 +114,7 @@ def load_model(
     model_class = getattr(importlib.import_module(module_name), class_name)
 
     # monkeypatch _build_tokenizer method to be process-safe
-    tokenizer_lock = filelock.FileLock(f"/tmp/{model_path.name}.tokenizer.lock")
+    tokenizer_lock = filelock.FileLock(f"/tmp/{model_path.name}.tokenizer.lock")  # noqa: S108
 
     def _synced_build_tokenizer(self):
         with tokenizer_lock:
@@ -132,11 +133,9 @@ def load_model(
 
     model.freeze()
     model.training = False
-    try:
+    with contextlib.suppress(AttributeError):
         # Have to turn off activations_checkpoint_method for inference
         model.model.language_model.encoder.activations_checkpoint_method = None
-    except AttributeError:
-        pass
     return model
 
 
@@ -148,7 +147,7 @@ def setup_distributed_environment(trainer):
             "Attempted to use 'nemo_lm' model type, but package `nemo` is not installed"
             "Please install nemo following the instructions in the README: either with a NVIDIA PyTorch or NeMo container, "
             "or installing nemo following https://github.com/NVIDIA/NeMo.",
-        )
+        ) from exception
 
     def dummy():
         return
@@ -202,7 +201,7 @@ class NeMoLM(LM):
                 "Attempted to use 'nemo_lm' model type, but package `nemo` is not installed"
                 "Please install nemo following the instructions in the README: either with a NVIDIA PyTorch or NeMo container, "
                 "or installing nemo following https://github.com/NVIDIA/NeMo.",
-            )
+            ) from exception
 
         super().__init__()
 

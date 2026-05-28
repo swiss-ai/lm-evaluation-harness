@@ -1,7 +1,7 @@
+import contextlib
 import copy
 import logging
 from importlib.util import find_spec
-from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -21,13 +21,8 @@ from lm_eval.utils import (
 
 eval_logger = logging.getLogger(__name__)
 
-try:
+with contextlib.suppress(ModuleNotFoundError):
     import sglang as sgl
-except ModuleNotFoundError:
-    pass
-
-if TYPE_CHECKING:
-    pass
 
 
 @register_model("sglang")
@@ -270,14 +265,14 @@ class SGLangLM(TemplateLM):
             )
 
             # cache generations
-            for output, context in zip(cont, context):
+            for output, ctx in zip(cont, context):
                 generated_text = output.get("text", "")
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
                 )
                 res.append(generated_text)
                 self.cache_hook.add_partial(
-                    "generate_until", (context, gen_kwargs), generated_text
+                    "generate_until", (ctx, gen_kwargs), generated_text
                 )
                 pbar.update(1)
 
@@ -444,7 +439,7 @@ class SGLangLM(TemplateLM):
         for chunk in chunks:
             inputs = []
             ctxlens = []
-            for cache_key, context_enc, continuation_enc in chunk:
+            for _cache_key, context_enc, continuation_enc in chunk:
                 inp = (context_enc + continuation_enc)[-(self.max_length) :]
                 ctxlen = len(context_enc) - max(
                     0, len(context_enc) + len(continuation_enc) - (self.max_length)

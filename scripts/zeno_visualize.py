@@ -104,14 +104,11 @@ def main():
                 [Path(f).name for f in model_sample_filenames if task in f]
             )
             # Load the model_args, which can be either a string or a dictionary
-            model_args = sanitize_string(
-                json.load(
-                    open(
-                        Path(args.data_path, model, latest_results),
-                        encoding="utf-8",
-                    )
-                )["config"]["model_args"]
-            )
+            with open(
+                Path(args.data_path, model, latest_results),
+                encoding="utf-8",
+            ) as _f:
+                model_args = sanitize_string(json.load(_f)["config"]["model_args"])
 
             print(model_args)
             data = []
@@ -122,9 +119,10 @@ def main():
                 for line in file:
                     data.append(json.loads(line.strip()))
 
-            configs = json.load(
-                open(Path(args.data_path, model, latest_results), encoding="utf-8")
-            )["configs"]
+            with open(
+                Path(args.data_path, model, latest_results), encoding="utf-8"
+            ) as _f:
+                configs = json.load(_f)["configs"]
             config = configs[task]
 
             if model_index == 0:  # Only need to assemble data for the first model
@@ -173,7 +171,8 @@ def tasks_for_model(model: str, data_path: str):
     model_files = [f.as_posix() for f in model_dir.iterdir() if f.is_file()]
     model_results_filenames = get_results_filenames(model_files)
     latest_results = get_latest_filename(model_results_filenames)
-    config = (json.load(open(latest_results, encoding="utf-8"))["configs"],)
+    with open(latest_results, encoding="utf-8") as _f:
+        config = (json.load(_f)["configs"],)
     return list(config[0].keys())
 
 

@@ -27,11 +27,11 @@ try:
         ground_schema_into_plain_operator_from_grounding,
     )
     from tarski.util import SymbolIndex
-except ModuleNotFoundError:
+except ModuleNotFoundError as e:
     raise ModuleNotFoundError(
         "`lark>=1.1.9`, `tarski[clingo]==0.8.2`, `pddl==0.4.2` and `kstar-planner==1.4.2` are required for evaluating the generative tasks. \
 Please install via pip install lm-eval[acpbench] or pip install -e .[acpbench]",
-    )
+    ) from e
 
 
 #########################################################################
@@ -109,9 +109,7 @@ class ACPGrammarParser:
             visitor.visit_topdown(tree)
             if self.task == "action_list":
                 return visitor.action_lists
-            elif self.task == "act":
-                return visitor.action_names
-            elif self.task == "action_name":
+            elif self.task in ("act", "action_name"):
                 return visitor.action_names
             elif self.task == "index":
                 return visitor.indexes
@@ -281,7 +279,7 @@ def extract_goal(prob):
         if cp == 0:
             return "(:goal" + a[: i + 1]
 
-    assert False
+    raise AssertionError()
 
 
 def entails(state, partialstate):
@@ -338,13 +336,13 @@ def create_tmp_dom_prob_replace_init(P, state, result_domain_file, result_proble
 
 def fix_name(s):
     # (act param)
-    if "(" == s[0] and ")" == s[-1]:
+    if s[0] == "(" and s[-1] == ")":
         return s[1:-1]
     # make it space separated
     s = s.replace(", ", " ").replace(",", " ")
     # act(param)
     if "(" in s:
-        assert ")" == s[-1], f"Broken name? {s}"
+        assert s[-1] == ")", f"Broken name? {s}"
         s = s.replace("(", " ").replace(")", "")
     # act param
     return s
@@ -493,7 +491,7 @@ class STRIPS:
         return self.action_map[fix_name(name).lower()]
 
     def get_action_or_none(self, name):
-        if "(" in name and ")" != name[-1]:
+        if "(" in name and name[-1] != ")":
             return None
         return self.action_map.get(fix_name(name).lower(), None)
 
@@ -555,8 +553,8 @@ class STRIPS:
         return set([fix_name(str(x)) for x in ret])
 
     def PDDL_replace_init_pddl_parser(self, s):
-        d = DomainParser()(open(self.domain_file).read().lower())
-        p = ProblemParser()(open(self.problem_file).read().lower())
+        d = DomainParser()(open(self.domain_file).read().lower())  # noqa: SIM115
+        p = ProblemParser()(open(self.problem_file).read().lower())  # noqa: SIM115
 
         new_state = get_atoms_pddl(d, p, s | self.get_static())
 
@@ -598,64 +596,55 @@ def compare(l1, l2):
         return compare_str(l1, l2)
     if not isinstance(l2, list):
         return False
-    for i, v in enumerate(l1):
-        if not compare(v, l2[i]):
-            return False
-    return True
+    return all(compare(v, l2[i]) for i, v in enumerate(l1))
 
 
 def check_prog_response(resp):
-    if (
+    return (
         "Positive Effects".lower() in resp.lower()
         and "Negative Effects".lower() in resp.lower()
-    ):
-        if "[" not in resp:
-            return True
-    return False
+        and "[" not in resp
+    )
 
 
 def clean_answer(resp, task):
     # Minor cleanup
-    if "progression_gen" in task:
+    if "progression_gen" in task and check_prog_response(resp):
         # Check for Positive Effects and Negative Effects instead of separation
-        if check_prog_response(resp):
-            # replace **Positive Effects** with "["
-            # replace **Negative Effects** with "] ["
-            # append "]" to the end
-            resp2 = resp.lower()
-            resp2 = resp2.replace("*", "")
-            resp2 = resp2.replace("positive effects", "[")
-            resp2 = resp2.replace("negative effects", "] [")
-            resp2 = resp2 + "]"
-            return resp2
-    if "action_justification_gen" in task:
+        # replace **Positive Effects** with "["
+        # replace **Negative Effects** with "] ["
+        # append "]" to the end
+        resp2 = resp.lower()
+        resp2 = resp2.replace("*", "")
+        resp2 = resp2.replace("positive effects", "[")
+        resp2 = resp2.replace("negative effects", "] [")
+        resp2 = resp2 + "]"
+        return resp2
+    if "action_justification_gen" in task and "simplified plan:" in resp.lower():
         # Check for "simplified plan:"
-        if "simplified plan:" in resp.lower():
-            resp2 = resp.lower()
-            resp2 = resp2.replace("*", "")
-            resp2 = resp2.split("simplified plan:")[1]
-            return resp2
+        resp2 = resp.lower()
+        resp2 = resp2.replace("*", "")
+        resp2 = resp2.split("simplified plan:")[1]
+        return resp2
     return resp
+
+
+_GRAMMAR_TASK_MAP = {
+    "reachable_atom_gen": "act",
+    "progression_gen": "progression_list",
+    "validation_gen": "index",
+    "reachable_action_gen": "act",
+    "action_justification_gen": "action_list",
+    "landmarks_gen": "act",
+    "goal_closer_gen": "action_name",
+    "applicable_actions_gen": "action_list",
+}
 
 
 def get_grammar_task(task):
     # print(task)
-    if task == "reachable_atom_gen":
-        return "act"
-    elif task == "progression_gen":
-        return "progression_list"
-    elif task == "validation_gen":
-        return "index"
-    elif task == "reachable_action_gen":
-        return "act"
-    elif task == "action_justification_gen":
-        return "action_list"
-    elif task == "landmarks_gen":
-        return "act"
-    elif task == "goal_closer_gen":
-        return "action_name"
-    elif task == "applicable_actions_gen":
-        return "action_list"
+    if task in _GRAMMAR_TASK_MAP:
+        return _GRAMMAR_TASK_MAP[task]
 
 
 ##############################################################################
@@ -759,7 +748,7 @@ class ActionReachabilityEvaluator(BaseEvaluator):
         if not real_answer or len(real_answer) == 0:
             # The correct answer is None
             self.add_scores(
-                ["none" == x.strip().lower() if x is not None else False for x in ans]
+                [x.strip().lower() == "none" if x is not None else False for x in ans]
             )
         else:
             for x in ans:
@@ -996,7 +985,7 @@ class ReachabilityEvaluator(BaseEvaluator):
         if len(real_answer) == 0:
             # The correct answer is None
             self.add_scores(
-                ["none" == x.strip().lower() if x is not None else False for x in ans]
+                [x.strip().lower() == "none" if x is not None else False for x in ans]
             )
         else:
             for x in ans:
@@ -1065,7 +1054,7 @@ class ACPGrammarFilter(RegexFilter):
 
     def __init__(self, *args, **kwargs):
         self.parser = ACPGrammarParser(kwargs["grammar_task"])
-        self.clean = kwargs["clean"] if "clean" in kwargs else None
+        self.clean = kwargs.get("clean")
 
     def clean_pos_neg(self, resp):
         # Check for Positive Effects and Negative Effects instead of separation

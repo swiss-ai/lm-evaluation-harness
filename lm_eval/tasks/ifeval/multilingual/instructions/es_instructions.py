@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import collections
+import contextlib
 import json
 import random
 import re
@@ -254,11 +255,9 @@ class NumberOfSentences(Instruction):
 
         # Detect the language
         detected_lang = "es"  # Default to Spanish
-        try:
-            detected_lang = langdetect.detect(value.lower())
-        except langdetect.lang_detect_exception.LangDetectException:
+        with contextlib.suppress(langdetect.lang_detect_exception.LangDetectException):
             # If language detection fails, default to Spanish
-            pass
+            detected_lang = langdetect.detect(value.lower())
 
         if detected_lang == "es":
             num_sentences = instructions_util.count_sentences(cleaned_text)
@@ -377,7 +376,7 @@ class BulletListChecker(Instruction):
 
         Args:
             value: A string representing the response. The response is expected to
-                contain some bullet lists that start with `\*`.
+                contain some bullet lists that start with ``\\*``.
 
         Returns:
             True if the actual number of bullet lists in the response meets the
@@ -473,7 +472,7 @@ class ConstrainedStartChecker(Instruction):
         response_with_constrained_start = re.search(
             response_pattern, value, flags=re.MULTILINE
         )
-        return True if response_with_constrained_start else False
+        return bool(response_with_constrained_start)
 
 
 class HighlightSectionChecker(Instruction):
@@ -753,7 +752,7 @@ class PostscriptChecker(Instruction):
         else:
             postscript_pattern = r"\s*" + self._postscript_marker.lower() + r".*$"
         postscript = re.findall(postscript_pattern, value, flags=re.MULTILINE)
-        return True if postscript else False
+        return bool(postscript)
 
 
 # RephraseChecker is not used in the current instructions, so this +
@@ -1395,9 +1394,7 @@ class RepeatPromptThenAnswer(Instruction):
         return ["prompt_to_repeat"]
 
     def check_following(self, value):
-        if value.strip().lower().startswith(self._prompt_to_repeat.strip().lower()):
-            return True
-        return False
+        return value.strip().lower().startswith(self._prompt_to_repeat.strip().lower())
 
 
 class EndChecker(Instruction):
@@ -1465,10 +1462,7 @@ class TitleChecker(Instruction):
         re_pattern = re.compile(pattern)
         titles = re.findall(re_pattern, value)
 
-        for title in titles:
-            if title.lstrip("<").rstrip(">").strip():
-                return True
-        return False
+        return any(title.lstrip("<").rstrip(">").strip() for title in titles)
 
 
 class LetterFrequencyChecker(Instruction):
@@ -1756,10 +1750,7 @@ class QuestionMarkChecker(Instruction):
         re_pattern = re.compile(pattern)
         questions = re.findall(re_pattern, value)
 
-        for question in questions:
-            if question.lstrip("¿").rstrip("?").strip():
-                return True
-        return False
+        return any(question.lstrip("¿").rstrip("?").strip() for question in questions)
 
 
 class ExclamationMarkChecker(Instruction):

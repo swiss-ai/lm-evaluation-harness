@@ -2057,13 +2057,13 @@ def process_docs(dataset: datasets.Dataset):
         try:
             if contains_indian_characters(diagnosis):
                 diagnosis = "NA"
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
         try:
             if len(check_list_for_indian_characters(medicines_list)) > 0:
                 medicines_list = []
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
         gold, gold_position = doc_to_target_obtain(doc)

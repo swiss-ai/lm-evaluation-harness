@@ -32,14 +32,14 @@ def make_table(result_dict):
             if m + "_stderr" in dic:
                 se = dic[m + "_stderr"]
                 if percent or m == "ppl":
-                    values.append([k, version, m, "%.2f" % v, "±", "%.2f" % se])
+                    values.append([k, version, m, f"{v:.2f}", "±", f"{se:.2f}"])
                 else:
                     values.append(
                         [k, version, m, "%.2f" % (v * 100), "±", "%.2f" % (se * 100)]
                     )
             else:
                 if percent or m == "ppl":
-                    values.append([k, version, m, "%.2f" % v, "", ""])
+                    values.append([k, version, m, f"{v:.2f}", "", ""])
                 else:
                     values.append([k, version, m, "%.2f" % (v * 100), "", ""])
             k = ""
@@ -56,7 +56,7 @@ def make_table(result_dict):
 if __name__ == "__main__":
     # loop dirs and subdirs in results dir
     # for each dir, load json files
-    for dirpath, dirnames, filenames in os.walk("../results"):
+    for dirpath, _dirnames, filenames in os.walk("../results"):
         # skip dirs without files
         if not filenames:
             continue

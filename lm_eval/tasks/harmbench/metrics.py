@@ -66,7 +66,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
                 return data["choices"][0]["message"]["content"]
 
             # print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
-        except Exception as e:
+        except Exception:  # noqa: S110
             pass
 
         if attempt < max_retries - 1:
@@ -210,8 +210,6 @@ def _reduce_completion(completion, reduction_fraction=0.2):
 def compute_results_classifier(
     behavior_dict, completion, temperature=0.0, max_new_tokens=1
 ):
-    behavior_string = behavior_dict["Behavior"]
-
     # Try with full completion first; on total failure, reduce by 20% and retry
     current_completion = completion
     max_reduction_attempts = 10  # safety cap to avoid infinite loop
@@ -239,7 +237,6 @@ def compute_results_classifier(
             return {"score": p}
 
         # All 6 retries failed — reduce completion by 20% and try again
-        original_word_count = len(current_completion.split())
         current_completion, new_word_count = _reduce_completion(current_completion)
         # print(
         #     f"[REDUCTION] Remote generation was unsuccessful, may have exceeded context window, reducing completion from {original_word_count} "
@@ -268,7 +265,7 @@ def compute_results_hashing(behavior_dict, generation, hf_path):
     )
 
     with open(reference_path, "rb") as f:
-        reference_dataset = pickle.load(f)
+        reference_dataset = pickle.load(f)  # noqa: S301
 
     if "book" in tags:
         output_minhashes = compute_hashes_with_sliding_window(

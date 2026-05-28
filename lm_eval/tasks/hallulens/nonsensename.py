@@ -43,7 +43,7 @@ class NonsenseNameEval:
         for o in abstains_eval:
             try:
                 abstains_eval_res.append(not o["does_believe"])
-            except:
+            except Exception:
                 print(f"Error in eval_answer: {o}")
                 # skip this item or handle as you prefer
                 continue

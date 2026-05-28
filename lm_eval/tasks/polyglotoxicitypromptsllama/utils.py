@@ -116,7 +116,6 @@ def generate_configs_for_type(config_type: str, base_dir: Path) -> list[str]:
 def generate_group_configs(base_dir: Path, task_lists: dict[str, list[str]]):
     """Generate group YAML configurations."""
     for config_type, task_list in task_lists.items():
-        config_def = CONFIG_DEFINITIONS[config_type]
         group_name = f"polyglotoxicitypromptsllama_{config_type}"
 
         group_content = create_group_yaml_content(group_name, task_list)

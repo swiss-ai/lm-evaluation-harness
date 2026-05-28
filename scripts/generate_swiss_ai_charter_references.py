@@ -286,21 +286,20 @@ def main() -> None:
         return
 
     client = openai_client(args)
-    with output_path.open("a", encoding="utf-8") as handle:
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=args.workers
-        ) as executor:
-            future_to_doc = {
-                executor.submit(generate_one, client, doc, args): doc for doc in docs
-            }
-            completed = 0
-            for future in concurrent.futures.as_completed(future_to_doc):
-                row = future.result()
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-                handle.flush()
-                completed += 1
-                if completed % 25 == 0 or completed == len(docs):
-                    print(f"Completed {completed}/{len(docs)}")
+    with (
+        output_path.open("a", encoding="utf-8") as handle,
+        concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor,
+    ):
+        future_to_doc = {
+            executor.submit(generate_one, client, doc, args): doc for doc in docs
+        }
+        for idx, future in enumerate(concurrent.futures.as_completed(future_to_doc)):
+            row = future.result()
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            handle.flush()
+            completed = idx + 1
+            if completed % 25 == 0 or completed == len(docs):
+                print(f"Completed {completed}/{len(docs)}")
 
 
 if __name__ == "__main__":

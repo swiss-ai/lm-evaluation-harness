@@ -355,15 +355,16 @@ def consolidate_results(
             results[task_output.task_name]["alias"] = task_config["task_alias"]
         else:
             results[task_output.task_name]["alias"] = task_output.task_name
-        if group_alias := task_output.group_alias:
-            if group_alias not in results and (group_name := task_output.group_name):
-                results[group_name]["alias"] = group_alias
+        if (group_alias := task_output.group_alias) and (
+            group_alias not in results and (group_name := task_output.group_name)
+        ):
+            results[group_name]["alias"] = group_alias
         num_fewshot[task_output.task_name] = task_output.n_shot
         configs[task_output.task_name] = task_output.task_config
         versions[task_output.task_name] = task_output.version
         samples[task_output.task_name] = task_output.logged_samples
         higher_is_better[task_output.task_name] = task_output.task.higher_is_better()
-        for (metric, filter_key), items in task_output.sample_metrics.items():
+        for (metric, filter_key), _items in task_output.sample_metrics.items():
             metric_key = f"{metric},{filter_key}"
             results[task_output.task_name][metric_key] = task_output.agg_metrics[
                 metric_key

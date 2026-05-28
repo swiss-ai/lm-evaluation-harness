@@ -167,15 +167,11 @@ fixable = [
     "UP",     # pyupgrade fixes
 ]
 ignore = [
-    # docstrings
+    # docstrings — only require existence; formatting nits are too noisy
     "D10",    # missing-docstring
-        # docstrings
-    "D212", # start first line
-    "D415", # terminal punctuation
-    "D205", # missing blank line
-    "D417", # docs: undocumented param
-    "D200", # unnecessary line
-    "D202", # blank-line-after-function
+    "D2",     # whitespace / indentation in docstrings
+    "D3",     # quote style / backslashes
+    "D4",     # section formatting (Args/Returns/Raises etc.)
 
     "B905", # zip-strict
 
@@ -188,6 +184,7 @@ ignore = [
     "E731",   # lambda-assignment
     "E741",   # ambiguous-variable-name
     "SIM118", # dict-in-keys
+    "SIM108", # ternary if
     "S101",   # assert-used
     "S311",   # cryptographic random generator
 ]

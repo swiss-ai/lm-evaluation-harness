@@ -144,7 +144,7 @@ class Janitor:
 
     def load_contamination_ngrams(self, filename: str) -> None:
         with open(filename, "rb") as fp:
-            self.dirt_ngrams = pickle.load(fp)
+            self.dirt_ngrams = pickle.load(fp)  # noqa: S301
 
     ##############
     # Call these :)
@@ -175,7 +175,7 @@ class Janitor:
         clean_chunks = []
         splice_idx = 0
         end = -1
-        for i, (ngram, start, end) in enumerate(dirty_parts):
+        for i, (_ngram, start, end) in enumerate(dirty_parts):
             if i >= self.too_dirty_cutoff:
                 return []
             start = max(0, start - self.window_to_remove)

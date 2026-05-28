@@ -53,7 +53,7 @@ def try_remote_generate(
                     if "maximum context length" in err_msg:
                         eval_logger.warning(f"Context length exceeded: {err_msg}")
                         return _CONTEXT_TOO_LONG
-                except Exception:
+                except Exception:  # noqa: S110
                     pass
 
             eval_logger.error(

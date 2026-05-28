@@ -118,7 +118,7 @@ class LongWikiRetrieval:
         if os.path.exists(self.embed_cache_path):
             try:
                 with open(self.embed_cache_path, "rb") as f:
-                    self.embed_cache = pkl.load(f)
+                    self.embed_cache = pkl.load(f)  # noqa: S301
             except (EOFError, pkl.UnpicklingError):
                 # File is empty or corrupted (e.g. crashed mid-write); start fresh
                 self.embed_cache = {}
@@ -141,7 +141,7 @@ class LongWikiRetrieval:
                 if os.path.exists(self.embed_cache_path):
                     try:
                         with open(self.embed_cache_path, "rb") as f:
-                            disk_cache = pkl.load(f)
+                            disk_cache = pkl.load(f)  # noqa: S301
                     except (EOFError, pkl.UnpicklingError):
                         pass  # file empty/corrupted from prior crash; overwrite it
 

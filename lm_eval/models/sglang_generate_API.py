@@ -24,11 +24,7 @@ class SGLANGGENERATEAPI(LocalCompletionsAPI):
         eos=None,
         **kwargs,
     ) -> dict:
-        is_string = (
-            True
-            if (isinstance(messages, str) or isinstance(messages[0], str))
-            else False
-        )
+        is_string = isinstance(messages, str) or isinstance(messages[0], str)
         if generate:
             gen_kwargs.pop("do_sample", False)
             if "max_tokens" in gen_kwargs:

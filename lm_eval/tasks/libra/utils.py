@@ -31,9 +31,9 @@ def filter_dataset_by_page_lengths(*args, **kwargs) -> dict[str, datasets.Datase
     valid_pages = kwargs.get("valid_pages", [])
 
     dataset_repo_name = kwargs.get("dataset_repo_name", "ai-forever/LIBRA")
-    dataset_name = kwargs.get("dataset_name", None)
+    dataset_name = kwargs.get("dataset_name")
     filter_colname = kwargs.get("filter_colname", "length")
-    token = kwargs.get("token", None)
+    token = kwargs.get("token")
 
     dataset_columns = list(
         datasets.load_dataset(dataset_repo_name, dataset_name, token=token)[

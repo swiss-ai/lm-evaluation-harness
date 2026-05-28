@@ -1,4 +1,5 @@
 import ast
+import contextlib
 import os
 import random
 import re
@@ -6,10 +7,8 @@ import re
 import numpy as np
 
 
-try:
+with contextlib.suppress(ImportError):
     from openai import OpenAI
-except ImportError:
-    pass
 
 API_TYPE = os.getenv("API_TYPE", "openai")
 MODEL_VERSION = os.getenv("MODEL_VERSION", "gpt-4.1-mini")
@@ -86,11 +85,6 @@ def pisa_process_results_llm_judged(doc, results, **kwargs):
     assert os.getenv("OPENAI_API_KEY") is not None, (
         "OPENAI_API_KEY environment variable is not set."
     )
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise ImportError("Please install openai package to use LLM judging.")
-
     index2ans, all_choices = get_multi_choice_info(
         ast.literal_eval(f"{doc['choices']}")
     )

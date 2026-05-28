@@ -3,11 +3,11 @@ import numpy as np
 
 try:
     import tinyBenchmarks as tb
-except ModuleNotFoundError:
+except ModuleNotFoundError as e:
     raise ModuleNotFoundError(
         "`tinyBenchmarks` is required for tinyBenchmarks task metric calculation, install via \
 `pip install git+https://github.com/felipemaiapolo/tinyBenchmarks`"
-    )
+    ) from e
 
 
 def agg_pirt(items: list[float], benchmark: str) -> float:

@@ -81,10 +81,10 @@ def get_watsonx_credentials() -> dict[str, str]:
     """
     try:
         from dotenv import load_dotenv
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "Could not import dotenv: Please install lm_eval[ibm_watsonx_ai] package."
-        )
+        ) from e
 
     # This function attempts to load a file named .env starting from the CWD and working backwards
     # towards root. KV pairs are parsed and stored as env vars iff not already set
@@ -106,7 +106,8 @@ def get_watsonx_credentials() -> dict[str, str]:
         warnings.warn(
             "You're passing `username`, `password`, and `apikey` at the same time, "
             "which might cause issues. More info on authentication in different scenarios "
-            "can be found in the docs: https://ibm.github.io/watsonx-ai-python-sdk/setup_cpd.html"
+            "can be found in the docs: https://ibm.github.io/watsonx-ai-python-sdk/setup_cpd.html",
+            stacklevel=2,
         )
     _verify_credentials(credentials)
     return credentials
@@ -130,10 +131,10 @@ class WatsonxLLM(LM):
         """
         try:
             from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
-            )
+            ) from e
 
         args = simple_parse_args_string(arg_string)
         args.update(additional_config)
@@ -193,13 +194,13 @@ class WatsonxLLM(LM):
         try:
             from ibm_watsonx_ai import APIClient
             from ibm_watsonx_ai.foundation_models import ModelInference
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
-            )
+            ) from e
         super().__init__()
         client = APIClient(watsonx_credentials)
-        project_id = watsonx_credentials.get("project_id", None)
+        project_id = watsonx_credentials.get("project_id")
         client.set.default_project(project_id)
         self.generate_params = generate_params
         self.model = ModelInference(
@@ -335,10 +336,10 @@ class WatsonxLLM(LM):
         """
         try:
             from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
-            )
+            ) from e
         self._check_model_logprobs_support()
         generate_params = copy.copy(self.generate_params)
         generate_params[GenParams.MAX_NEW_TOKENS] = 1
@@ -383,7 +384,7 @@ class WatsonxLLM(LM):
                 ),
             )
 
-        return cast(list[tuple[float, bool]], results)
+        return cast("list[tuple[float, bool]]", results)
 
     def loglikelihood_rolling(self, requests) -> list[tuple[float, bool]]:
         """
@@ -397,10 +398,10 @@ class WatsonxLLM(LM):
         """
         try:
             from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
-            )
+            ) from e
         self._check_model_logprobs_support()
         generate_params = copy.deepcopy(self.generate_params)
         generate_params[GenParams.MAX_NEW_TOKENS] = 1
@@ -432,7 +433,7 @@ class WatsonxLLM(LM):
                 log_likelihood_response.log_likelihood,
             )
 
-        return cast(list[tuple[float, bool]], results)
+        return cast("list[tuple[float, bool]]", results)
 
     @property
     def tokenizer_name(self) -> str:

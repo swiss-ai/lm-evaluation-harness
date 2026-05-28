@@ -49,7 +49,7 @@ def anthropic_completion(
         raise type(exception)(
             "attempted to use 'anthropic' LM type, but package `anthropic` is not installed. \
 please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install -e '.[anthropic]'`",
-        )
+        ) from exception
 
     def _exception_callback(e: Exception, sleep_time: float) -> None:
         eval_logger.warning(
@@ -112,7 +112,7 @@ def anthropic_chat(
         raise type(exception)(
             "attempted to use 'anthropic' LM type, but package `anthropic` is not installed. \
 please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install -e '.[anthropic]'`",
-        )
+        ) from exception
 
     def _exception_callback(e: Exception, sleep_time: float) -> None:
         eval_logger.warning(
@@ -172,7 +172,7 @@ class AnthropicLM(LM):
             raise type(exception)(
                 "attempted to use 'anthropic' LM type, but package `anthropic` is not installed. \
 please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install -e '.[anthropic]'`",
-            )
+            ) from exception
 
         self.model = model
         # defaults to os.environ.get("ANTHROPIC_API_KEY")
@@ -221,7 +221,7 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
             raise type(exception)(
                 "attempted to use 'anthropic' LM type, but package `anthropic` is not installed. \
 please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install -e '.[anthropic]'`",
-            )
+            ) from exception
 
         if not requests:
             return []

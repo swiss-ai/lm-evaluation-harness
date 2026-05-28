@@ -21,7 +21,6 @@ import random
 import re
 import string
 from collections.abc import Sequence
-from typing import Optional
 
 import langdetect
 
@@ -30,7 +29,7 @@ from lm_eval.tasks.multi_if import instructions_util
 
 logger = logging.getLogger(__name__)
 
-_InstructionArgsDtype = Optional[dict[str, int | str | Sequence[str]]]
+_InstructionArgsDtype = dict[str, int | str | Sequence[str]] | None
 
 _LANGUAGES = instructions_util.LANGUAGE_CODES
 
@@ -431,7 +430,7 @@ class ConstrainedStartChecker(Instruction):
         response_with_constrained_start = re.search(
             response_pattern, value, flags=re.MULTILINE
         )
-        return True if response_with_constrained_start else False
+        return bool(response_with_constrained_start)
 
 
 class HighlightSectionChecker(Instruction):
@@ -669,7 +668,7 @@ class PostscriptChecker(Instruction):
         else:
             postscript_pattern = r"\s*" + self._postscript_marker.lower() + r".*$"
         postscript = re.findall(postscript_pattern, value, flags=re.MULTILINE)
-        return True if postscript else False
+        return bool(postscript)
 
 
 class RephraseChecker(Instruction):
@@ -1288,9 +1287,7 @@ class RepeatPromptThenAnswer(Instruction):
         return ["prompt_to_repeat"]
 
     def check_following(self, value):
-        if value.strip().lower().startswith(self._prompt_to_repeat.strip().lower()):
-            return True
-        return False
+        return value.strip().lower().startswith(self._prompt_to_repeat.strip().lower())
 
 
 class EndChecker(Instruction):
@@ -1354,10 +1351,7 @@ class TitleChecker(Instruction):
         re_pattern = re.compile(pattern)
         titles = re.findall(re_pattern, value)
 
-        for title in titles:
-            if title.lstrip("<").rstrip(">").strip():
-                return True
-        return False
+        return any(title.lstrip("<").rstrip(">").strip() for title in titles)
 
 
 class LetterFrequencyChecker(Instruction):

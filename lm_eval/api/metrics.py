@@ -33,10 +33,12 @@ def is_degenerating_chunk(
 
 def is_degenerating_text(
     text: str,
-    list_n: list = [1, 2, 3, 10, 25, 50],
+    list_n: list | None = None,
     threshold: float = 0.8,
     chunk_size: int = 1024,
 ) -> bool:
+    if list_n is None:
+        list_n = [1, 2, 3, 10, 25, 50]
     words = text.split()
     for start in range(0, len(words), chunk_size):
         chunk = words[start : start + chunk_size]
@@ -335,12 +337,12 @@ def bits_per_byte_fn(items):  # This is a passthrough function
 
 def pop_stddev(arr):
     mu = mean(arr)
-    return math.sqrt(sum([(x - mu) ** 2 for x in arr]) / len(arr))
+    return math.sqrt(sum((x - mu) ** 2 for x in arr) / len(arr))
 
 
 def sample_stddev(arr: Sequence[T]) -> float:
     mu = mean(arr)
-    return math.sqrt(sum([(x - mu) ** 2 for x in arr]) / (len(arr) - 1))
+    return math.sqrt(sum((x - mu) ** 2 for x in arr) / (len(arr) - 1))
 
 
 def mean_stderr(arr):
@@ -627,7 +629,7 @@ def stderr_for_metric(
 
     stderr = {mean: mean_stderr, acc_all: acc_all_stderr}
 
-    return stderr.get(metric, None)
+    return stderr.get(metric)
 
 
 def pooled_sample_stderr(stderrs: list[float], sizes: list[int]):
@@ -642,7 +644,7 @@ def pooled_sample_stderr(stderrs: list[float], sizes: list[int]):
     # this empirically seems to match running `stderr_for_metric` on all instances
     # from the subtasks concatenated with each other.
     pooled_sample_var = (
-        sum([(size - 1) * stderr**2 * size for size, stderr in zip(sizes, stderrs)])
+        sum((size - 1) * stderr**2 * size for size, stderr in zip(sizes, stderrs))
     ) / (sum(sizes) - len(sizes))
 
     return np.sqrt(pooled_sample_var / sum(sizes))
@@ -689,7 +691,7 @@ def aggregate_subtask_metrics(metrics, sizes, weight_by_size=True):
 
     assert len(metrics) == len(sizes)
 
-    return sum([metric * size for metric, size in zip(metrics, sizes)]) / sum(sizes)
+    return sum(metric * size for metric, size in zip(metrics, sizes)) / sum(sizes)
 
 
 @register_aggregation("dwacc")

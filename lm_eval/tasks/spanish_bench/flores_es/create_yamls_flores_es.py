@@ -275,9 +275,9 @@ def gen_lang_yamls(output_dir: str, overwrite: bool) -> None:
     """
 
     err = []
-    for src, tgt in LANGUAGE_PAIRS:
+    for s1, t1 in LANGUAGE_PAIRS:
         # do both translation directions for each lang pair
-        for src, tgt in [(src, tgt), (tgt, src)]:
+        for src, tgt in [(s1, t1), (t1, s1)]:
             lang_pair_name = f"{code_to_short_name(src)}-{code_to_short_name(tgt)}"
             yaml_file_name = f"flores_{lang_pair_name}.yaml"
 

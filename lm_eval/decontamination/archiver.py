@@ -16,7 +16,7 @@ def json_serial(obj: Any) -> str:
 
     if isinstance(obj, (datetime.datetime,)):
         return obj.isoformat()
-    raise TypeError("Type %s not serializable" % type(obj))
+    raise TypeError(f"Type {type(obj)} not serializable")
 
 
 # Modified version of lm_dataformat Archive for single file.
@@ -26,7 +26,7 @@ class Archive:
         dir_name = os.path.dirname(file_path)
         if dir_name:
             os.makedirs(dir_name, exist_ok=True)
-        self.fh = open(self.file_path, "wb")
+        self.fh = open(self.file_path, "wb")  # noqa: SIM115
         self.cctx = zstandard.ZstdCompressor(level=compression_level)
         self.compressor = self.cctx.stream_writer(self.fh)
 
@@ -76,7 +76,7 @@ class Reader:
                     text = para_joiner.join(text)
 
                 if get_meta:
-                    yield text, (ob["meta"] if "meta" in ob else {})
+                    yield text, ob.get("meta", {})
                 else:
                     yield text
 
@@ -91,7 +91,7 @@ class TextArchive:
         if not os.path.exists(file_path):
             Path(file_path).touch()
 
-        self.fh = open(self.file_path, mode)
+        self.fh = open(self.file_path, mode)  # noqa: SIM115
 
     def add_data(self, data) -> None:
         self.fh.write(data.encode("UTF-8") + b"\n")
@@ -118,36 +118,40 @@ class TextReader:
                 unit="byte",
                 unit_scale=1,
             ) as progress,
+            mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj,
         ):
-            with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj:
-                for line in iter(mmap_obj.readline, b""):
-                    line = line.decode("utf-8")
-                    line_counter += 1
-                    if line_counter == update_frequency:
-                        new_file_pos = mmap_obj.tell()
-                        bytes_read = new_file_pos - current_file_position
-                        current_file_position = new_file_pos
-                        progress.update(bytes_read)
-                        line_counter = 0
-                    yield line[:-1]
+            for line in iter(mmap_obj.readline, b""):
+                line = line.decode("utf-8")
+                line_counter += 1
+                if line_counter == update_frequency:
+                    new_file_pos = mmap_obj.tell()
+                    bytes_read = new_file_pos - current_file_position
+                    current_file_position = new_file_pos
+                    progress.update(bytes_read)
+                    line_counter = 0
+                yield line[:-1]
 
     def read_and_tell(self):
         current_file_position = 0
-        with open(self.file_path, encoding="utf8") as fh:
-            with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj:
-                for line in iter(mmap_obj.readline, b""):
-                    line = line.decode("utf-8")
-                    new_file_pos = mmap_obj.tell()
-                    raw_bytes_read = new_file_pos - current_file_position
-                    current_file_position = new_file_pos
-                    yield line[:-1], raw_bytes_read
+        with (
+            open(self.file_path, encoding="utf8") as fh,
+            mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj,
+        ):
+            for line in iter(mmap_obj.readline, b""):
+                line = line.decode("utf-8")
+                new_file_pos = mmap_obj.tell()
+                raw_bytes_read = new_file_pos - current_file_position
+                current_file_position = new_file_pos
+                yield line[:-1], raw_bytes_read
 
     def read(self):
-        with open(self.file_path, encoding="utf8") as fh:
-            with mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj:
-                for line in iter(mmap_obj.readline, b""):
-                    line = line.decode("utf-8")
-                    yield line[:-1]
+        with (
+            open(self.file_path, encoding="utf8") as fh,
+            mmap.mmap(fh.fileno(), length=0, access=mmap.ACCESS_READ) as mmap_obj,
+        ):
+            for line in iter(mmap_obj.readline, b""):
+                line = line.decode("utf-8")
+                yield line[:-1]
 
     def read_slow(self):
         with open(self.file_path, encoding="utf8") as fh:
@@ -168,7 +172,7 @@ class ZStdTextReader:
     def read_tqdm(self):
         decompressed_file = self.file[:-4]
         print("Decompressing file, please wait...")
-        os.system(f"zstd -d {self.file}")  # linux decompress is faster
+        os.system(f"zstd -d {self.file}")  # noqa: S605 linux decompress is faster
         reader = TextReader(decompressed_file)
         yield from reader.read_tqdm()
         os.remove(decompressed_file)

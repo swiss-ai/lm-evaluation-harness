@@ -68,7 +68,7 @@ def normalize(s):
         s = re.sub(pattern, replace, s)
     s = xml.sax.saxutils.unescape(s, {"&quot;": '"'})
     # language-dependent part (assuming Western languages):
-    s = " %s " % s
+    s = f" {s} "
     if not preserve_case:
         s = s.lower()  # this might not be identical to the original
     for pattern, replace in normalize2:
@@ -185,7 +185,7 @@ def splitPuncts(line):
 def computeMaps(predictions, goldfile):
     predictionMap: dict[str, list] = {}
     goldMap: dict[str, list] = {}
-    gf = open(goldfile, encoding="utf-8")
+    gf = open(goldfile, encoding="utf-8")  # noqa: SIM115
 
     for row in predictions:
         cols = row.strip().split("\t")

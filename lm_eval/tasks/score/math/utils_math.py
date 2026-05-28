@@ -78,7 +78,7 @@ def find_boxed_entries(answer_str):
         # (b) The answer is split across multiple boxed entries and we need to merge
         result_equal = True
         for idx in range(len(results) - 1):
-            if not (results[idx] == results[idx + 1]):
+            if results[idx] != results[idx + 1]:
                 result_equal = False
                 break
 
@@ -103,16 +103,19 @@ def extract_answer_dataset(solution: str, problem: str, corrected_answers: list)
         else:
             parsed_answer = ", ".join(entries)
 
-    if not (
-        ("Find the equation" in problem)
-        or ("Enter the equation" in problem)
-        or ("What is the equation" in problem)
-        or ("described by the equation" in problem)
-        or ("Find an equation" in problem)
-    ) and ("=" in parsed_answer):
-        if parsed_answer.count("=") == 1:
-            # For greater count, it means we're just predicting values of multiple variables
-            parsed_answer = parsed_answer.split("=")[1]
+    if (
+        not (
+            ("Find the equation" in problem)
+            or ("Enter the equation" in problem)
+            or ("What is the equation" in problem)
+            or ("described by the equation" in problem)
+            or ("Find an equation" in problem)
+        )
+        and ("=" in parsed_answer)
+        and parsed_answer.count("=") == 1
+    ):
+        # For greater count, it means we're just predicting values of multiple variables
+        parsed_answer = parsed_answer.split("=")[1]
     return parsed_answer
 
 

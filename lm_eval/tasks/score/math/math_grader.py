@@ -99,10 +99,10 @@ def _check_antlr_version():
             raise RuntimeError(
                 f"Package {PACKAGE_NAME} version mismatch: {installed_version} (required: {REQUIRED_VERSION})"
             )
-    except PackageNotFoundError:
+    except PackageNotFoundError as e:
         raise RuntimeError(
             f"Package {PACKAGE_NAME} not found. Please install antlr4-python3-runtime==4.11.0."
-        )
+        ) from e
 
 
 def _fix_fracs(string):
@@ -424,10 +424,10 @@ def math_equal(
                 try:
                     if isclose(item, prediction, rel_tol=tolerance):
                         return True
-                except Exception:
+                except Exception:  # noqa: S112
                     continue
             return False
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     if not prediction and prediction not in [0, False]:
@@ -469,59 +469,43 @@ def math_equal(
     ):
         pred_parts = prediction[1:-1].split(",")
         ref_parts = reference[1:-1].split(",")
-        if len(pred_parts) == len(ref_parts):
-            if all(
-                [
-                    math_equal(pred_pt, ref_pt, include_percentage, tolerance)
-                    for pred_pt, ref_pt in zip(pred_parts, ref_parts)
-                ]
-            ):
-                return True
+        if len(pred_parts) == len(ref_parts) and all(
+            math_equal(pred_pt, ref_pt, include_percentage, tolerance)
+            for pred_pt, ref_pt in zip(pred_parts, ref_parts)
+        ):
+            return True
 
     if "," in prediction and "," in reference:
         pred_parts = [item.strip() for item in prediction.split(",")]
         ref_parts = [item.strip() for item in reference.split(",")]
 
         if len(pred_parts) == len(ref_parts):
-            if all(
-                [
-                    math_equal(
-                        pred_parts[i], ref_parts[i], include_percentage, tolerance
-                    )
-                    for i in range(len(pred_parts))
-                ]
-            ):
-                return True
-            else:
-                return False
+            return all(
+                math_equal(pred_parts[i], ref_parts[i], include_percentage, tolerance)
+                for i in range(len(pred_parts))
+            )
 
     # if we have point == tuple of values
     if prediction.startswith("Point") and reference[0] == "(" and reference[-1] == ")":
         pred_parts = prediction[prediction.find("(") + 1 : -1].split(",")
         ref_parts = reference[1:-1].split(",")
-        if len(pred_parts) == len(ref_parts):
-            if all(
-                [
-                    math_equal(pred_pt, ref_pt, include_percentage, tolerance)
-                    for pred_pt, ref_pt in zip(pred_parts, ref_parts)
-                ]
-            ):
-                return True
+        if len(pred_parts) == len(ref_parts) and all(
+            math_equal(pred_pt, ref_pt, include_percentage, tolerance)
+            for pred_pt, ref_pt in zip(pred_parts, ref_parts)
+        ):
+            return True
 
     # if reference is a matrix
     if reference.startswith("\\begin{pmatrix}") and prediction.startswith("Matrix"):
         try:
             pred_matrix = parse_expr(prediction)
             ref_matrix_items = reference.split()[1:-1:2]
-            if len(pred_matrix) == len(ref_matrix_items):
-                if all(
-                    [
-                        math_equal(ref, pred, include_percentage, tolerance)
-                        for ref, pred in zip(ref_matrix_items, pred_matrix)
-                    ]
-                ):
-                    return True
-        except Exception:
+            if len(pred_matrix) == len(ref_matrix_items) and all(
+                math_equal(ref, pred, include_percentage, tolerance)
+                for ref, pred in zip(ref_matrix_items, pred_matrix)
+            ):
+                return True
+        except Exception:  # noqa: S110
             pass
 
     return symbolic_equal(prediction, reference, tolerance, timeout)
@@ -537,7 +521,7 @@ def symbolic_equal(a, b, tolerance, timeout=10.0):
             try:
                 with time_limit(timeout):
                     return f(s)
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         return s
 
@@ -548,14 +532,14 @@ def symbolic_equal(a, b, tolerance, timeout=10.0):
         with time_limit(timeout):
             if sympy.simplify(a - b) == 0:
                 return True
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     try:
         with time_limit(timeout):
             if isclose(sympy.N(a), sympy.N(b), rel_tol=tolerance):
                 return True
-    except Exception:
+    except Exception:  # noqa: S110
         pass
     return False
 
@@ -636,18 +620,18 @@ def format_intervals(prediction):
         "Interval.open(": r"^Interval\.open\((.*)\)$",
     }
 
+    _INTERVAL_BRACKETS = {
+        "Interval(": ("[", "]"),
+        "Interval.Ropen(": ("[", ")"),
+        "Interval.Lopen(": ("(", "]"),
+        "Interval.open(": ("(", ")"),
+    }
     for key, pattern in patterns.items():
         match = re.match(pattern, prediction)
         if match:
             inner_content = match.group(1)
-
-            if key == "Interval(":  # Intarval(a, b) == [a, b]
-                return f"[{inner_content}]"
-            elif key == "Interval.Ropen(":  # Intarval.Ropen(a, b) == [a, b)
-                return f"[{inner_content})"
-            elif key == "Interval.Lopen(":  # Intarval.Lopen(a, b) == (a, b]
-                return f"({inner_content}]"
-            elif key == "Interval.open(":  # Intarval.open(a, b) == (a, b)
-                return f"({inner_content})"
+            if key in _INTERVAL_BRACKETS:
+                left, right = _INTERVAL_BRACKETS[key]
+                return f"{left}{inner_content}{right}"
 
     return prediction

@@ -38,7 +38,7 @@ def get_train_overlap(docs_by_task_set: dict, ngrams_path: str, limit: int) -> d
     # return get_train_overlap_stub(docs, ngrams_path, ngrams_n_size)
 
     info_dict_path = os.path.join(ngrams_path, "info.json")
-    info_dict = json.load(open(info_dict_path, encoding="utf-8"))
+    info_dict = json.load(open(info_dict_path, encoding="utf-8"))  # noqa: SIM115
     ngrams_n_size = info_dict["ngram_size"]
 
     janitor = Janitor()
@@ -63,8 +63,8 @@ def get_train_overlap(docs_by_task_set: dict, ngrams_path: str, limit: int) -> d
             task_name, task_set, ngrams_n_size, limit
         )
         if os.path.exists(overlaps_dump_path):
-            duplicates[(task_name, task_set)] = pickle.load(
-                open(overlaps_dump_path, "rb")
+            duplicates[(task_name, task_set)] = pickle.load(  # noqa: S301
+                open(overlaps_dump_path, "rb")  # noqa: SIM115
             )
             sets_to_decontaminate -= 1
             continue
@@ -77,8 +77,8 @@ def get_train_overlap(docs_by_task_set: dict, ngrams_path: str, limit: int) -> d
         )
         if os.path.exists(task_set_lookup_path):
             print(f"{task_set_lookup_path} available, loading...")
-            lookups[(task_name, task_set)] = pickle.load(
-                open(task_set_lookup_path, "rb")
+            lookups[(task_name, task_set)] = pickle.load(  # noqa: S301
+                open(task_set_lookup_path, "rb")  # noqa: SIM115
             )
         else:
             print(f"{task_set_lookup_path} not available, building...")
@@ -89,7 +89,7 @@ def get_train_overlap(docs_by_task_set: dict, ngrams_path: str, limit: int) -> d
                 for ngram in ngrams:
                     lookup[ngram].add(doc_id)
 
-            pickle.dump(lookup, open(task_set_lookup_path, "wb"))
+            pickle.dump(lookup, open(task_set_lookup_path, "wb"))  # noqa: SIM115
             lookups[(task_name, task_set)] = lookup
 
     elapsed = time.perf_counter() - start
@@ -160,7 +160,7 @@ def get_train_overlap(docs_by_task_set: dict, ngrams_path: str, limit: int) -> d
             overlaps_dump_path = get_overlaps_dump_path(
                 task_name, task_set, ngrams_n_size, limit
             )
-            pickle.dump(doc_ids, open(overlaps_dump_path, "wb"))
+            pickle.dump(doc_ids, open(overlaps_dump_path, "wb"))  # noqa: SIM115
 
     # Strip task set and return
     return {task_name: doc_ids for (task_name, task_set), doc_ids in duplicates.items()}

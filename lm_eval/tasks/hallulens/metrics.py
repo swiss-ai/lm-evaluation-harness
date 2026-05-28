@@ -262,7 +262,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
     print(f"[LONGWIKI] Starting batch: {len(longwiki_indices)} docs", flush=True)
 
     # Phase 1
-    print(f"[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
+    print("[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
     # Phase 1: parallel extraction (abstention check + claim extraction are API calls)
     extraction_data = [None] * len(longwiki_indices)
 
@@ -285,7 +285,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
 
     # Phase 2: one big prewarm across ALL documents (single batched GPU call)
     all_claims_tuples = []
-    for gen, claims, _ in extraction_data:
+    for _gen, claims, _ in extraction_data:
         for claim in claims:
             all_claims_tuples.append((claim.topic, claim.claim, claim.question))
 
@@ -296,7 +296,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
 
     _longwiki_evaluator.bulk_prewarm(all_claims_tuples)
 
-    print(f"[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
+    print("[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
 
     # Phase 3: parallel verification + scoring (retrieval = cache hits, verification = API)
     def _verify(pos):
@@ -318,7 +318,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
             cache_key = (items[idx]["doc"]["prompt"], items[idx]["completion"])
             with _eval_cache_lock:
                 _eval_cache[cache_key] = result
-    print(f"[LONGWIKI] Phase 3 done.", flush=True)
+    print("[LONGWIKI] Phase 3 done.", flush=True)
 
 
 def _run_all(items, max_workers=64):
@@ -521,7 +521,7 @@ def process_res(abstantion_res, halu_eval_raw):
         print(
             f"Unexpected hallucination evaluation response: {halu_eval_raw}. Expected 'Correct', 'Incorrect', or 'Unverifiable'."
         )
-    hallucinated_judge = False if halu_eval_raw.startswith("correct") else True
+    hallucinated_judge = not halu_eval_raw.startswith("correct")
     return abstantion_res, hallucinated_judge
 
 

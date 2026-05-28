@@ -149,10 +149,9 @@ class FactHalu:
         ### [[STEP #2]] Extract claims
         all_claims = self.extract_claims(generation=_generation, prompt=prompt)
 
-        if _generation.abstain is not None:
-            if _generation.abstain:
-                final_result["abstained"] = 1
-                return _generation, [], final_result
+        if _generation.abstain is not None and _generation.abstain:
+            final_result["abstained"] = 1
+            return _generation, [], final_result
 
         return _generation, all_claims, final_result
 
@@ -389,8 +388,6 @@ def make_claim_extraction_prompts(generation, prompt, tokenizer):
     sentences = []
     # split the text into sentences
     sentences_text = [x.strip() for x in split_single(generation.generation)]
-    question = prompt.replace("Answer in one paragraph.", "").strip()
-    response = generation.generation.strip()
 
     for i, sentence in list(enumerate(sentences_text)):
         if len(sentence) < 5:

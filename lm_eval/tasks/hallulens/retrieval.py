@@ -82,10 +82,10 @@ class DocDB:
                 if title in titles:
                     continue
                 titles.add(title)
-                if type(text) == str:
+                if type(text) is str:
                     text = [text]
                 passages = [[]]
-                for sent_idx, sent in enumerate(text):
+                for _sent_idx, sent in enumerate(text):
                     assert len(sent.strip()) > 0
                     tokens = tokenizer(sent)["input_ids"]
                     max_length = MAX_LENGTH - len(passages[-1])
@@ -111,15 +111,13 @@ class DocDB:
                     c.executemany("INSERT INTO documents VALUES (?,?)", output_lines)
                     output_lines = []
                     print(
-                        "Finish saving %dM documents (%dmin)"
-                        % (tot / 1000000, (time.time() - start_time) / 60)
+                        f"Finish saving {int(tot / 1000000)}M documents ({int((time.time() - start_time) / 60)}min)"
                     )
 
         if len(output_lines) > 0:
             c.executemany("INSERT INTO documents VALUES (?,?)", output_lines)
             print(
-                "Finish saving %dM documents (%dmin)"
-                % (tot / 1000000, (time.time() - start_time) / 60)
+                f"Finish saving {int(tot / 1000000)}M documents ({int((time.time() - start_time) / 60)}min)"
             )
 
         self.connection.commit()
@@ -183,7 +181,7 @@ class Retrieval:
             self.cache = {}
         if os.path.exists(self.embed_cache_path):
             with open(self.embed_cache_path, "rb") as f:
-                self.embed_cache = pkl.load(f)
+                self.embed_cache = pkl.load(f)  # noqa: S301
         else:
             self.embed_cache = {}
 
@@ -200,7 +198,7 @@ class Retrieval:
         if self.add_n_embed > 0:
             if os.path.exists(self.embed_cache_path):
                 with open(self.embed_cache_path, "rb") as f:
-                    new_cache = pkl.load(f)
+                    new_cache = pkl.load(f)  # noqa: S301
                 self.embed_cache.update(new_cache)
 
             with open(self.embed_cache_path, "wb") as f:

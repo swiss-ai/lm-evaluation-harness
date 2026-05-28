@@ -41,7 +41,7 @@ def process_results_coqcat(doc, results):
     answers = [doc["answers"]["input_text"][turn_id - 1]]
     additional_answers_list = doc.get("additional_answers")
     if additional_answers_list:
-        for key, additional_answers in additional_answers_list.items():
+        for _key, additional_answers in additional_answers_list.items():
             if additional_answers["input_text"][turn_id - 1].lower() not in map(
                 str.lower, answers
             ):

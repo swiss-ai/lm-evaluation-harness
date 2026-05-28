@@ -119,7 +119,6 @@ def main():
     hard_countries = [
         f"cultural_bench_hard_{country_to_filename(country)}" for country in COUNTRIES
     ]
-    all_tasks = easy_countries + hard_countries
 
     # Easy group task
     easy_group_content = f"""group: cultural_bench_easy
@@ -142,7 +141,7 @@ task:
     print("Created: lm_eval/tasks/cultural_bench/cultural_bench_hard.yaml")
 
     # Overall group task
-    overall_group_content = f"""group: cultural_bench
+    overall_group_content = """group: cultural_bench
 task:
   - cultural_bench_easy
   - cultural_bench_hard
