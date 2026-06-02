@@ -42,14 +42,30 @@
 #     setting) but at this value both happen to be no-ops for the
 #     actual benchmark data.
 #
-# Chat-template caveat
-# --------------------
-# Tested on Llama-3.x and Qwen-2.5 tokenizers, whose chat templates
-# natively emit a system-role slot. Templates that **fold system → user**
-# (e.g., Mistral v0.1 / v0.2's `[INST]` wrapping) silently degrade the
-# benchmark to IFEval-Separated / TensorTrust-without-defender semantics.
-# Verify your model's chat_template before reading paper-parity into the
-# numbers.
+# System-prompt boilerplate handling
+# -----------------------------------
+# Many model tokenizers inject boilerplate (e.g., Llama 3.x's "Cutting
+# Knowledge Date" / "Today Date") into the system header. For benchmarks
+# that evaluate system-prompt robustness this dilutes the prompt's
+# authority and causes TensorTrust scores to diverge from the paper by
+# ~19-24 pp.
+#
+# This script passes `strip_system_boilerplate=true` in model_args,
+# which auto-detects and strips Llama 3.x date boilerplate from the
+# tokenizer's built-in chat template at the Python level. No external
+# template files are needed.
+#
+# Two model_args control this behavior:
+#   strip_system_boilerplate=true   — regex-strip known boilerplate patterns
+#   allow_system_boilerplate=true   — suppress the detection check entirely
+#
+# If neither flag is set, the harness will probe the chat template and
+# exit with an error if boilerplate injection is detected.
+#
+# Templates that **fold system → user** (e.g., Mistral v0.1 / v0.2's
+# `[INST]` wrapping) silently degrade the benchmark to IFEval-Separated
+# / TensorTrust-without-defender semantics. Verify your model's
+# chat_template before reading paper-parity into the numbers.
 #
 # Prereqs
 # -------
@@ -69,6 +85,14 @@
 #   meta-llama/Llama-3.3-70B-Instruct                 → 87.9 / 92.1 / 90.2 / 93.6
 #       (70B; needs tensor-parallel via `--extra-model-args parallelize=True`)
 #
+# Multi-GPU via accelerate
+# -----------------------
+# Pass --accelerate to use `accelerate launch` for data-parallel evaluation
+# (one model copy per GPU, requests distributed across processes).
+# By default the script auto-detects all visible CUDA devices; override
+# with --num-gpus N. --device is incompatible with --accelerate because
+# accelerate manages device placement itself.
+#
 # Apple Silicon note
 # ------------------
 # The HF backend in lm-eval does NOT auto-detect MPS — its
@@ -86,6 +110,15 @@
 #   ./run_hf.sh <model_id> --smoke
 #   ./run_hf.sh <model_id> --tasks realguardrails_s_ifeval --batch_size 4
 #   ./run_hf.sh <model_id> --extra-model-args dtype=bfloat16,parallelize=True
+#   ./run_hf.sh <model_id> --accelerate              # all visible GPUs
+#   ./run_hf.sh <model_id> --accelerate --num-gpus 4 # explicit GPU count
+#   ./run_hf.sh <model_id> --device cuda:1            # explicit device
+#   ./run_hf.sh <model_id> --output /tmp/results --seed 0
+#
+# Boilerplate override examples:
+#   # Default: strip_system_boilerplate=true is baked into MODEL_ARGS.
+#   # To disable stripping and suppress the detection check entirely:
+#   ./run_hf.sh <model_id> --extra-model-args allow_system_boilerplate=true,strip_system_boilerplate=false
 #
 # Outputs land in:
 #   ./results/realguardrails/<model_slug>/<UTC-timestamp>/
@@ -99,10 +132,12 @@ MODEL=""
 TASKS="realguardrails_s_ifeval,realguardrails_tensortrust"
 BATCH_SIZE="auto"
 DEVICE=""
-LIMIT=""
+LIMIT_ARG=()
 EXTRA_MODEL_ARGS=""
 OUTPUT_ROOT="${OUTPUT_ROOT:-./results/realguardrails}"
 SEED="42"
+USE_ACCELERATE=false
+NUM_GPUS=""
 
 usage() {
     sed -n '2,/^set -euo/p' "$0" | sed '$d'
@@ -117,8 +152,16 @@ while [[ $# -gt 0 ]]; do
         --smoke)
             # 20 docs per task — enough to validate the pipeline + chat
             # template wiring without spending GPU hours.
-            LIMIT="--limit 20"
+            LIMIT_ARG=(--limit 20)
             shift
+            ;;
+        --accelerate)
+            USE_ACCELERATE=true
+            shift
+            ;;
+        --num-gpus|--num_gpus)
+            NUM_GPUS="$2"
+            shift 2
             ;;
         --tasks)
             TASKS="$2"
@@ -173,6 +216,22 @@ if [[ -z "$MODEL" ]]; then
     exit 2
 fi
 
+if [[ -n "$NUM_GPUS" ]] && ! $USE_ACCELERATE; then
+    echo "error: --num-gpus requires --accelerate." >&2
+    exit 2
+fi
+
+if $USE_ACCELERATE && [[ -n "$DEVICE" ]]; then
+    echo "error: --device and --accelerate are mutually exclusive." >&2
+    echo "accelerate manages device placement; remove --device." >&2
+    exit 2
+fi
+
+if [[ -n "$NUM_GPUS" ]] && ! [[ "$NUM_GPUS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "error: --num-gpus must be a positive integer, got '$NUM_GPUS'." >&2
+    exit 2
+fi
+
 # ---------------------------------------------------------------------------
 # Preflight: lm-eval on PATH, torch importable, version reportable
 # ---------------------------------------------------------------------------
@@ -180,6 +239,12 @@ if ! command -v lm-eval >/dev/null 2>&1; then
     echo "error: 'lm-eval' not found on PATH." >&2
     echo "Activate the env that has lm_eval installed:" >&2
     echo "  pip install -e \".[hf,sysp_eval]\"" >&2
+    exit 127
+fi
+
+if $USE_ACCELERATE && ! command -v accelerate >/dev/null 2>&1; then
+    echo "error: --accelerate requires 'accelerate' on PATH." >&2
+    echo "  pip install accelerate" >&2
     exit 127
 fi
 
@@ -211,7 +276,7 @@ echo "PyTorch: $TORCH_VERSION"
 # on Darwin without an explicit --device, probe for MPS and use it if
 # available. Linux + Windows are left to the harness's CUDA/CPU default
 # logic.
-if [[ -z "$DEVICE" && "$(uname)" == "Darwin" ]]; then
+if [[ -z "$DEVICE" && "$(uname)" == "Darwin" ]] && ! $USE_ACCELERATE; then
     # Two-line probe: (a) MPS built+available, (b) torch >= 2.1 (the
     # harness raises otherwise at `huggingface.py:162-167`).
     PROBE="$("$PY" -c "
@@ -254,7 +319,13 @@ mkdir -p "$OUTPUT_DIR"
 # to allocate ~48 GiB of bf16 embeddings on the very first attempt and
 # OOMs. Bound by `max_length` instead. Matches the paper's vLLM setup
 # (`max_model_len=4096`) as a side benefit.
-MODEL_ARGS="pretrained=${MODEL},dtype=auto,max_length=4096"
+
+# ---------------------------------------------------------------------------
+# Build MODEL_ARGS
+# ---------------------------------------------------------------------------
+# `strip_system_boilerplate=true` handles Llama 3.x date boilerplate at
+# the Python level — no external template files needed.
+MODEL_ARGS="pretrained=${MODEL},dtype=auto,max_length=4096,strip_system_boilerplate=true"
 if [[ -n "$EXTRA_MODEL_ARGS" ]]; then
     MODEL_ARGS="${MODEL_ARGS},${EXTRA_MODEL_ARGS}"
 fi
@@ -264,19 +335,44 @@ if [[ -n "$DEVICE" ]]; then
     DEVICE_ARG=(--device "$DEVICE")
 fi
 
+# ---------------------------------------------------------------------------
+# Accelerate: resolve GPU count
+# ---------------------------------------------------------------------------
+if $USE_ACCELERATE; then
+    if [[ -z "$NUM_GPUS" ]]; then
+        # Auto-detect visible CUDA devices
+        NUM_GPUS="$("$PY" -c "import torch; print(torch.cuda.device_count())" 2>/dev/null)"
+        if [[ -z "$NUM_GPUS" || "$NUM_GPUS" -eq 0 ]]; then
+            echo "error: --accelerate requires CUDA GPUs but none were detected." >&2
+            exit 1
+        fi
+    fi
+fi
+
+LIMIT_DISPLAY="(none — full eval)"
+if [[ ${#LIMIT_ARG[@]} -gt 0 ]]; then
+    LIMIT_DISPLAY="${LIMIT_ARG[1]}"
+fi
+
+ACCEL_DISPLAY="off"
+if $USE_ACCELERATE; then
+    ACCEL_DISPLAY="${NUM_GPUS} GPUs (data parallel)"
+fi
+
 cat <<EOF
 === RealGuardrails / SystemCheck — local HF run ===
 Model:       $MODEL
 Tasks:       $TASKS
-Limit:       ${LIMIT:+${LIMIT##--limit }}${LIMIT:-(none — full eval)}
+Limit:       $LIMIT_DISPLAY
 Batch size:  $BATCH_SIZE
 Device:      ${DEVICE:-(auto)}
-Model args:  $MODEL_ARGS
+Accelerate:  $ACCEL_DISPLAY
+Boilerplate: strip
 Output:      $OUTPUT_DIR
 Seed:        $SEED
 EOF
 
-if [[ -n "$LIMIT" ]]; then
+if [[ ${#LIMIT_ARG[@]} -gt 0 ]]; then
     echo
     echo "WARNING: --smoke / --limit truncates each task to the first N docs."
     echo "Resulting numbers are NOT representative and are NOT paper-comparable."
@@ -286,18 +382,25 @@ fi
 # Tee a copy of stdout/stderr so the per-run log is alongside the metrics.
 LOG_FILE="${OUTPUT_DIR}/run.log"
 
-# shellcheck disable=SC2086  # we intentionally word-split $LIMIT
-lm-eval run \
-    --model hf \
-    --model_args "$MODEL_ARGS" \
-    --tasks "$TASKS" \
-    --apply_chat_template \
-    --batch_size "$BATCH_SIZE" \
-    --output_path "$OUTPUT_DIR" \
-    --log_samples \
-    --seed "$SEED" \
-    "${DEVICE_ARG[@]}" \
-    $LIMIT 2>&1 | tee "$LOG_FILE"
+EVAL_ARGS=(
+    --model hf
+    --model_args "$MODEL_ARGS"
+    --tasks "$TASKS"
+    --apply_chat_template
+    --batch_size "$BATCH_SIZE"
+    --output_path "$OUTPUT_DIR"
+    --log_samples
+    --seed "$SEED"
+    ${DEVICE_ARG[@]+"${DEVICE_ARG[@]}"}
+    ${LIMIT_ARG[@]+"${LIMIT_ARG[@]}"}
+)
+
+if $USE_ACCELERATE; then
+    accelerate launch --num_processes "$NUM_GPUS" \
+        -m lm_eval "${EVAL_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+else
+    lm-eval run "${EVAL_ARGS[@]}" 2>&1 | tee "$LOG_FILE"
+fi
 
 echo
 echo "Done. Results: $OUTPUT_DIR"

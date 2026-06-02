@@ -88,6 +88,46 @@ Chat templates that fold the system role into the first user turn
 benchmark. Verified working: Llama-3.x, Qwen-2.5. Verify your tokenizer's
 `chat_template` field before reading paper-parity into the numbers.
 
+### System-prompt authority: boilerplate detection & stripping
+
+This benchmark measures whether a model honors its **system prompt** over
+adversarial user input — which is only meaningful if the per-doc system
+message is *authoritative*, i.e. the only instruction-bearing content in
+the system turn. Some tokenizers break this by injecting text into the
+system header: Llama 3.x prepends `Cutting Knowledge Date: … / Today Date:
+…`, which competes for authority and pulls TensorTrust scores ~19–24 pp off
+the paper (Mu et al., 2025). Qwen, Mistral, Phi, Gemma, and Llama 4 are
+clean.
+
+**Design decision.** Since a custom system-message override must be
+authoritative, the harness treats *any* non-whitespace text between the
+system role header and the system prompt as a defect. At model init it
+probes the chat template, strips the tokenizer's special tokens and the
+role label, and raises `RuntimeError` if natural-language text remains. The
+check is model-agnostic (special-token templates like Llama/ChatML/Phi/
+Command-R *and* plain-text ones like `### System:`), so it guards future
+models too.
+
+Two `model_args` control this (both `hf` and `vllm`):
+
+| `model_args` | Effect |
+|--------------|--------|
+| *(neither)* | **Default.** Probe runs; raises if injection is detected. |
+| `strip_system_boilerplate=true` | Strip the known Llama 3.x boilerplate, then use the cleaned template (probe skipped). |
+| `allow_system_boilerplate=true` | Suppress the check; use the template as-is. |
+
+```bash
+# Recommended for Llama 3.x — auto-strip
+--model_args pretrained=meta-llama/Llama-3.1-8B-Instruct,strip_system_boilerplate=true
+# Qwen / Mistral / Phi / Gemma — neither flag needed; the probe passes
+```
+
+Detection is general but the auto-strip is Llama-specific: for a non-Llama
+model that injects boilerplate the probe still raises, but
+`strip_system_boilerplate` won't clean it — supply your own `chat_template`
+or use `allow_system_boilerplate=true`. `run_hf.sh` sets
+`strip_system_boilerplate=true` by default.
+
 ### Reproducing the paper
 
 `run_hf.sh` in this directory drives `lm-eval run --model hf` against the

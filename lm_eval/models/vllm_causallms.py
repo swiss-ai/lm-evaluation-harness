@@ -24,9 +24,12 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
+    check_system_boilerplate,
     configure_pad_token,
+    get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
+    maybe_strip_system_boilerplate,
     maybe_truncate,
     normalize_gen_kwargs,
     postprocess_generated_text,
@@ -151,6 +154,8 @@ class VLLM(TemplateLM):
         # VLLM: enable thinking tags in the prompt.
         enable_thinking: bool = True,
         chat_template_args: dict | None = None,
+        strip_system_boilerplate: bool = False,
+        allow_system_boilerplate: bool = False,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         max_lora_rank: int = 16,
@@ -233,7 +238,14 @@ class VLLM(TemplateLM):
             ),  # type :ignore[invalid-argument-type]
         )
         self.tokenizer = configure_pad_token(self.tokenizer, model_config=self._config)
-        self.chat_template_args = chat_template_args or {}
+
+        chat_template_args = maybe_strip_system_boilerplate(
+            chat_template_source=getattr(self.tokenizer, "chat_template", None),
+            chat_template_args=chat_template_args,
+            strip=strip_system_boilerplate,
+        )
+
+        self.chat_template_args = chat_template_args
         self.enable_thinking = self.chat_template_args.pop(
             "enable_thinking", enable_thinking
         )
@@ -265,6 +277,24 @@ class VLLM(TemplateLM):
             )
         else:
             self.hf_chat_template = None
+
+        # If stripping injected a chat_template into chat_template_args, move
+        # it to self.hf_chat_template.  VLLM's apply_chat_template() passes
+        # chat_template=self.hf_chat_template explicitly, so keeping the key
+        # in chat_template_args would cause a duplicate-kwarg TypeError.
+        if "chat_template" in self.chat_template_args:
+            self.hf_chat_template = self.chat_template_args.pop("chat_template")
+
+        # Probe for system boilerplate injection unless explicitly opted out.
+        # Must run after self.hf_chat_template is initialized.
+        probe_boilerplate = (
+            not strip_system_boilerplate and not allow_system_boilerplate
+        )
+        if probe_boilerplate and getattr(self.tokenizer, "chat_template", None):
+            check_system_boilerplate(
+                self.apply_chat_template,
+                special_tokens=get_template_special_tokens(self.tokenizer),
+            )
 
         self.custom_prefix_token_id = prefix_token_id
         if prefix_token_id is not None:
