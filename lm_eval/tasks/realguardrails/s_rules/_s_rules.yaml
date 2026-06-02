@@ -1,0 +1,19 @@
+# Umbrella S-RuLES group — unweighted mean over all 6 buckets. This
+# matches the full RuLES score upstream `read_scores.py` exposes via the
+# `--averaged` flag, useful for comparing S-RuLES against the (non-S)
+# RuLES baseline.
+group: realguardrails_s_rules
+group_alias: "RealGuardrails / S-RuLES (all 6 buckets)"
+task:
+  - realguardrails_s_rules_benign_harmless
+  - realguardrails_s_rules_benign_helpful
+  - realguardrails_s_rules_basic_harmless
+  - realguardrails_s_rules_basic_helpful
+  - realguardrails_s_rules_redteam_harmless
+  - realguardrails_s_rules_redteam_helpful
+aggregate_metric_list:
+  - metric: passed
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 0.1

@@ -1,0 +1,50 @@
+# Shared config for the six S-RuLES bucket leaf tasks. Each leaf
+# overrides `task` and `dataset_kwargs.data_files.test`.
+#
+# `include:` is a SHALLOW top-level merge (see lm_eval/utils.py
+# `load_yaml_config`). Setting any of `metadata`, `generation_kwargs`,
+# `metric_list`, `dataset_kwargs`, or `class` in a leaf wholly replaces
+# the template's value for that key. The leaves below redefine only
+# `task` and `dataset_kwargs`, so they inherit everything else.
+#
+# Each leaf binds `class: !function task.SRulesTask` directly — the
+# `class` directive cannot live here because TaskManager's discovery
+# loop classifies any config with `class` as a python_task and then
+# tries to read `task = config["task"]`, which a template file does not
+# have.
+#
+# Generation params match the upstream defaults in
+# `normster/llm_rules/llm_rules/models/{vllm,transformers,openai}.py`
+# (`max_tokens=100`, `temperature=0`). The wrapper script
+# `evals/llm_rules/run_vllm.sh` of `normster/RealGuardrails` does not
+# override either, so this is what produced the published numbers.
+# `until: []` is intentional — chat template stop tokens are handled by
+# the backing model wrapper.
+dataset_path: json
+# Iterative multi-turn rollout: the evaluator's
+# `_run_multi_turn_rollout` driver generates one assistant turn at a
+# time, calling `SRulesTask.next_user_turn` / `.should_stop` per turn.
+# This matches upstream `evaluate_batched.py:323` byte-for-byte
+# (early-exit on scenario failure, per-turn re-evaluation), eliminating
+# the previous static-rollout divergence on rows with N>1 trailing
+# user turns.
+output_type: multi_turn_generate
+test_split: test
+# `description` and `doc_to_text` are ignored by SRulesTask's overridden
+# fewshot_context (which builds messages directly from doc["messages"])
+# but the harness's task config requires them to be set.
+description: ""
+doc_to_text: ""
+doc_to_target: ""
+process_results: !function utils.process_results
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 100
+  until: []
+metric_list:
+  - metric: passed
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 0.1
