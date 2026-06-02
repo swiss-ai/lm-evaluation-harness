@@ -11,10 +11,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import lm_eval.api.metrics
 import lm_eval.api.model
 import lm_eval.api.registry
-import lm_eval.api.task
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
 from lm_eval.evaluator_utils import (
@@ -578,6 +576,17 @@ def evaluate(
             # todo: may not account for padding in cases like SquadV2 which has multiple req types
             padding_requests[reqtype] += numpad
 
+    ### Iterative multi-turn rollout (output_type: multi_turn_generate) ###
+    # Runs BEFORE the standard one-shot dispatch so the turn-indexed
+    # `Instance` objects it builds end up on each task's `_instances` list
+    # and flow through the existing filter + process_results + sample-log
+    # path unchanged. Tasks without multi_turn_generate are unaffected.
+    _mt_task_outputs = [
+        to for to in eval_tasks if to.task.OUTPUT_TYPE == "multi_turn_generate"
+    ]
+    if _mt_task_outputs:
+        run_multi_turn_rollout(lm, _mt_task_outputs)
+
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
     for reqtype, reqs in requests.items():
@@ -789,6 +798,161 @@ def evaluate(
 
     else:
         return None
+
+
+def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
+    """Iterative multi-turn rollout driver.
+
+    For each task with ``output_type: multi_turn_generate``, runs a
+    per-turn batched loop:
+
+    1. Ask each pending doc for its next user turn via
+       ``task.next_user_turn(doc, history, turn_idx)``. None → mark done.
+    2. Append the user message; render the conversation through
+       ``lm.apply_chat_template(..., add_generation_prompt=True)``.
+    3. Build one ``Instance(idx=turn_idx)`` per pending doc.
+    4. Batch all pending instances across all multi-turn tasks into a
+       single ``lm.generate_until(...)`` call.
+    5. Append each assistant response to its doc's history and to
+       ``task._instances`` (so the existing post-process loop sees it).
+    6. Run ``task.should_stop(...)`` for early-exit.
+
+    Stops once no docs are pending. The existing filter +
+    ``process_results`` + sample-log path at evaluator.py:608+ then
+    handles the variable-length per-doc instance lists the same way it
+    handles ``multiple_choice``'s N-instances-per-doc.
+
+    Backend interactions are unchanged: each turn issues ONE batched
+    ``generate_until`` call; cross-task batching maximises occupancy.
+    The vLLM continuous-batching / HF auto-batch / openai num_concurrent
+    machinery operate exactly as in single-shot eval.
+    """
+    from copy import deepcopy
+
+    from lm_eval.api.instance import Instance
+    from lm_eval.api.utils import Message
+
+    if not mt_task_outputs:
+        return
+
+    # Distributed runs are not supported yet. The per-rank `while pending:`
+    # loop terminates at different times when ranks hold docs with
+    # different turn counts (or hold no docs at all due to --limit /
+    # small datasets). The collective ops the standard dispatch loop
+    # relies on (`accelerator.gather` and `wait_for_everyone`) require
+    # every rank to participate every iteration — so an asymmetric exit
+    # deadlocks. Until cross-rank loop synchronisation is implemented,
+    # hard-error so users see the problem instead of a silent hang.
+    if lm.world_size > 1:
+        raise NotImplementedError(
+            "multi_turn_generate does not yet support distributed runs "
+            "(world_size > 1). Use a single-rank eval, e.g. drop "
+            "`accelerate launch` or set `--num_processes 1`, until "
+            "cross-rank loop synchronisation lands."
+        )
+
+    # Build the cross-task pending list. Each entry tracks the task it
+    # belongs to so we can dispatch the response back to the right place.
+    pending: list[tuple] = []
+    for to in mt_task_outputs:
+        for doc_id, state in to.task._multi_turn_states.items():
+            pending.append((to, doc_id, state))
+
+    if not pending:
+        return
+
+    # Discover the chat-template callable once (every backend exposes
+    # `apply_chat_template`; multi-turn requires it — `build_all_requests`
+    # already errored if --apply_chat_template was forgotten).
+    if not hasattr(lm, "apply_chat_template"):
+        raise RuntimeError(
+            "multi_turn_generate requires `lm.apply_chat_template`; "
+            "backend does not provide it."
+        )
+
+    turn_idx = 0
+    max_safety_turns = 64
+    while pending:
+        if turn_idx >= max_safety_turns:
+            eval_logger.warning(
+                "multi_turn_generate driver hit safety cap of %d turns; "
+                "%d docs still pending — stopping.",
+                max_safety_turns,
+                len(pending),
+            )
+            break
+
+        live: list[tuple] = []
+        this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
+
+        for to, doc_id, state in pending:
+            user_text = to.task.next_user_turn(state.doc, state.history, turn_idx)
+            if user_text is None:
+                state.done = True
+                continue
+
+            state.history.append(Message("user", user_text))
+
+            prompt = lm.apply_chat_template(
+                [m.to_dict() for m in state.history],
+                add_generation_prompt=True,
+            )
+            gen_kwargs = deepcopy(to.task.config.generation_kwargs or {})
+
+            inst = Instance(
+                request_type="generate_until",
+                doc=state.doc,
+                arguments=(prompt, gen_kwargs),
+                idx=turn_idx,
+                metadata=(
+                    to.task.config.task,
+                    doc_id,
+                    to.task.config.repeats or 1,
+                ),
+            )
+            this_turn_batch.append((to, state, inst))
+            live.append((to, doc_id, state))
+
+        if not this_turn_batch:
+            break
+
+        # FSDP padding for distributed runs: pad to the max live count
+        # across ranks so every rank issues an evenly-sized batch.
+        cloned = [inst for _, _, inst in this_turn_batch]
+        if lm.world_size > 1:
+            import torch
+
+            live_n = torch.tensor(len(cloned), device=lm.device)
+            gathered = lm.accelerator.gather(live_n).cpu().detach().numpy().tolist()
+            numpad = max(gathered) - gathered[lm.rank]
+            if numpad > 0 and cloned:
+                cloned.extend([cloned[-1]] * numpad)
+
+        responses = lm.generate_until(cloned)
+
+        if lm.world_size > 1:
+            lm.accelerator.wait_for_everyone()
+
+        for (to, state, inst), resp in zip(
+            this_turn_batch, responses[: len(this_turn_batch)], strict=True
+        ):
+            inst.resps.append(resp)
+            state.history.append(Message("assistant", resp))
+            to.task._instances.append(inst)
+
+            if to.task.should_stop(state.doc, state.history, turn_idx):
+                state.done = True
+
+        pending = [(to, did, st) for to, did, st in live if not st.done]
+        turn_idx += 1
+
+    eval_logger.info(
+        "multi_turn_generate driver completed: %d task(s), %d total turns "
+        "across %d initial docs",
+        len(mt_task_outputs),
+        turn_idx,
+        sum(len(to.task._multi_turn_states) for to in mt_task_outputs),
+    )
 
 
 def request_caching_arg_to_dict(cache_requests: str) -> dict:

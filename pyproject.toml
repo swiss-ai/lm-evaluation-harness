@@ -194,6 +194,10 @@ ignore = [
     "F403",   # undefined-local-with-import-star
     "F405",   # undefined-local-with-import-star-usage
 ]
+# Vendored from github.com/normster/llm_rules (Apache-2.0, SHA f627e56).
+# Kept verbatim; do not lint upstream style.
+"lm_eval/tasks/realguardrails/s_rules/message.py" = ["ALL"]
+"lm_eval/tasks/realguardrails/s_rules/scenarios/**/*.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

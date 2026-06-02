@@ -14,7 +14,8 @@ old URL. The training data and the multi-turn evaluation suites
 [`normster/SystemCheck`](https://huggingface.co/datasets/normster/SystemCheck);
 the single-turn evaluation inputs covered here ship as JSONL files in the
 GitHub repo (and in [`normster/llm_rules`](https://github.com/normster/llm_rules)
-for S-RuLES, deferred to a later milestone).
+for S-RuLES, vendored in-tree at SHA
+[`f627e56`](https://github.com/normster/llm_rules/tree/f627e569146015d7fd6f200bb758b2591f9eb6c6)).
 
 ### Citation
 
@@ -38,20 +39,75 @@ content is concatenated as a plain-text prefix to the user message and
 silently changes the task. The README and each task's metadata document
 the requirement; there is no programmatic enforcement.
 
-Three single-turn sub-suites are implemented on this branch. The two
-multi-turn suites in the paper (RealGuardrails handwritten / distractors
-and Monkey Island) are deferred — they require iterative rollout
-(generation of turn *n+1* conditioned on the model's own turn *n*), which
-the harness does not natively support.
+Four sub-suites are implemented: three single-turn (S-IFEval, TensorTrust
+× 3) and one iterative-multi-turn (S-RuLES). The judge-based multi-turn
+suites in the paper (RealGuardrails handwritten / distractors, Monkey
+Island) are still deferred — they need LLM-judge calls from the rollout
+loop, not a structural problem but additional plumbing.
+
+**S-RuLES uses the harness's new `output_type: multi_turn_generate` path.**
+The evaluator's per-turn driver generates one assistant turn at a time,
+re-runs `scenario.evaluate(...)` after each, and short-circuits on first
+rule violation — byte-faithful to upstream `evaluate_batched.py:323`.
+Every per-turn batch goes through the existing
+`lm.generate_until(list[Instance])` interface, so no backend wrappers
+change. See [docs/multi_turn_rollout.md](../../../docs/multi_turn_rollout.md)
+for the full architecture, task contract, performance characteristics,
+limits, and a guide to adding new multi-turn benchmarks.
 
 | Sub-suite | Scoring | Rows scored | Headline metric |
 |---|---|---|---|
 | `realguardrails_s_ifeval` | rule-based (canonical IFEval verifiers) | 470 of 541 | prompt_strict / inst_strict + loose variants |
 | `realguardrails_tensortrust_{extraction,hijacking,helpful}` (+ group) | rule-based (substring + regex) | 105 / 165 / 239 | macro-average of the three pass rates |
+| `realguardrails_s_rules_{benign,basic,redteam}_{harmless,helpful}` (6 bucket leaves + 2 groups) | rule-based (14 vendored scenario evaluators from `normster/llm_rules`) | 225 / 250 / 225 / 250 / 355 / 390 (1,695 total) | `br_average` = unweighted mean of the 4 basic/redteam buckets |
 
-The skip lists, filter predicates, and paper-faithful row counts that
-produce these denominators are documented in each task's `utils.py`
-docstring; this README only states the *what*, not the *why*.
+The skip lists, filter predicates, scenario evaluators, and paper-faithful
+row counts that produce these denominators are documented in each task's
+`utils.py` docstring; this README only states the *what*, not the *why*.
+
+S-RuLES vendors 14 scenario classes (8 security + 6 games) and 57 JSONL
+input files from [`normster/llm_rules`](https://github.com/normster/llm_rules)
+at SHA `f627e569146015d7fd6f200bb758b2591f9eb6c6` under Apache-2.0. The
+57 upstream JSONLs are pre-processed at vendor time into 6 bucket files
+under `s_rules/data/` (one per `{suite}_{harmless|helpful}` combination),
+with `scenario`, `suite`, and `bucket_category` fields injected for
+runtime dispatch. To re-vendor at a newer SHA: re-run the steps inlined
+in this folder's git history (no standalone script — the vendoring is a
+one-shot operation by design).
+
+`SRulesTask` implements the three task hooks the multi-turn driver
+consults (`build_initial_messages` / `next_user_turn` / `should_stop`);
+the upstream flags `--system_instructions` and
+`--remove_precedence_reminders` are built in (always-on system role +
+3 precedence-reminder phrases stripped at evaluation time).
+
+### Limits and known caveats
+
+- **Distributed multi-rank runs (`world_size > 1`) are NOT supported.**
+  The multi-turn driver hard-errors on `accelerate launch` / FSDP — the
+  per-rank loop terminates asymmetrically when ranks hold docs with
+  different turn counts and collective ops deadlock. Single-rank
+  (CPU, MPS, single-GPU, vLLM `tensor_parallel_size=N`, HF
+  `parallelize=True`, `local-chat-completions` with `num_concurrent`) is
+  fully supported. Cross-rank synchronisation is a follow-up
+  (~half a day of work). See
+  [docs/multi_turn_rollout.md#limits](../../../docs/multi_turn_rollout.md#limits).
+- **`repeats > 1` is not supported on multi-turn tasks** — `_build_initial_multi_turn_states`
+  hard-errors so a `repeats: 3` YAML doesn't silently single-sample.
+- **HF-vs-vLLM kernel drift**: expect ~0.5–1 pp at T=0 bf16, intrinsic
+  to swapping inference backends. Not a config bug.
+- **Numerical paper parity is unverified.** Implementation is
+  structurally faithful (verified by code review + smoke); scoring
+  numbers have not been compared to paper Tables 5 / 7 / 8 against
+  real models. A full eval against Llama-3.1-8B-Instruct on the
+  cluster is the open follow-up.
+- **No bootstrap confidence intervals.** Harness emits point estimates
+  only; paper reports CIs from `bootstrap=10000`. Post-process the
+  per-doc booleans in `samples_*.jsonl` to produce CIs.
+- **Judge-based multi-turn suites still deferred** (RealGuardrails
+  handwritten / distractors / Monkey Island) — need an LLM-judge call
+  from inside the rollout loop. The judge client exists at
+  `lm_eval/api/judge.py`; the wiring is a separate PR.
 
 ### Dataset
 
@@ -170,6 +226,9 @@ shorter labels. Same number, just different column header:
 | `inst_level_loose_acc` | Inst-level loose |
 | `passed` (TensorTrust leaf) | suite-specific pass rate |
 | `passed` (TensorTrust group, macro) | macro-average (no-post) |
+| `passed` (S-RuLES leaf, per bucket) | per-bucket pass rate (`{suite}_{harmless,helpful}`) |
+| `passed` (S-RuLES group `_br_average`) | `br_average` headline (unweighted mean of 4 buckets) |
+| `passed` (S-RuLES group full) | full RuLES score (unweighted mean of 6 buckets) |
 
 The harness reports fractions in [0, 1]; the paper reports percentages.
 Multiply by 100 when comparing.
@@ -229,5 +288,19 @@ If other tasks on this dataset are already supported:
 ### Changelog
 
 - 0.1: initial single-turn sub-suites (S-IFEval, TensorTrust). Multi-turn
-  RealGuardrails (handwritten, distractors, Monkey Island) and S-RuLES
-  remain to be added.
+  RealGuardrails (handwritten, distractors, Monkey Island) remain to be
+  added.
+- 0.2: added S-RuLES as a static-multi-turn implementation (model
+  generates only the final assistant turn from the row's prefilled
+  history; not iterative rollout). 14 scenario evaluators + 57 input
+  JSONLs vendored from `normster/llm_rules` @ `f627e56` and
+  pre-processed into 6 bucket files.
+- 0.3: migrated S-RuLES to the harness's new
+  `output_type: multi_turn_generate`. The static-rollout divergence on
+  basic_helpful / parts of redteam_* (`~17.6%` of rows) is closed —
+  per-turn iterative generation with early-exit-on-scenario-failure now
+  matches upstream `scripts/evaluate_batched.py` exactly. The architecture
+  is task-agnostic: SysBench, RG handwritten / distractors, Monkey
+  Island, MT-Bench turn-2, Multi-IF turns 2-3, and MT-Eval are all
+  unblocked at the harness level (judge integration is the only
+  remaining piece for the judge-based subset).
