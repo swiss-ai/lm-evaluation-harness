@@ -304,7 +304,14 @@ def simple_evaluate(
                 }
 
             else:
-                if task_obj.get_config("output_type") == "generate_until":
+                if task_obj.get_config("output_type") in (
+                    "generate_until",
+                    "multi_turn_generate",
+                ):
+                    # multi_turn_generate also issues generate_until calls per
+                    # turn (see run_multi_turn_rollout), reading the task's
+                    # generation_kwargs — so the CLI override must reach it too,
+                    # e.g. `--gen_kwargs until=<|im_end|>` to add a stop token.
                     if gen_kwargs is not None:
                         task_obj.set_config(
                             key="generation_kwargs", value=gen_kwargs, update=True

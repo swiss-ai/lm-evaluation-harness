@@ -182,6 +182,56 @@ No backend wrapper changes are required because each turn issues exactly
 one `generate_until(list[Instance])` call — the same interface single-shot
 eval uses.
 
+## Generation parameters & overrides
+
+Every turn is a `generate_until` call built from the task's single
+`generation_kwargs` block (the driver deep-copies
+`task.config.generation_kwargs` per turn), so sampling params behave as for
+`generate_until` tasks:
+
+- **Defaults** (YAML omits `generation_kwargs`): greedy — `temperature=0.0`,
+  `do_sample=False`, `max_gen_toks=256` — with **`until=[]`**. This is the
+  same greedy default as `generate_until` except for `until`:
+  `generate_until` defaults to `until=[fewshot_delimiter]` (`"\n\n"`), which
+  would truncate a multi-turn response at the first blank line, so
+  multi-turn instead relies on the model's own turn-end (EOS) token.
+- **CLI overrides are respected**: `--gen_kwargs key=value` *merges* into the
+  task's `generation_kwargs` (CLI wins on conflicting keys, other YAML keys
+  are kept), identical to `generate_until`. The override is gated on
+  `output_type in ("generate_until", "multi_turn_generate")` in
+  `simple_evaluate`.
+- Per-turn *varying* params are not supported (one block for all turns) —
+  see the limit below.
+
+### Turn termination depends on the model's EOS — mind mis-configured fine-tunes
+
+Each turn stops at the model's EOS token or any `until` string. **If a
+model's tokenizer `eos_token` is not its chat turn-end token, generation
+runs on past the turn boundary** — the model emits its turn-end token, the
+backend does not treat it as a stop, and it keeps generating (usually
+hallucinating the next user/assistant turns up to `max_gen_toks`),
+silently corrupting the per-turn response the evaluator scores.
+
+Observed with fine-tunes whose `eos_token` is `<|endoftext|>` while the
+chat template ends turns with `<|im_end|>` (no `generation_config.json` to
+reconcile them). Remedies:
+
+- **vLLM**: add the turn-end token as a stop, `--gen_kwargs 'until=<|im_end|>'`
+  — works because vLLM detokenizes with special tokens visible, so the stop
+  string matches.
+- **HF**: needs a **token-level** stop. A stop *string* does NOT work (HF
+  strips special tokens from the decoded output, so `<|im_end|>` never
+  appears to match), and setting the *tokenizer's* `eos_token` does NOT help
+  either — HF's `model.generate()` stops on the *model's*
+  `generation_config.json`/`config.json` `eos_token_id`, not the tokenizer's.
+  Pass the turn-end **token id** instead: `--gen_kwargs 'eos_token_id=151645'`
+  (`HFLM._model_generate` forwards it to `model.generate()`), or correct the
+  model's `generation_config.json` `eos_token_id`.
+
+Well-formed chat models — tokenizer `eos_token` == chat turn-end (Llama
+`<|eot_id|>`, stock Qwen2.5 `<|im_end|>`) or a `generation_config.json`
+listing the turn-end id — need none of this.
+
 ## Limits
 
 These are **intentional v1 trade-offs**. None of them is a structural

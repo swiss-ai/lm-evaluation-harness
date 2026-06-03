@@ -134,6 +134,7 @@ BATCH_SIZE="auto"
 DEVICE=""
 LIMIT_ARG=()
 EXTRA_MODEL_ARGS=""
+EXTRA_GEN_KWARGS=""
 OUTPUT_ROOT="${OUTPUT_ROOT:-./results/realguardrails}"
 SEED="42"
 USE_ACCELERATE=false
@@ -177,6 +178,16 @@ while [[ $# -gt 0 ]]; do
             ;;
         --extra-model-args)
             EXTRA_MODEL_ARGS="$2"
+            shift 2
+            ;;
+        --gen-kwargs|--gen_kwargs)
+            # Passed through to lm-eval --gen_kwargs (merged into the task's
+            # generation_kwargs). For multi-turn tasks (S-RuLES) whose model
+            # over-runs the turn boundary, use a token-level stop, e.g.
+            # 'eos_token_id=151645' (HF stops at the token id; a stop *string*
+            # like until=<|im_end|> does NOT work on HF — special tokens are
+            # stripped from the decoded output before matching).
+            EXTRA_GEN_KWARGS="$2"
             shift 2
             ;;
         --output)
@@ -382,6 +393,11 @@ fi
 # Tee a copy of stdout/stderr so the per-run log is alongside the metrics.
 LOG_FILE="${OUTPUT_DIR}/run.log"
 
+GEN_KWARGS_ARG=()
+if [[ -n "$EXTRA_GEN_KWARGS" ]]; then
+    GEN_KWARGS_ARG=(--gen_kwargs "$EXTRA_GEN_KWARGS")
+fi
+
 EVAL_ARGS=(
     --model hf
     --model_args "$MODEL_ARGS"
@@ -391,6 +407,7 @@ EVAL_ARGS=(
     --output_path "$OUTPUT_DIR"
     --log_samples
     --seed "$SEED"
+    ${GEN_KWARGS_ARG[@]+"${GEN_KWARGS_ARG[@]}"}
     ${DEVICE_ARG[@]+"${DEVICE_ARG[@]}"}
     ${LIMIT_ARG[@]+"${LIMIT_ARG[@]}"}
 )

@@ -52,8 +52,10 @@ rule violation — byte-faithful to upstream `evaluate_batched.py:323`.
 Every per-turn batch goes through the existing
 `lm.generate_until(list[Instance])` interface, so no backend wrappers
 change. See [docs/multi_turn_rollout.md](../../../docs/multi_turn_rollout.md)
-for the full architecture, task contract, performance characteristics,
-limits, and a guide to adding new multi-turn benchmarks.
+for the full architecture, task contract, generation parameters &
+`--gen_kwargs` overrides (incl. the per-model stop-token / EOS caveat),
+performance characteristics, limits, and a guide to adding new multi-turn
+benchmarks.
 
 | Sub-suite | Scoring | Rows scored | Headline metric |
 |---|---|---|---|

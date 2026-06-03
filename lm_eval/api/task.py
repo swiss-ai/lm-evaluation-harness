@@ -602,7 +602,13 @@ class Task(abc.ABC):
             raise ValueError("Key must be provided.")
 
         if update:
-            current_value = getattr(self._config, key, {})
+            current_value = getattr(self._config, key, None)
+            if current_value is None:
+                # Declared-but-unset dict field (e.g. generation_kwargs on a
+                # task that omits it in YAML): initialize so update() can merge
+                # rather than raising on None.
+                current_value = {}
+                setattr(self._config, key, current_value)
             if not isinstance(current_value, dict):
                 raise TypeError(
                     f"Expected a dict for key '{key}', got {type(current_value).__name__} instead."
