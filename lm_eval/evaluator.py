@@ -807,32 +807,54 @@ def evaluate(
         return None
 
 
+def _any_rank_has_pending(lm, pending) -> bool:
+    """Collective entry guard. True iff any rank has docs. All ranks
+    must call together — issues one ``accelerator.gather``.
+    """
+    import torch
+
+    flag = torch.tensor(int(bool(pending)), device=lm.device)
+    gathered = lm.accelerator.gather(flag).cpu().detach().numpy().tolist()
+    return any(gathered)
+
+
+def _gather_max_live(lm, local_n: int) -> int:
+    """Collective per-turn gather. Returns ``max(live_n across ranks)``,
+    used both for global termination (``== 0``) and pad-to-global-max.
+    All ranks must call together.
+    """
+    import torch
+
+    n = torch.tensor(local_n, device=lm.device)
+    gathered = lm.accelerator.gather(n).cpu().detach().numpy().tolist()
+    return int(max(gathered))
+
+
 def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
-    """Iterative multi-turn rollout driver.
+    """Iterative multi-turn rollout driver for ``output_type: multi_turn_generate``.
 
-    For each task with ``output_type: multi_turn_generate``, runs a
-    per-turn batched loop:
+    Per turn, for each pending doc: ask the task for the next user turn
+    via ``task.next_user_turn`` (None → mark done), render the growing
+    history through ``lm.apply_chat_template``, build one
+    ``Instance(idx=turn_idx)``, and batch all pending instances across
+    all multi-turn tasks into a single ``lm.generate_until`` call. The
+    response is appended to history and ``task._instances``, then
+    ``task.should_stop`` decides early-exit. Loop stops when no docs
+    are pending; downstream post-process at evaluator.py:608+ then
+    consumes the variable-length per-doc instance lists the same way
+    it handles ``multiple_choice``'s N-instances-per-doc.
 
-    1. Ask each pending doc for its next user turn via
-       ``task.next_user_turn(doc, history, turn_idx)``. None → mark done.
-    2. Append the user message; render the conversation through
-       ``lm.apply_chat_template(..., add_generation_prompt=True)``.
-    3. Build one ``Instance(idx=turn_idx)`` per pending doc.
-    4. Batch all pending instances across all multi-turn tasks into a
-       single ``lm.generate_until(...)`` call.
-    5. Append each assistant response to its doc's history and to
-       ``task._instances`` (so the existing post-process loop sees it).
-    6. Run ``task.should_stop(...)`` for early-exit.
+    Distributed (``accelerate launch``) is supported when the LM
+    exposes ``lm.accelerator``. Three coordination points keep
+    collectives even-batched: a collective entry guard, a per-turn
+    ``gather`` of live counts (drives termination and pad size), and
+    sentinel-dummy padding for ranks with fewer live docs than the
+    global max. Backends with internal DP (vLLM ``data_parallel_size``,
+    SGLang / openai ``num_concurrent``) expose ``world_size == 1`` and
+    take the non-distributed branch.
 
-    Stops once no docs are pending. The existing filter +
-    ``process_results`` + sample-log path at evaluator.py:608+ then
-    handles the variable-length per-doc instance lists the same way it
-    handles ``multiple_choice``'s N-instances-per-doc.
-
-    Backend interactions are unchanged: each turn issues ONE batched
-    ``generate_until`` call; cross-task batching maximises occupancy.
-    The vLLM continuous-batching / HF auto-batch / openai num_concurrent
-    machinery operate exactly as in single-shot eval.
+    Full architecture, hook contract, backend matrix, and limits:
+    ``docs/multi_turn_rollout.md``.
     """
     from copy import deepcopy
 
@@ -842,53 +864,59 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
     if not mt_task_outputs:
         return
 
-    # Distributed runs are not supported yet. The per-rank `while pending:`
-    # loop terminates at different times when ranks hold docs with
-    # different turn counts (or hold no docs at all due to --limit /
-    # small datasets). The collective ops the standard dispatch loop
-    # relies on (`accelerator.gather` and `wait_for_everyone`) require
-    # every rank to participate every iteration — so an asymmetric exit
-    # deadlocks. Until cross-rank loop synchronisation is implemented,
-    # hard-error so users see the problem instead of a silent hang.
-    if lm.world_size > 1:
+    # Docs are already sharded across ranks by
+    # `task.doc_iterator(rank, world_size)` in
+    # `_build_initial_multi_turn_states`; the coordination rules live in
+    # the docstring above.
+    is_distributed = lm.world_size > 1
+    if is_distributed and not hasattr(lm, "accelerator"):
         raise NotImplementedError(
-            "multi_turn_generate does not yet support distributed runs "
-            "(world_size > 1). Use a single-rank eval, e.g. drop "
-            "`accelerate launch` or set `--num_processes 1`, until "
-            "cross-rank loop synchronisation lands."
+            "multi_turn_generate with world_size > 1 requires an "
+            "`accelerator` attribute on the LM (HuggingFace + `accelerate "
+            "launch`). Backends that do their own data parallelism "
+            "internally should expose world_size=1."
         )
 
-    # Build the cross-task pending list. Each entry tracks the task it
-    # belongs to so we can dispatch the response back to the right place.
+    # Each (task_output, doc_id, state) so the response routes back to
+    # the right task.
     pending: list[tuple] = []
     for to in mt_task_outputs:
         for doc_id, state in to.task._multi_turn_states.items():
             pending.append((to, doc_id, state))
 
-    if not pending:
-        return
-
-    # Discover the chat-template callable once (every backend exposes
-    # `apply_chat_template`; multi-turn requires it — `build_all_requests`
-    # already errored if --apply_chat_template was forgotten).
+    # `build_all_requests` already errored if --apply_chat_template was
+    # forgotten; this catches backends that don't implement it at all.
     if not hasattr(lm, "apply_chat_template"):
         raise RuntimeError(
             "multi_turn_generate requires `lm.apply_chat_template`; "
             "backend does not provide it."
         )
 
+    # Entry guard — collective so ranks with empty shards don't strand
+    # peers at the next gather. Both early-return sites must clear
+    # `_multi_turn_states` (otherwise the histories built by
+    # `_build_initial_multi_turn_states` leak past short-circuit).
+    if is_distributed:
+        if not _any_rank_has_pending(lm, pending):
+            _clear_multi_turn_states(mt_task_outputs)
+            return
+    elif not pending:
+        _clear_multi_turn_states(mt_task_outputs)
+        return
+
+    # Pad sentinel: 1-token throwaway request used by ranks whose live
+    # batch is below the global max. Response is discarded.
+    dummy_instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("<pad>", {"max_gen_toks": 1, "until": []}),
+        idx=-1,
+        metadata=("__multi_turn_dp_pad__", -1, 1),
+    )
+
     turn_idx = 0
     max_safety_turns = 64
-    while pending:
-        if turn_idx >= max_safety_turns:
-            eval_logger.warning(
-                "multi_turn_generate driver hit safety cap of %d turns; "
-                "%d docs still pending — stopping.",
-                max_safety_turns,
-                len(pending),
-            )
-            break
-
+    while True:
         live: list[tuple] = []
         this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
 
@@ -920,28 +948,44 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
             this_turn_batch.append((to, state, inst))
             live.append((to, doc_id, state))
 
-        if not this_turn_batch:
+        # Termination: distributed requires EVERY rank's batch to be
+        # empty before breaking (else the next gather deadlocks).
+        local_n = len(this_turn_batch)
+        if is_distributed:
+            global_max = _gather_max_live(lm, local_n)
+            if global_max == 0:
+                break
+        else:
+            if local_n == 0:
+                break
+            global_max = local_n
+
+        # Safety cap deliberately checked AFTER the per-turn gather so a
+        # future refactor that diverges `turn_idx` across ranks cannot
+        # cause an asymmetric break that deadlocks the next gather.
+        # Today `turn_idx` is identical on every rank — all ranks break
+        # together — but the order matters for that invariant.
+        if turn_idx >= max_safety_turns:
+            eval_logger.warning(
+                "multi_turn_generate driver hit safety cap of %d turns; "
+                "%d docs still pending — stopping.",
+                max_safety_turns,
+                len(pending),
+            )
             break
 
-        # FSDP padding for distributed runs: pad to the max live count
-        # across ranks so every rank issues an evenly-sized batch.
         cloned = [inst for _, _, inst in this_turn_batch]
-        if lm.world_size > 1:
-            import torch
-
-            live_n = torch.tensor(len(cloned), device=lm.device)
-            gathered = lm.accelerator.gather(live_n).cpu().detach().numpy().tolist()
-            numpad = max(gathered) - gathered[lm.rank]
-            if numpad > 0 and cloned:
-                cloned.extend([cloned[-1]] * numpad)
+        numpad = global_max - local_n
+        if numpad > 0:
+            cloned.extend([dummy_instance] * numpad)
 
         responses = lm.generate_until(cloned)
 
-        if lm.world_size > 1:
+        if is_distributed:
             lm.accelerator.wait_for_everyone()
 
         for (to, state, inst), resp in zip(
-            this_turn_batch, responses[: len(this_turn_batch)], strict=True
+            this_turn_batch, responses[:local_n], strict=True
         ):
             inst.resps.append(resp)
             state.history.append(Message("assistant", resp))
@@ -960,6 +1004,20 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
         turn_idx,
         sum(len(to.task._multi_turn_states) for to in mt_task_outputs),
     )
+
+    _clear_multi_turn_states(mt_task_outputs)
+
+
+def _clear_multi_turn_states(mt_task_outputs) -> None:
+    """Release per-doc conversation histories. Called at end-of-loop
+    AND each early-return in :func:`run_multi_turn_rollout`; task
+    objects can persist across ``simple_evaluate`` calls (notebook /
+    test flows) and would otherwise retain full N-turn histories
+    indefinitely.
+    """
+    for to in mt_task_outputs:
+        if hasattr(to.task, "_multi_turn_states"):
+            del to.task._multi_turn_states
 
 
 def request_caching_arg_to_dict(cache_requests: str) -> dict:

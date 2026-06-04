@@ -85,15 +85,16 @@ the upstream flags `--system_instructions` and
 
 ### Limits and known caveats
 
-- **Distributed multi-rank runs (`world_size > 1`) are NOT supported.**
-  The multi-turn driver hard-errors on `accelerate launch` / FSDP — the
-  per-rank loop terminates asymmetrically when ranks hold docs with
-  different turn counts and collective ops deadlock. Single-rank
-  (CPU, MPS, single-GPU, vLLM `tensor_parallel_size=N`, HF
-  `parallelize=True`, `local-chat-completions` with `num_concurrent`) is
-  fully supported. Cross-rank synchronisation is a follow-up
-  (~half a day of work). See
-  [docs/multi_turn_rollout.md#limits](../../../docs/multi_turn_rollout.md#limits).
+- **Multi-turn parallelism.** Supported on HF + `accelerate launch
+  --num_processes N` (the driver shards docs, gathers each turn, and pads
+  ranks with fewer live docs); on vLLM via `data_parallel_size` /
+  `tensor_parallel_size` in `--model_args`; and on any OpenAI-compatible
+  chat backend via `num_concurrent`. Native Anthropic / Google backends
+  don't implement `apply_chat_template` and the driver hard-errors —
+  route through `local-chat-completions` against a wrapper instead. The
+  full matrix and a "which path do I pick?" guide live in
+  [docs/multi_turn_rollout.md#backend-compatibility](../../../docs/multi_turn_rollout.md#backend-compatibility)
+  — that is the canonical source; this bullet is a pointer.
 - **`repeats > 1` is not supported on multi-turn tasks** — `_build_initial_multi_turn_states`
   hard-errors so a `repeats: 3` YAML doesn't silently single-sample.
 - **HF-vs-vLLM kernel drift**: expect ~0.5–1 pp at T=0 bf16, intrinsic

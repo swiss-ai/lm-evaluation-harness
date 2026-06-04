@@ -171,16 +171,52 @@ After the driver returns, the standard post-process path
 
 ## Backend compatibility
 
-| Backend | Per-turn batching | Status |
-|---|---|---|
-| HF transformers | `_detect_batch_size` runs once at first call; cached batch size reused across turns. Smaller late-turn batches due to early-exit (acceptable). | ✓ Supported |
-| vLLM | Continuous batching within each turn; synchronous barrier between (intrinsic). | ✓ Supported |
-| `local-chat-completions` + `num_concurrent` | Concurrent dispatch within a turn; same sync barrier. | ✓ Supported |
-| OpenAI / Anthropic / Google API backends | Same as `local-chat-completions`. | ✓ Supported |
+| Backend | Parallelism path | Per-turn batching | Status |
+|---|---|---|---|
+| HF transformers, single rank (CPU, MPS, 1 GPU) | n/a | `_detect_batch_size` runs once at first call; cached value reused across turns. | ✓ Supported |
+| HF transformers, `parallelize=True` (single-rank model-parallel) | Single process spans GPUs; harness sees `world_size == 1`. | Same as single-rank. | ✓ Supported |
+| HF transformers, `accelerate launch --num_processes N` (data-parallel) | `world_size == N`; harness shards docs across ranks via `task.doc_iterator`; driver gathers live counts each turn and pads with sentinel dummies (`max_gen_toks=1`) so ranks stay even-batched. | One batched call per turn per rank; global gather per turn. | ✓ Supported |
+| vLLM `tensor_parallel_size=T` | One model copy across T GPUs (intra-model). Configured via `--model_args`. Harness sees `world_size == 1`. | Continuous batching within each turn; intrinsic sync barrier between. | ✓ Supported |
+| vLLM `data_parallel_size=D` | D model replicas; vLLM internally routes prompts across replicas inside `generate_until(list)`. Harness sees `world_size == 1`. | Continuous batching across all D replicas. | ✓ Supported |
+| SGLang `num_concurrent=N` | Backend-internal concurrency; harness sees `world_size == 1`. | Concurrent dispatch within a turn; intrinsic sync barrier between. | ✓ Supported |
+| `local-chat-completions` + `num_concurrent=N` (any OpenAI-compatible server) | Same as SGLang. | Same. | ✓ Supported |
+| OpenAI / OpenAI-compatible chat APIs via `openai-chat-completions` | Provider-side concurrency via `num_concurrent`. | Same. | ✓ Supported |
+| Anthropic / Google native backends (`anthropic_llms.py` etc.) | Provider-side concurrency. | n/a | ✗ Not supported (no `apply_chat_template`; driver hard-errors). Route through `local-chat-completions` against a wrapper instead. |
 
 No backend wrapper changes are required because each turn issues exactly
 one `generate_until(list[Instance])` call — the same interface single-shot
-eval uses.
+eval uses. The two parallelism axes (cross-rank under `accelerate launch`
+and within-rank under the backend's own batching) compose: each rank's
+per-turn batch is dispatched through whichever backend-internal mechanism
+that rank's `LM` instance uses.
+
+### Choosing a parallelism path
+
+- **vLLM available** → prefer `data_parallel_size=N` (and
+  `tensor_parallel_size>1` only if the model doesn't fit one GPU). The
+  per-turn batch crosses all replicas inside one `generate_until` call;
+  no harness-level coordination needed.
+- **HF only, multiple GPUs** → `accelerate launch --num_processes=N`.
+  Cross-rank coordination costs one small gather per turn plus dummy
+  generations on ranks whose docs early-exited; expected to be tolerable
+  when docs are uniformly distributed across ranks (which the default
+  `doc_iterator` index-mod-rank sharding gives for shuffled datasets —
+  not yet measured against a real workload). Avoid combining with
+  `parallelize=True` on the same model (both would try to spread it).
+
+  Concrete example:
+
+  ```bash
+  accelerate launch --num_processes 8 -m lm_eval run \
+    --model hf \
+    --model_args pretrained=meta-llama/Llama-3.1-8B-Instruct,dtype=bfloat16,strip_system_boilerplate=true \
+    --tasks realguardrails_s_rules_br_average \
+    --apply_chat_template \
+    --batch_size 8 \
+    --output_path ./results/
+  ```
+- **Single GPU / single host** → no special config needed; the
+  in-process per-turn batched call already exploits the device.
 
 ## Generation parameters & overrides
 
@@ -237,27 +273,41 @@ listing the turn-end id — need none of this.
 These are **intentional v1 trade-offs**. None of them is a structural
 problem; each has a documented remediation path.
 
-### Distributed multi-rank runs not supported
+### Distributed: HF data-parallel tail-pad cost
 
-The driver hard-errors when `lm.world_size > 1` with `NotImplementedError`.
+Cross-rank synchronisation is implemented (see the row for
+`accelerate launch` above), but it has a cost worth understanding.
 
-**Why:** the per-rank `while pending:` loop terminates at different
-times across ranks when (a) ranks hold docs with different turn counts
-or (b) some ranks hold no docs at all (small dataset + `--limit`).
-Collective ops (`accelerator.gather`, `wait_for_everyone`) require every
-rank to participate every iteration — asymmetric exit deadlocks.
+**Why a barrier is unavoidable.** Different ranks hold docs with
+different turn counts and different early-exit timings, so per-rank
+live-doc counts diverge. The standard FSDP/DDP requirement that every
+rank issue an evenly-sized batch every collective forces ranks with
+fewer live docs to pad. The driver:
 
-**What works today:** single-rank (CPU, MPS, single-GPU), single-process
-multi-GPU via vLLM `tensor_parallel_size=N`, single-process model-parallel
-via HF `parallelize=True`, and `local-chat-completions` against any
-backend (vLLM server, openai, etc.) with `num_concurrent`.
+1. Issues `accelerator.gather` at the entry guard so no rank enters
+   the loop alone (would deadlock the next gather).
+2. Issues `accelerator.gather` at the start of every turn to compute
+   `global_max = max(live_n across ranks)` and to detect global
+   termination (`global_max == 0` → all ranks break together).
+3. Pads each rank's per-turn batch up to `global_max` with a sentinel
+   `dummy_instance` (`max_gen_toks=1`, `until=[]`). The padded slots
+   never reach `task._instances`; their responses are discarded.
 
-**Path to enable distributed:** add a cross-rank "any pending?" gather
-at the top of each turn (one `accelerator.gather(torch.tensor(int(not pending)))`),
-pad idle ranks with no-op requests to participate in the within-turn
-batched `generate_until`, terminate only when every rank reports done.
-Estimated effort: ~half a day. See `lm_eval/evaluator.py:run_multi_turn_rollout`
-inline comments.
+**Tail cost.** As docs early-exit unevenly, a rank that finishes early
+still issues padded-only batches until the slowest rank is done. With
+a balanced random shard the tail is short; with biased early-exit
+(e.g. all redteam docs landing on one rank) it can dominate. Doc
+sharding by `doc_iterator` is index-mod-rank, which is essentially
+random for shuffled datasets. No mitigation is implemented; if a
+benchmark shows tail-heavy behaviour, the right fix is task-level
+balanced sharding.
+
+**Backends that don't go through `accelerate launch`** — vLLM
+`data_parallel_size`, SGLang / `local-chat-completions` /
+`api_models` with `num_concurrent`, single-rank HF — expose
+`world_size == 1` to the harness and bypass this entire mechanism;
+the backend's own internal parallelism handles routing inside the
+single `generate_until(list[Instance])` call.
 
 ### `repeats > 1` not supported
 
@@ -318,7 +368,7 @@ on `meta-llama/Llama-3.2-3B-Instruct`:
 |---|---|---|
 | HF + MPS (M4 Mac, bs=4) | ~30 s | ~1.5–2 min for the smoke (10 docs); ~25–40 min for full 250 docs |
 | vLLM (single GH200, `num_concurrent=64`) | ~3–5 s per turn | ~10–15 min for full 250 docs |
-| HF + accelerate launch DP | not supported (yet) | — |
+| HF + `accelerate launch --num_processes N` | not measured | not measured (expected ~N× single-rank for evenly-distributed docs; less in the tail-pad regime) |
 
 vLLM continuous batching gives the biggest speedup; cross-doc batching
 inside a turn approximates the throughput of single-shot eval on a
@@ -362,6 +412,44 @@ still-pending docs).
    the requirement. The system role is load-bearing for any multi-turn
    benchmark; the flat-text fallback would silently change the task.
 
+### Hook contract — clarifications
+
+These details are implicit in the driver code but worth spelling out
+for first-time multi-turn task authors:
+
+- **What's in `history` when `next_user_turn` is called.** At
+  `turn_idx == 0`, `history` is exactly what `build_initial_messages`
+  returned (typically system + any prefilled user/assistant turns up
+  to and including the last prefilled assistant message). At
+  `turn_idx == k > 0`, `history` is the initial messages followed by
+  the alternating sequence
+  ``user_0, assistant_0, user_1, assistant_1, …, user_{k-1}, assistant_{k-1}``.
+  The driver appends each ``user`` Message immediately after calling
+  `next_user_turn` and each ``assistant`` Message immediately after
+  the model generates. `should_stop` runs AFTER the assistant append
+  for that turn, so `history[-1].role == "assistant"` when it's called.
+- **Returning `None` immediately is valid.** If `next_user_turn(doc,
+  history, 0)` returns `None`, the doc is marked done with zero model
+  generations; no `Instance` is created and `process_results(doc, [])`
+  receives an empty list. Tasks that filter docs by a runtime
+  predicate (e.g. "skip rows with no trailing user turns") can use
+  this as the natural skip mechanism — no early-exit hook needed.
+- **`generation_kwargs` is shared across all turns.** The driver
+  re-uses the task's single `generation_kwargs` block (`max_gen_toks`,
+  `until`, `temperature`, etc.) on every turn. Per-turn variation
+  isn't supported in v1 — see the Limits section. For tasks that need
+  it (rare), add a `next_gen_kwargs(turn_idx)` hook on the task and a
+  matching line in the driver.
+- **Driver state is task-owned, not user-facing.** `task._instances`
+  is mutated in place as turns are generated; `task._multi_turn_states`
+  is built by `_build_initial_multi_turn_states` and torn down by the
+  driver at the natural end or at every early-return. Don't read or
+  write either from custom hook overrides — read `doc` and `history`
+  (the parameters) instead. A hook that inspects `task._instances`
+  mid-rollout sees the in-progress list and will produce
+  rank-dependent behavior under DP, since each rank only holds its
+  shard.
+
 See `lm_eval/tasks/realguardrails/s_rules/task.py:SRulesTask` for a
 worked example covering all four hooks plus an `__init__` that strips
 the YAML `class` key and a `download` override that anchors relative
@@ -384,20 +472,24 @@ The complete change set:
 + `lm_eval/api/task.py` — `ALL_OUTPUT_TYPES` extended; three new hooks on `ConfigurableTask` (`build_initial_messages`, `next_user_turn`, `should_stop`); `_build_initial_multi_turn_states` helper; `build_all_requests` early-returns for multi-turn; `construct_requests` returns `[]` for multi-turn.
 + `lm_eval/api/registry.py` — `DEFAULT_METRIC_REGISTRY` extended.
 + `lm_eval/api/multi_turn.py` (new) — `MultiTurnState` dataclass.
-+ `lm_eval/evaluator.py` — `run_multi_turn_rollout(lm, mt_task_outputs)` driver; 4-line insertion in `evaluate()` to call it before the standard request dispatch.
++ `lm_eval/evaluator.py` — `run_multi_turn_rollout(lm, mt_task_outputs)` driver; `_any_rank_has_pending` / `_gather_max_live` / `_clear_multi_turn_states` helpers; 4-line insertion in `evaluate()` to call the driver before the standard request dispatch.
++ `lm_eval/config/task.py` — multi-turn default `generation_kwargs` (`until=[]`); CLI `--gen_kwargs` override extended to multi-turn (upstream commit `504922b38`).
 + `lm_eval/tasks/realguardrails/s_rules/{task.py,utils.py,_s_rules_template.yaml}` — SRulesTask migration to the new path.
-+ `tests/test_multi_turn_rollout.py` (new) — 11 driver tests.
++ `lm_eval/tasks/realguardrails/README.md` — Limits section: multi-turn parallelism pointer + Anthropic/Google caveat.
++ `tests/test_multi_turn_rollout.py` (new) — 20 driver tests (10 single-rank + 4 distributed + 4 helper unit + asymmetric-DP + safety-cap) plus 1 documented real-DP smoke placeholder.
 + `tests/test_s_rules.py` — multi-turn hook + `process_results` tests added.
 
 ## Future work
 
 Tracked as follow-up items, in rough priority order:
 
-1. Cross-rank synchronisation for distributed runs (lifts the
-   single-rank limit).
-2. Judge integration from the rollout loop (unlocks RealGuardrails
+1. Judge integration from the rollout loop (unlocks RealGuardrails
    handwritten / distractors / Monkey Island and SysBench).
-3. `next_gen_kwargs(turn_idx)` hook for per-turn generation params.
-4. Bootstrap CI post-processor for paper-comparison reporting.
+2. `next_gen_kwargs(turn_idx)` hook for per-turn generation params.
+3. Bootstrap CI post-processor for paper-comparison reporting.
+4. Balanced doc sharding (or work-stealing) for tail-heavy multi-turn
+   benchmarks on HF + `accelerate launch` — current `doc_iterator`
+   index-mod-rank can produce uneven tails when early-exit correlates
+   with doc bucket.
 5. Optionally factor `pending` / `batch_this_turn` tuples into
    `NamedTuple`s for legibility.

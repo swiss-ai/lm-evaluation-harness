@@ -340,10 +340,9 @@ class Task(abc.ABC):
     ) -> None:
         """Build a set of Instances for a task, and store them in task.instances"""
 
-        # Multi-turn tasks build per-doc initial state instead of
-        # constructing all per-turn `Instance` objects up-front (turn
-        # `t+1`'s prompt depends on turn `t`'s response). The actual
-        # per-turn loop lives in `lm_eval.evaluator._run_multi_turn_rollout`.
+        # Multi-turn: turn t+1's prompt contains turn t's response, so
+        # we build only per-doc initial state here; the actual loop is
+        # `lm_eval.evaluator.run_multi_turn_rollout`.
         if self.OUTPUT_TYPE == "multi_turn_generate":
             self._build_initial_multi_turn_states(
                 limit=limit,
@@ -1464,10 +1463,9 @@ class ConfigurableTask(Task):
     # =========================================================================
     # Multi-turn rollout hooks
     # =========================================================================
-    # Three task-overridable methods plus one helper that the evaluator's
-    # `_run_multi_turn_rollout` driver consults for tasks declaring
-    # ``output_type: multi_turn_generate``. Defaults raise on first use so
-    # forgetting to override is loud rather than silent.
+    # Consulted by `lm_eval.evaluator.run_multi_turn_rollout` for tasks
+    # with ``output_type: multi_turn_generate``. Defaults raise so
+    # forgetting to override is loud.
 
     def build_initial_messages(self, doc: dict) -> list[Message]:
         """Return the conversation prefix BEFORE any model generation.
@@ -1530,17 +1528,13 @@ class ConfigurableTask(Task):
         world_size: int,
         apply_chat_template: bool,
     ) -> None:
-        """Populate ``self._multi_turn_states`` for the evaluator driver.
+        """Populate ``self._multi_turn_states`` (one ``MultiTurnState``
+        per doc on this rank) for the evaluator driver to consume.
 
-        One ``MultiTurnState`` per doc on this rank. Each carries the
-        initial messages (from :meth:`build_initial_messages`) and a
-        ``done`` flag that the driver mutates as the rollout progresses.
-
-        The ``apply_chat_template`` flag is not strictly needed here —
-        rendering happens inside the driver — but we accept it for
-        symmetry with :meth:`build_all_requests` and to surface a loud
-        error early if a task author forgets to enable chat templating
-        for multi-turn evaluation.
+        ``apply_chat_template`` is checked here — not strictly needed
+        for state-building but it surfaces the requirement early; the
+        per-doc system prompt becomes a plain-text prefix without it
+        and the task silently changes meaning.
         """
         from lm_eval.api.multi_turn import MultiTurnState
 
@@ -1551,12 +1545,10 @@ class ConfigurableTask(Task):
                 "a plain-text prefix and the task silently changes meaning."
             )
 
-        # multi_turn_generate does not currently support per-instance
-        # replication. Each (doc, turn) maps to exactly one Instance;
-        # the driver does NOT clone requests by `repeats` the way the
-        # standard dispatch loop does (see lm_eval/evaluator.py:597).
-        # Erroring early so a `repeats: 3` YAML doesn't silently produce
-        # single samples per turn.
+        # Per-instance replication isn't supported: the driver does not
+        # clone by `repeats` the way `evaluator.py:597` does for the
+        # single-shot path. Erroring early so a `repeats: 3` YAML
+        # doesn't silently produce single samples per turn.
         repeats = getattr(self.config, "repeats", None) or 1
         if repeats != 1:
             raise ValueError(
