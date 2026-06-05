@@ -470,8 +470,7 @@ def test_distributed_pads_to_global_max_when_local_batch_smaller(task_output_fac
                 f"pad slot must use the sentinel (idx=-1); got idx={pad_inst.idx}"
             )
             assert pad_inst.arguments[0] == "<pad>", (
-                f"pad slot must carry sentinel arguments; "
-                f"got args={pad_inst.arguments}"
+                f"pad slot must carry sentinel arguments; got args={pad_inst.arguments}"
             )
             assert pad_inst.arguments[1].get("max_gen_toks") == 1, (
                 "pad slot must request only 1 token to minimize wasted compute"

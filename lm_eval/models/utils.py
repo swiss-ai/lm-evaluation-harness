@@ -542,7 +542,7 @@ def configure_pad_token(
         # handle special cases
         if model_config and getattr(model_config, "model_type", None) == "qwen":
             # Qwen's trust_remote_code tokenizer does not allow for adding special tokens
-            tokenizer.pad_token = "<|endoftext|>"
+            tokenizer.pad_token = "<|endoftext|>"  # noqa: S105 (pad token, not a secret)
         elif (
             tokenizer.__class__.__name__ == "RWKVWorldTokenizer"
             or tokenizer.__class__.__name__ == "Rwkv5Tokenizer"
@@ -560,7 +560,7 @@ def configure_pad_token(
 
 
 def strip_system_boilerplate_from_template(template_source: str | None) -> str | None:
-    """Strip Llama 3.x date/knowledge boilerplate from a Jinja chat template.
+    r"""Strip Llama 3.x date/knowledge boilerplate from a Jinja chat template.
 
     Llama 3.x chat templates unconditionally inject "Cutting Knowledge Date"
     and "Today Date" headers into the system message. For benchmarks that
