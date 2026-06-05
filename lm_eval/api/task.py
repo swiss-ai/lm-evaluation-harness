@@ -1546,8 +1546,8 @@ class ConfigurableTask(Task):
             )
 
         # Per-instance replication isn't supported: the driver does not
-        # clone by `repeats` the way `evaluator.py:597` does for the
-        # single-shot path. Erroring early so a `repeats: 3` YAML
+        # clone by `repeats` the way the single-shot dispatch loop in
+        # `evaluate()` does. Erroring early so a `repeats: 3` YAML
         # doesn't silently produce single samples per turn.
         repeats = getattr(self.config, "repeats", None) or 1
         if repeats != 1:
@@ -1648,7 +1648,7 @@ class ConfigurableTask(Task):
             arguments = (ctx, deepcopy(self.config.generation_kwargs))
         elif self.OUTPUT_TYPE == "multi_turn_generate":
             # Multi-turn tasks do not build per-doc requests here. The
-            # evaluator's `_run_multi_turn_rollout` driver constructs
+            # evaluator's `run_multi_turn_rollout` driver constructs
             # `Instance` objects one turn at a time as the conversation
             # unfolds. `build_all_requests` already early-returned for
             # this OUTPUT_TYPE after populating `task._multi_turn_states`.

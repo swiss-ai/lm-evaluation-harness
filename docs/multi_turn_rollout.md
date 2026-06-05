@@ -153,13 +153,11 @@ Key properties:
 ### Integration with the existing single-shot path
 
 The driver runs **before** `evaluator.evaluate()`'s standard
-`for reqtype, reqs in requests.items()` dispatch (around
-`evaluator.py:583`). Single-shot tasks are unaffected; the new branch
-fires only if at least one task in the run has
-`output_type: multi_turn_generate`.
+`for reqtype, reqs in requests.items()` dispatch loop. Single-shot tasks
+are unaffected; the new branch fires only if at least one task in the run
+has `output_type: multi_turn_generate`.
 
-After the driver returns, the standard post-process path
-(`evaluator.py:608+`):
+After the driver returns, the standard post-process loop in `evaluate()`:
 1. `task.apply_filters()` — operates on each Instance's `resps` (a
    singleton list per turn), same as single-shot. Default `take_first`
    produces `inst.filtered_resps["none"]` = the string response.

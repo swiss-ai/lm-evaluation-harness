@@ -22,7 +22,7 @@
 # the backing model wrapper.
 dataset_path: json
 # Iterative multi-turn rollout: the evaluator's
-# `_run_multi_turn_rollout` driver generates one assistant turn at a
+# `run_multi_turn_rollout` driver generates one assistant turn at a
 # time, calling `SRulesTask.next_user_turn` / `.should_stop` per turn.
 # This matches upstream `evaluate_batched.py:323` byte-for-byte
 # (early-exit on scenario failure, per-turn re-evaluation), eliminating

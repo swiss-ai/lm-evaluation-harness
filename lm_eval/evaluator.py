@@ -623,12 +623,17 @@ def evaluate(
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output, limit in zip(eval_tasks, limits, strict=True):
         task = task_output.task
-        task.apply_filters()
 
-        # Skip post-processing for ranks with no instances (data parallel with small datasets)
-        # The gather will collect empty results from this rank
+        # Skip post-processing for ranks with no instances (data parallel with
+        # small datasets, or multi_turn_generate when world_size > docs-for-task,
+        # leaving some ranks an empty shard). Must come BEFORE apply_filters():
+        # Filter.apply does `zip(*(... for inst in instances))`, which raises
+        # `ValueError: not enough values to unpack` on an empty instance list.
+        # The gather will collect empty results from this rank.
         if len(task.instances) == 0:
             continue
+
+        task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
         # # unpack results and sort back in order and return control to Task
@@ -708,11 +713,20 @@ def evaluate(
                         itertools.chain.from_iterable(full_samples)
                     )
 
-            # then collect metrics across all ranks
-            for metrics in task_output.sample_metrics:
+            # then collect metrics across all ranks. Agree on a consistent key
+            # set first: a rank with an empty shard (world_size > docs-for-task,
+            # reachable for multi_turn_generate on small/limited tasks, or any DP
+            # run with fewer docs than ranks) has no `sample_metrics` keys and
+            # would otherwise issue fewer `gather_object` collectives than its
+            # peers — desyncing the gather and deadlocking the job.
+            local_keys = list(task_output.sample_metrics.keys())
+            gathered_keys = [None] * WORLD_SIZE
+            torch.distributed.all_gather_object(gathered_keys, local_keys)
+            all_keys = sorted({k for keys in gathered_keys for k in keys})
+            for metrics in all_keys:
                 metric_list = [None] * WORLD_SIZE if RANK == 0 else None
                 torch.distributed.gather_object(
-                    obj=task_output.sample_metrics[metrics],
+                    obj=task_output.sample_metrics.get(metrics, []),
                     object_gather_list=metric_list,
                     dst=0,
                 )
@@ -807,27 +821,33 @@ def evaluate(
         return None
 
 
-def _any_rank_has_pending(lm, pending) -> bool:
-    """Collective entry guard. True iff any rank has docs. All ranks
-    must call together — issues one ``accelerator.gather``.
+# Defensive cap on multi-turn rollout depth against a task whose
+# ``next_user_turn`` never returns ``None``. No real benchmark exceeds ~10
+# turns; 64 is comfortable headroom. Expose via task config if ever needed.
+MAX_SAFETY_TURNS = 64
+
+
+def _gather_ints(lm, value: int) -> list[int]:
+    """Collective ``accelerator.gather`` of one per-rank integer, returned as
+    a plain list (length == world_size). All ranks must call together. The
+    caller applies the reduction (``any`` / ``max``).
     """
     import torch
 
-    flag = torch.tensor(int(bool(pending)), device=lm.device)
-    gathered = lm.accelerator.gather(flag).cpu().detach().numpy().tolist()
-    return any(gathered)
+    t = torch.tensor(int(value), device=lm.device)
+    return lm.accelerator.gather(t).cpu().detach().numpy().tolist()
+
+
+def _any_rank_has_pending(lm, pending) -> bool:
+    """Collective entry guard. True iff any rank has docs."""
+    return any(_gather_ints(lm, bool(pending)))
 
 
 def _gather_max_live(lm, local_n: int) -> int:
     """Collective per-turn gather. Returns ``max(live_n across ranks)``,
     used both for global termination (``== 0``) and pad-to-global-max.
-    All ranks must call together.
     """
-    import torch
-
-    n = torch.tensor(local_n, device=lm.device)
-    gathered = lm.accelerator.gather(n).cpu().detach().numpy().tolist()
-    return int(max(gathered))
+    return max(_gather_ints(lm, local_n))
 
 
 def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
@@ -840,7 +860,7 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
     all multi-turn tasks into a single ``lm.generate_until`` call. The
     response is appended to history and ``task._instances``, then
     ``task.should_stop`` decides early-exit. Loop stops when no docs
-    are pending; downstream post-process at evaluator.py:608+ then
+    are pending; the standard post-process loop in ``evaluate()`` then
     consumes the variable-length per-doc instance lists the same way
     it handles ``multiple_choice``'s N-instances-per-doc.
 
@@ -915,7 +935,6 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
     )
 
     turn_idx = 0
-    max_safety_turns = 64
     while True:
         live: list[tuple] = []
         this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
@@ -965,11 +984,11 @@ def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
         # cause an asymmetric break that deadlocks the next gather.
         # Today `turn_idx` is identical on every rank — all ranks break
         # together — but the order matters for that invariant.
-        if turn_idx >= max_safety_turns:
+        if turn_idx >= MAX_SAFETY_TURNS:
             eval_logger.warning(
                 "multi_turn_generate driver hit safety cap of %d turns; "
                 "%d docs still pending — stopping.",
-                max_safety_turns,
+                MAX_SAFETY_TURNS,
                 len(pending),
             )
             break
