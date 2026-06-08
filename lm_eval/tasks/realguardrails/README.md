@@ -222,6 +222,20 @@ Tables 7 + 8). Two intrinsic gaps to be aware of when comparing:
    `inst_level_strict_acc` etc. preserved as lists), e.g. with a
    `numpy.random.choice`-based bootstrap.
 
+### What to extract for a report
+
+Read `results_*.json → ["results"][<key>][<metric>]`. The three headline numbers:
+
+| Benchmark   | Run (`--tasks`)              | Result key                   | Metric field                   | = headline                                  |
+| :---------- | :--------------------------- | :--------------------------- | :----------------------------- | :------------------------------------------ |
+| S-IFEval    | `realguardrails_s_ifeval`    | `realguardrails_s_ifeval`    | `prompt_level_strict_acc,none` | prompt_strict                               |
+| TensorTrust | `realguardrails_tensortrust` | `realguardrails_tensortrust` | `passed,none`                  | macro (extraction/hijacking/helpful avg)    |
+| S-RuLES     | `realguardrails_s_rules`     | `realguardrails_s_rules_br`  | `passed,none`                  | br_average (basic+redteam; benign excluded) |
+
+(For S-RuLES you *run* `realguardrails_s_rules` but *report* the nested `realguardrails_s_rules_br`
+key. Optional sub-metrics — S-IFEval inst/loose variants, TensorTrust per bucket, S-RuLES full-6 /
+benign / per-bucket — are in the metric table below.)
+
 ### Metric-name translation to the paper
 
 The harness emits IFEval's canonical metric names; the paper uses

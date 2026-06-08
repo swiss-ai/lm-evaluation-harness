@@ -34,8 +34,8 @@ backend wrapper changes.
 A new evaluator phase (`run_multi_turn_rollout`) runs **before** the
 standard one-shot dispatch loop, iterates the conversation turn-by-turn
 across all pending docs, and appends turn-indexed `Instance` objects to
-each task's `_instances` list — so the existing filter + `process_results`
-+ sample-log path consumes the variable-length per-doc instance lists
+each task's `_instances` list — so the existing filter + `process_results` +
+sample-log path consumes the variable-length per-doc instance lists
 the same way it consumes `multiple_choice`'s N-instances-per-doc.
 
 ## Data dependency, and why each turn is a synchronization barrier
@@ -54,7 +54,7 @@ inside one turn as in single-shot eval.
 
 Per-doc rollout state, owned by the task during `evaluate()`:
 
-```
+```python
 @dataclass
 class MultiTurnState:
     doc: dict
@@ -105,7 +105,7 @@ Public function (intentionally not underscore-prefixed; consumers and
 tests reach it as `lm_eval.evaluator.run_multi_turn_rollout`). The
 algorithm:
 
-```
+```text
 pending = [(task_output, doc_id, state) for each multi-turn task's docs]
 turn_idx = 0
 while pending and turn_idx < MAX_SAFETY_TURNS:
@@ -144,6 +144,7 @@ while pending and turn_idx < MAX_SAFETY_TURNS:
 ```
 
 Key properties:
+
 + One synchronous barrier per turn (intrinsic to the data dependency).
 + Cross-task batching at the per-turn level maximizes occupancy.
 + Reuses `lm.generate_until` unchanged — no backend wrapper changes.
@@ -190,11 +191,11 @@ that rank's `LM` instance uses.
 
 ### Choosing a parallelism path
 
-- **vLLM available** → prefer `data_parallel_size=N` (and
++ **vLLM available** → prefer `data_parallel_size=N` (and
   `tensor_parallel_size>1` only if the model doesn't fit one GPU). The
   per-turn batch crosses all replicas inside one `generate_until` call;
   no harness-level coordination needed.
-- **HF only, multiple GPUs** → `accelerate launch --num_processes=N`.
++ **HF only, multiple GPUs** → `accelerate launch --num_processes=N`.
   Cross-rank coordination costs one small gather per turn plus dummy
   generations on ranks whose docs early-exited; expected to be tolerable
   when docs are uniformly distributed across ranks (which the default
@@ -213,8 +214,9 @@ that rank's `LM` instance uses.
     --batch_size 8 \
     --output_path ./results/
   ```
-- **Single GPU / single host** → no special config needed; the
-  in-process per-turn batched call already exploits the device.
+  
++ **Single GPU / single host** → no special config needed; the
+in-process per-turn batched call already exploits the device.
 
 ## Generation parameters & overrides
 
@@ -223,18 +225,18 @@ Every turn is a `generate_until` call built from the task's single
 `task.config.generation_kwargs` per turn), so sampling params behave as for
 `generate_until` tasks:
 
-- **Defaults** (YAML omits `generation_kwargs`): greedy — `temperature=0.0`,
++ **Defaults** (YAML omits `generation_kwargs`): greedy — `temperature=0.0`,
   `do_sample=False`, `max_gen_toks=256` — with **`until=[]`**. This is the
   same greedy default as `generate_until` except for `until`:
   `generate_until` defaults to `until=[fewshot_delimiter]` (`"\n\n"`), which
   would truncate a multi-turn response at the first blank line, so
   multi-turn instead relies on the model's own turn-end (EOS) token.
-- **CLI overrides are respected**: `--gen_kwargs key=value` *merges* into the
++ **CLI overrides are respected**: `--gen_kwargs key=value` *merges* into the
   task's `generation_kwargs` (CLI wins on conflicting keys, other YAML keys
   are kept), identical to `generate_until`. The override is gated on
   `output_type in ("generate_until", "multi_turn_generate")` in
   `simple_evaluate`.
-- Per-turn *varying* params are not supported (one block for all turns) —
++ Per-turn *varying* params are not supported (one block for all turns) —
   see the limit below.
 
 ### Turn termination depends on the model's EOS — mind mis-configured fine-tunes
@@ -250,10 +252,10 @@ Observed with fine-tunes whose `eos_token` is `<|endoftext|>` while the
 chat template ends turns with `<|im_end|>` (no `generation_config.json` to
 reconcile them). Remedies:
 
-- **vLLM**: add the turn-end token as a stop, `--gen_kwargs 'until=<|im_end|>'`
++ **vLLM**: add the turn-end token as a stop, `--gen_kwargs 'until=<|im_end|>'`
   — works because vLLM detokenizes with special tokens visible, so the stop
   string matches.
-- **HF**: needs a **token-level** stop. A stop *string* does NOT work (HF
++ **HF**: needs a **token-level** stop. A stop *string* does NOT work (HF
   strips special tokens from the decoded output, so `<|im_end|>` never
   appears to match), and setting the *tokenizer's* `eos_token` does NOT help
   either — HF's `model.generate()` stops on the *model's*
@@ -415,7 +417,7 @@ still-pending docs).
 These details are implicit in the driver code but worth spelling out
 for first-time multi-turn task authors:
 
-- **What's in `history` when `next_user_turn` is called.** At
++ **What's in `history` when `next_user_turn` is called.** At
   `turn_idx == 0`, `history` is exactly what `build_initial_messages`
   returned (typically system + any prefilled user/assistant turns up
   to and including the last prefilled assistant message). At
@@ -426,19 +428,19 @@ for first-time multi-turn task authors:
   `next_user_turn` and each ``assistant`` Message immediately after
   the model generates. `should_stop` runs AFTER the assistant append
   for that turn, so `history[-1].role == "assistant"` when it's called.
-- **Returning `None` immediately is valid.** If `next_user_turn(doc,
++ **Returning `None` immediately is valid.** If `next_user_turn(doc,
   history, 0)` returns `None`, the doc is marked done with zero model
   generations; no `Instance` is created and `process_results(doc, [])`
   receives an empty list. Tasks that filter docs by a runtime
   predicate (e.g. "skip rows with no trailing user turns") can use
   this as the natural skip mechanism — no early-exit hook needed.
-- **`generation_kwargs` is shared across all turns.** The driver
++ **`generation_kwargs` is shared across all turns.** The driver
   re-uses the task's single `generation_kwargs` block (`max_gen_toks`,
   `until`, `temperature`, etc.) on every turn. Per-turn variation
   isn't supported in v1 — see the Limits section. For tasks that need
   it (rare), add a `next_gen_kwargs(turn_idx)` hook on the task and a
   matching line in the driver.
-- **Driver state is task-owned, not user-facing.** `task._instances`
++ **Driver state is task-owned, not user-facing.** `task._instances`
   is mutated in place as turns are generated; `task._multi_turn_states`
   is built by `_build_initial_multi_turn_states` and torn down by the
   driver at the natural end or at every early-return. Don't read or
