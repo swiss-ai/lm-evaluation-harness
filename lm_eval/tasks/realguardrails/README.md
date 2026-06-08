@@ -61,7 +61,7 @@ benchmarks.
 |---|---|---|---|
 | `realguardrails_s_ifeval` | rule-based (canonical IFEval verifiers) | 470 of 541 | prompt_strict / inst_strict + loose variants |
 | `realguardrails_tensortrust_{extraction,hijacking,helpful}` (+ group) | rule-based (substring + regex) | 105 / 165 / 239 | macro-average of the three pass rates |
-| `realguardrails_s_rules_{benign,basic,redteam}_{harmless,helpful}` (6 bucket leaves + 2 groups) | rule-based (14 vendored scenario evaluators from `normster/llm_rules`) | 225 / 250 / 225 / 250 / 355 / 390 (1,695 total) | `br_average` = unweighted mean of the 4 basic/redteam buckets |
+| `realguardrails_s_rules_{benign,basic,redteam}_{harmless,helpful}` (6 bucket leaves + 3 groups) | rule-based (14 vendored scenario evaluators from `normster/llm_rules`) | 225 / 250 / 225 / 250 / 355 / 390 (1,695 total) | `br_average` = unweighted mean of the 4 basic/redteam buckets (benign excluded) |
 
 The skip lists, filter predicates, scenario evaluators, and paper-faithful
 row counts that produce these denominators are documented in each task's
@@ -160,32 +160,38 @@ clean.
 
 **Design decision.** Since a custom system-message override must be
 authoritative, the harness treats *any* non-whitespace text between the
-system role header and the system prompt as a defect. At model init it
-probes the chat template, strips the tokenizer's special tokens and the
+system role header and the system prompt as a defect. The authority probe
+renders the chat template, strips the tokenizer's special tokens and the
 role label, and raises `RuntimeError` if natural-language text remains. The
 check is model-agnostic (special-token templates like Llama/ChatML/Phi/
-Command-R *and* plain-text ones like `### System:`), so it guards future
-models too.
+Command-R *and* plain-text ones like `### System:`).
 
-Two `model_args` control this (both `hf` and `vllm`):
+**The probe is OFF by default.** The RealGuardrails tasks declare in their
+config metadata (`requires_system_prompt_authority: true`) that they need an
+authoritative system prompt, so the harness prints a **warning** if you run
+them without engaging any of the three `model_args` below — it does not error.
 
 | `model_args` | Effect |
 |--------------|--------|
-| *(neither)* | **Default.** Probe runs; raises if injection is detected. |
-| `strip_system_boilerplate=true` | Strip the known Llama 3.x boilerplate, then use the cleaned template (probe skipped). |
-| `allow_system_boilerplate=true` | Suppress the check; use the template as-is. |
+| *(none)* | Probe not run. Running a RealGuardrails task logs a warning. |
+| `check_system_prompt_authority=true` | Run the authority probe at model init; raises `RuntimeError` if injection is detected. |
+| `strip_system_boilerplate=true` | Strip the known Llama 3.x boilerplate and use the cleaned template; silences the warning (probe not run). |
+| `allow_system_boilerplate=true` | Acknowledge / silence the warning; use the template as-is (waives the probe). |
 
 ```bash
-# Recommended for Llama 3.x — auto-strip
+# Recommended for Llama 3.x — auto-strip (silences the warning, fixes the template)
 --model_args pretrained=meta-llama/Llama-3.1-8B-Instruct,strip_system_boilerplate=true
-# Qwen / Mistral / Phi / Gemma — neither flag needed; the probe passes
+# Actively verify any model's system prompt is authoritative
+--model_args pretrained=<model>,check_system_prompt_authority=true
 ```
 
-Detection is general but the auto-strip is Llama-specific: for a non-Llama
-model that injects boilerplate the probe still raises, but
+The auto-strip is Llama-specific: for a non-Llama model that injects
+boilerplate, `check_system_prompt_authority=true` will still *detect* it (raise), but
 `strip_system_boilerplate` won't clean it — supply your own `chat_template`
-or use `allow_system_boilerplate=true`. `run_hf.sh` sets
-`strip_system_boilerplate=true` by default.
+or acknowledge with `allow_system_boilerplate=true`. Note `check_system_prompt_authority`
+false-positives on templates that fold the system prompt into the first user
+turn (e.g. gemma-3/4), so prefer `strip`/`allow` there. `run_hf.sh` /
+`run_vllm.sh` bake `strip_system_boilerplate=true` by default.
 
 ### Reproducing the paper
 
@@ -230,8 +236,14 @@ shorter labels. Same number, just different column header:
 | `passed` (TensorTrust leaf) | suite-specific pass rate |
 | `passed` (TensorTrust group, macro) | macro-average (no-post) |
 | `passed` (S-RuLES leaf, per bucket) | per-bucket pass rate (`{suite}_{harmless,helpful}`) |
-| `passed` (S-RuLES group `_br_average`) | `br_average` headline (unweighted mean of 4 buckets) |
-| `passed` (S-RuLES group full) | full RuLES score (unweighted mean of 6 buckets) |
+| `passed` (group `realguardrails_s_rules_br`) | **`br_average` headline** — unweighted mean of the 4 basic/redteam buckets (benign excluded) |
+| `passed` (group `realguardrails_s_rules_benign`) | benign baseline — unweighted mean of the 2 benign buckets |
+| `passed` (group `realguardrails_s_rules`) | full RuLES score — unweighted mean of all 6 buckets |
+
+The umbrella `realguardrails_s_rules` group nests the `_br` and `_benign` sub-groups, so a
+single `--tasks realguardrails_s_rules` run emits all of them in one results table: the
+`br_average` headline (excluding benign), the benign baseline, the full 6-bucket score, and
+the 6 per-bucket rows.
 
 The harness reports fractions in [0, 1]; the paper reports percentages.
 Multiply by 100 when comparing.

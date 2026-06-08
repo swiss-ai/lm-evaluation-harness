@@ -112,6 +112,7 @@ class HFLM(TemplateLM):
         enable_thinking: bool | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
+        check_system_prompt_authority: bool = False,
         chat_template_args: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
@@ -272,15 +273,26 @@ class HFLM(TemplateLM):
         if enable_thinking is not None:
             self.chat_template_args["enable_thinking"] = enable_thinking
 
-        # Probe for system boilerplate injection unless explicitly opted out.
-        probe_boilerplate = (
-            not strip_system_boilerplate and not allow_system_boilerplate
-        )
-        if probe_boilerplate and getattr(self.tokenizer, "chat_template", None):
+        # System-prompt authority probe — OFF by default. Run it only when the
+        # caller opts in via `check_system_prompt_authority` (and hasn't waived it with
+        # `allow_system_boilerplate`). Tasks that need an authoritative system
+        # prompt warn (in the evaluator) when none of these flags is set.
+        if (
+            check_system_prompt_authority
+            and not allow_system_boilerplate
+            and getattr(self.tokenizer, "chat_template", None)
+        ):
             check_system_boilerplate(
                 self.apply_chat_template,
                 special_tokens=get_template_special_tokens(self.tokenizer),
             )
+        # Did the caller engage with system-prompt authority at all (verify /
+        # auto-fix / waive)? Drives the per-task "check inactive" warning.
+        self.system_prompt_authority_handled = bool(
+            check_system_prompt_authority
+            or strip_system_boilerplate
+            or allow_system_boilerplate
+        )
 
         self.add_bos_token = add_bos_token
 

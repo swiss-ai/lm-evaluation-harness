@@ -156,6 +156,7 @@ class VLLM(TemplateLM):
         chat_template_args: dict | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
+        check_system_prompt_authority: bool = False,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         max_lora_rank: int = 16,
@@ -285,16 +286,25 @@ class VLLM(TemplateLM):
         if "chat_template" in self.chat_template_args:
             self.hf_chat_template = self.chat_template_args.pop("chat_template")
 
-        # Probe for system boilerplate injection unless explicitly opted out.
+        # System-prompt authority probe — OFF by default; opt in via
+        # `check_system_prompt_authority` (and not waived by `allow_system_boilerplate`).
         # Must run after self.hf_chat_template is initialized.
-        probe_boilerplate = (
-            not strip_system_boilerplate and not allow_system_boilerplate
-        )
-        if probe_boilerplate and getattr(self.tokenizer, "chat_template", None):
+        if (
+            check_system_prompt_authority
+            and not allow_system_boilerplate
+            and getattr(self.tokenizer, "chat_template", None)
+        ):
             check_system_boilerplate(
                 self.apply_chat_template,
                 special_tokens=get_template_special_tokens(self.tokenizer),
             )
+        # Did the caller engage with system-prompt authority (verify / auto-fix
+        # / waive)? Drives the per-task "check inactive" warning in the evaluator.
+        self.system_prompt_authority_handled = bool(
+            check_system_prompt_authority
+            or strip_system_boilerplate
+            or allow_system_boilerplate
+        )
 
         self.custom_prefix_token_id = prefix_token_id
         if prefix_token_id is not None:

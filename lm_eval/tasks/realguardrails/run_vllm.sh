@@ -47,10 +47,15 @@
 # ----------------------------------------
 # strip_system_boilerplate=true is baked into MODEL_ARGS in local mode and
 # auto-strips Llama 3.x date boilerplate from the tokenizer's chat template
-# at the Python level. Overrides:
-#   strip_system_boilerplate=true   — regex-strip known boilerplate patterns
-#   allow_system_boilerplate=true   — suppress the detection check entirely
-# If neither is set the harness probes the template and errors on injection.
+# at the Python level. The authority check is OFF by default; the
+# RealGuardrails tasks warn if run without engaging any of these model_args:
+#   strip_system_boilerplate=true   — regex-strip known Llama 3.x boilerplate
+#   check_system_prompt_authority=true        — run the authority probe at init (raises
+#                                     RuntimeError on detected boilerplate)
+#   allow_system_boilerplate=true   — acknowledge / silence the warning, use
+#                                     the template as-is (and waive the probe)
+# Baking strip=true handles Llama and silences the warning without running the
+# probe (so system-folding templates like gemma-3/4 don't false-positive).
 #
 # Stop tokens / EOS (local engine)
 # --------------------------------

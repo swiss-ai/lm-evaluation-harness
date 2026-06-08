@@ -1,6 +1,7 @@
 import os
 import re
 from math import isclose
+from types import SimpleNamespace
 
 import pytest
 
@@ -157,3 +158,77 @@ def test_printed_results(task_name: list[str], limit: int, model: str, model_arg
                     assert abs(t1_item_f - t2_item_f) < 0.3
             except ValueError:
                 assert t1_item == t2_item
+
+
+# ---------------------------------------------------------------------------
+# System-prompt authority check: per-task "check inactive" warning
+# (the probe itself is OFF by default; tasks opt in via metadata).
+# ---------------------------------------------------------------------------
+def _fake_task_output(name, *, requires):
+    metadata = (
+        {"requires_system_prompt_authority": True} if requires else {"version": 1}
+    )
+    return SimpleNamespace(
+        task_name=name, task=SimpleNamespace(config=SimpleNamespace(metadata=metadata))
+    )
+
+
+def test_sysprompt_warn_when_task_requires_and_check_inactive(monkeypatch, caplog):
+    monkeypatch.setattr(
+        evaluator,
+        "get_task_list",
+        lambda td: [_fake_task_output("realguardrails_s_ifeval", requires=True)],
+    )
+    lm = SimpleNamespace(system_prompt_authority_handled=False)
+    with caplog.at_level("WARNING"):
+        needy = evaluator._warn_if_system_prompt_authority_inactive(lm, {})
+    assert needy == ["realguardrails_s_ifeval"]
+    assert any("authoritative system prompt" in r.message for r in caplog.records)
+
+
+def test_sysprompt_no_warn_when_model_handled(monkeypatch):
+    monkeypatch.setattr(
+        evaluator,
+        "get_task_list",
+        lambda td: [_fake_task_output("realguardrails_s_ifeval", requires=True)],
+    )
+    # handled=True (e.g. strip/allow/check passed) -> no warning
+    lm = SimpleNamespace(system_prompt_authority_handled=True)
+    assert evaluator._warn_if_system_prompt_authority_inactive(lm, {}) == []
+
+
+def test_sysprompt_no_warn_when_task_does_not_require(monkeypatch):
+    monkeypatch.setattr(
+        evaluator,
+        "get_task_list",
+        lambda td: [_fake_task_output("hellaswag", requires=False)],
+    )
+    lm = SimpleNamespace(system_prompt_authority_handled=False)
+    assert evaluator._warn_if_system_prompt_authority_inactive(lm, {}) == []
+
+
+def test_sysprompt_no_warn_when_backend_lacks_attr(monkeypatch):
+    monkeypatch.setattr(
+        evaluator,
+        "get_task_list",
+        lambda td: [_fake_task_output("realguardrails_s_ifeval", requires=True)],
+    )
+    lm = SimpleNamespace()  # e.g. API backend without the concept
+    assert evaluator._warn_if_system_prompt_authority_inactive(lm, {}) == []
+
+
+def test_sysprompt_returns_only_requiring_tasks_in_mixed_list(monkeypatch):
+    # Mixed run: only the task that requests authority should be flagged.
+    monkeypatch.setattr(
+        evaluator,
+        "get_task_list",
+        lambda td: [
+            _fake_task_output("hellaswag", requires=False),
+            _fake_task_output("realguardrails_tensortrust_extraction", requires=True),
+            _fake_task_output("arc_easy", requires=False),
+        ],
+    )
+    lm = SimpleNamespace(system_prompt_authority_handled=False)
+    assert evaluator._warn_if_system_prompt_authority_inactive(lm, {}) == [
+        "realguardrails_tensortrust_extraction"
+    ]

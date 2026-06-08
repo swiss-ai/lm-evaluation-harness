@@ -208,7 +208,7 @@ that rank's `LM` instance uses.
   accelerate launch --num_processes 8 -m lm_eval run \
     --model hf \
     --model_args pretrained=meta-llama/Llama-3.1-8B-Instruct,dtype=bfloat16,strip_system_boilerplate=true \
-    --tasks realguardrails_s_rules_br_average \
+    --tasks realguardrails_s_rules_br \
     --apply_chat_template \
     --batch_size 8 \
     --output_path ./results/

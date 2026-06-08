@@ -47,4 +47,7 @@ metric_list:
     aggregation: mean
     higher_is_better: true
 metadata:
+  # RealGuardrails needs an authoritative system prompt; the evaluator
+  # warns if the model is run without the system-prompt authority check.
+  requires_system_prompt_authority: true
   version: 0.1

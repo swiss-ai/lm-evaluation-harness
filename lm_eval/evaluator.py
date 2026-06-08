@@ -47,6 +47,42 @@ if TYPE_CHECKING:
 eval_logger = logging.getLogger(__name__)
 
 
+def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
+    """Warn when a task needs an authoritative system prompt but the model's
+    system-prompt authority check was not activated (it is OFF by default).
+
+    A task opts in with ``metadata: {requires_system_prompt_authority: true}``.
+    HF/vLLM set ``lm.system_prompt_authority_handled`` to ``True`` when any of
+    ``check_system_prompt_authority`` / ``strip_system_boilerplate`` /
+    ``allow_system_boilerplate`` is passed; backends without the concept lack
+    the attribute (treated as handled → no warning). Returns the offending task
+    names (``[]`` if none), so the behaviour is unit-testable.
+    """
+    if getattr(lm, "system_prompt_authority_handled", True):
+        return []
+    needy = []
+    for to in get_task_list(task_dict):
+        # Group placeholders can carry a falsy/None task; read defensively.
+        cfg = getattr(getattr(to, "task", None), "config", None)
+        metadata = getattr(cfg, "metadata", None)
+        if isinstance(metadata, dict) and metadata.get(
+            "requires_system_prompt_authority"
+        ):
+            needy.append(to.task_name)
+    if needy:
+        eval_logger.warning(
+            "Task(s) %s expect an authoritative system prompt, but the "
+            "system-prompt authority check is not active for this model (OFF by "
+            "default). Chat-template boilerplate (e.g. Llama 3.x date headers) "
+            "can silently skew these scores. Pass `check_system_prompt_authority=true` to "
+            "verify, `strip_system_boilerplate=true` to auto-fix Llama 3.x "
+            "boilerplate, or `allow_system_boilerplate=true` to acknowledge and "
+            "silence this warning.",
+            needy,
+        )
+    return needy
+
+
 @positional_deprecated
 def simple_evaluate(
     model: str | LM,
@@ -353,6 +389,11 @@ def simple_evaluate(
         return adjusted_task_dict
 
     task_dict = _adjust_config(task_dict)
+
+    # Rank 0 only — `simple_evaluate` runs on every rank under accelerate/DDP,
+    # so guard to avoid one identical warning per process.
+    if getattr(lm, "rank", 0) == 0:
+        _warn_if_system_prompt_authority_inactive(lm, task_dict)
 
     if check_integrity:
         run_task_tests(task_list=tasks)

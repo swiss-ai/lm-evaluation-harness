@@ -55,12 +55,20 @@
 # tokenizer's built-in chat template at the Python level. No external
 # template files are needed.
 #
-# Two model_args control this behavior:
-#   strip_system_boilerplate=true   — regex-strip known boilerplate patterns
-#   allow_system_boilerplate=true   — suppress the detection check entirely
+# The authority check itself is OFF by default. The RealGuardrails tasks
+# flag (in their config metadata) that they need an authoritative system
+# prompt, so the harness prints a WARNING if you run them without engaging
+# any of the three model_args below. Three model_args control this:
+#   strip_system_boilerplate=true   — regex-strip known Llama 3.x boilerplate
+#   check_system_prompt_authority=true        — run the authority probe at model init
+#                                     (raises RuntimeError on detected boilerplate)
+#   allow_system_boilerplate=true   — acknowledge / silence the warning, use
+#                                     the template as-is (and waive the probe)
 #
-# If neither flag is set, the harness will probe the chat template and
-# exit with an error if boilerplate injection is detected.
+# Setting `strip_system_boilerplate=true` (as this script does) handles the
+# Llama case and silences the warning without running the probe — which also
+# avoids a false positive on templates that fold the system prompt into the
+# first user turn (e.g. gemma-3/4).
 #
 # Templates that **fold system → user** (e.g., Mistral v0.1 / v0.2's
 # `[INST]` wrapping) silently degrade the benchmark to IFEval-Separated
@@ -117,8 +125,10 @@
 #
 # Boilerplate override examples:
 #   # Default: strip_system_boilerplate=true is baked into MODEL_ARGS.
-#   # To disable stripping and suppress the detection check entirely:
+#   # To disable stripping and silence the per-task warning without it:
 #   ./run_hf.sh <model_id> --extra-model-args allow_system_boilerplate=true,strip_system_boilerplate=false
+#   # To actively verify the system prompt is authoritative (probe at init):
+#   ./run_hf.sh <model_id> --extra-model-args check_system_prompt_authority=true
 #
 # Outputs land in:
 #   ./results/realguardrails/<model_slug>/<UTC-timestamp>/
