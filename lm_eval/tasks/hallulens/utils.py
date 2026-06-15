@@ -29,6 +29,10 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                # Disable Qwen3 thinking traces so the judge returns the
+                # structured answer directly (avoids parse-skips where the
+                # reasoning trace hides the expected JSON/verdict).
+                "chat_template_kwargs": {"enable_thinking": False},
             }
 
             resp = requests.post(
