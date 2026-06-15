@@ -64,7 +64,8 @@ DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
 APERTUS_SYSTEM_PROMPT = """You are an expert tool-calling assistant. Use the available tools to satisfy the user's request.
 If no tool can be used, or the request lacks required parameters, do not emit a tool call.
 When you call tools, emit only an Apertus tool block in this exact format:
-<|tools_prefix|>[{"function_name": {"parameter_name": parameter_value}}]<|tools_suffix|>
+<|tools_prefix|>[{"<available_function_name>": {"<parameter_name>": <parameter_value>}}]<|tools_suffix|>
+Do not use the literal placeholder names <available_function_name> or <parameter_name>; replace them with an available function name and real parameter names.
 For multiple calls, include multiple single-key objects in the array.
 """
 
@@ -499,6 +500,28 @@ class BFCLV3Task(ConfigurableTask):
 
     def test_docs(self):
         return self.dataset["test"]
+
+    def fewshot_context(
+        self,
+        doc: dict,
+        num_fewshot: int,
+        system_instruction: str | None = None,
+        apply_chat_template: bool = False,
+        fewshot_as_multiturn: bool = False,
+        chat_template=None,
+        gen_prefix: str | None = None,
+    ):
+        if self.bfcl_tool_format == "apertus":
+            return self.doc_to_text(doc)
+        return super().fewshot_context(
+            doc,
+            num_fewshot,
+            system_instruction=system_instruction,
+            apply_chat_template=apply_chat_template,
+            fewshot_as_multiturn=fewshot_as_multiturn,
+            chat_template=chat_template,
+            gen_prefix=gen_prefix,
+        )
 
     def doc_to_text(self, doc):
         raw_functions = doc.get("function", [])

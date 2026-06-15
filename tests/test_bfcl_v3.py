@@ -112,6 +112,70 @@ def test_bfcl_v3_apertus_prompt_and_scores_reference_call():
     )["acc"]
 
 
+def test_bfcl_v3_apertus_fewshot_context_bypasses_outer_chat_template():
+    task = _make_apertus_task()
+    doc = task.test_docs()[0]
+
+    prompt = task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        apply_chat_template=True,
+        chat_template=lambda messages, **_: "WRAPPED:" + repr(messages),
+    )
+
+    assert prompt.startswith("<s><|system_start|>")
+    assert "WRAPPED:" not in prompt
+    assert "<|user_start|><s><|system_start|>" not in prompt
+    assert prompt.count("<|assistant_start|>") == 1
+
+
+def test_bfcl_v3_apertus_scores_nested_dict_call():
+    task = _make_apertus_task()
+    doc = {
+        "function": [
+            {
+                "name": "update_user_info",
+                "description": "Update user information in the database.",
+                "parameters": {
+                    "type": "dict",
+                    "properties": {
+                        "user_id": {"type": "integer"},
+                        "update_info": {
+                            "type": "dict",
+                            "properties": {
+                                "name": {"type": "string"},
+                                "email": {"type": "string"},
+                            },
+                        },
+                        "database": {"type": "string", "default": "CustomerInfo"},
+                    },
+                    "required": ["user_id", "update_info"],
+                },
+            }
+        ],
+        "ground_truth": [
+            {
+                "update_user_info": {
+                    "user_id": [43523],
+                    "update_info": [
+                        {"name": ["John Doe"], "email": ["johndoe@email.com"]}
+                    ],
+                    "database": ["CustomerInfo", ""],
+                }
+            }
+        ],
+    }
+
+    assert task.process_results(
+        doc,
+        [
+            '<|tools_prefix|>[{"update_user_info": {"user_id": 43523, '
+            '"update_info": {"name": "John Doe", "email": "johndoe@email.com"}, '
+            '"database": "CustomerInfo"}}]<|tools_suffix|>'
+        ],
+    )["acc"]
+
+
 def test_bfcl_v3_apertus_irrelevance_scores_absence_of_tool_block():
     task = _make_apertus_task("irrelevance")
     doc = task.test_docs()[0]
