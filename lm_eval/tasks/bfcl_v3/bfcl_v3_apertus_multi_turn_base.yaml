@@ -1,0 +1,10 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_apertus_multi_turn_base
+class: !function task.BFCLV3Task
+output_type: generate_until_multiturn
+metadata:
+  version: 3
+  bfcl_category: multi_turn_base
+  bfcl_language: Python
+  bfcl_tool_format: apertus
+

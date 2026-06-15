@@ -25,6 +25,9 @@ DATA_DIR = Path(__file__).parent / "data"
 POSSIBLE_ANSWER_DIR = DATA_DIR / "possible_answer"
 MULTI_TURN_FUNC_DOC_DIR = DATA_DIR / "multi_turn_func_doc"
 MAXIMUM_STEP_LIMIT = 20
+APERTUS_TOOL_PREFIX = "<|tools_prefix|>"
+APERTUS_TOOL_SUFFIX = "<|tools_suffix|>"
+APERTUS_ASSISTANT_END = "<|assistant_end|>"
 
 MULTI_TURN_FUNC_DOC_FILE_MAPPING = {
     "GorillaFileSystem": "gorilla_file_system.json",
@@ -57,6 +60,13 @@ DEFAULT_MULTI_TURN_SYSTEM_PROMPT_WITHOUT_FUNC_DOC = (
 DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
     "I have updated some more functions you can choose from. What about now?"
 )
+
+APERTUS_SYSTEM_PROMPT = """You are an expert tool-calling assistant. Use the available tools to satisfy the user's request.
+If no tool can be used, or the request lacks required parameters, do not emit a tool call.
+When you call tools, emit only an Apertus tool block in this exact format:
+<|tools_prefix|>[{"function_name": {"parameter_name": parameter_value}}]<|tools_suffix|>
+For multiple calls, include multiple single-key objects in the array.
+"""
 
 
 class _ListDocs(list):
@@ -143,6 +153,215 @@ def _strip_code_fence(text: str) -> str:
     text = text.strip()
     match = re.search(r"```(?:\w+)?\s*(.*?)```", text, flags=re.DOTALL)
     return match.group(1).strip() if match else text.strip("`\n ")
+
+
+def _message_content_to_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, dict):
+        if "text" in content:
+            return str(content["text"])
+        if "parts" in content:
+            return "".join(
+                str(part.get("text", "")) for part in content["parts"] if part
+            )
+        if "blocks" in content:
+            return "\n".join(
+                str(block.get("text", "")) for block in content["blocks"] if block
+            )
+    return str(content)
+
+
+def _render_apertus_messages(messages: list[dict]) -> str:
+    rendered = []
+    for message in messages:
+        role = message.get("role", "user")
+        content = _message_content_to_text(message.get("content", ""))
+        if role == "system":
+            rendered.append(f"<|system_start|>{content}<|system_end|>")
+        elif role == "assistant":
+            rendered.append(f"<|assistant_start|>{content}{APERTUS_ASSISTANT_END}")
+        elif role == "tool":
+            rendered.append(content)
+        else:
+            rendered.append(f"<|user_start|>{content}<|user_end|>")
+    return "\n".join(rendered)
+
+
+def _render_apertus_prompt(
+    functions: list[dict], messages: list[dict], category: str, multi_turn: bool
+) -> str:
+    functions = _prompt_functions(functions, category)
+    function_text = json.dumps(functions, ensure_ascii=False)
+    multi_turn_instruction = (
+        "\nContinue calling tools until the current user turn is complete. "
+        "When no further tool call is needed, finish without emitting another tool block."
+        if multi_turn
+        else ""
+    )
+    return (
+        f"<s><|system_start|>{APERTUS_SYSTEM_PROMPT}{multi_turn_instruction}"
+        f"<|system_end|>\n"
+        "<|developer_start|>Deliberation: enabled\n"
+        "Tool Capabilities: enabled\n"
+        "Available tools are provided as JSON below.\n"
+        f"{function_text}<|developer_end|>\n"
+        f"{_render_apertus_messages(messages)}\n"
+        "<|assistant_start|>"
+    )
+
+
+def _try_parse_apertus_json_array(text: str, start: int) -> tuple[Any | None, int]:
+    json_start = start + len(APERTUS_TOOL_PREFIX)
+    while json_start < len(text) and text[json_start].isspace():
+        json_start += 1
+    try:
+        parsed, end = json.JSONDecoder().raw_decode(text, json_start)
+    except json.JSONDecodeError:
+        return None, 0
+    return parsed if isinstance(parsed, list) else [parsed], end
+
+
+def _parse_apertus_calls(text: str) -> list[dict]:
+    calls = []
+    cursor = 0
+    while True:
+        start = text.find(APERTUS_TOOL_PREFIX, cursor)
+        if start == -1:
+            break
+        parsed, json_end = _try_parse_apertus_json_array(text, start)
+        if parsed is None:
+            raise ValueError("Malformed Apertus tool block.")
+        suffix_pos = text.find(APERTUS_TOOL_SUFFIX, json_end)
+        if suffix_pos == -1:
+            raise ValueError("Apertus tool block is missing suffix.")
+        for item in parsed:
+            if not isinstance(item, dict) or not item:
+                continue
+            name = next(iter(item))
+            arguments = item.get(name) or {}
+            calls.append({name: arguments})
+        cursor = suffix_pos + len(APERTUS_TOOL_SUFFIX)
+    return calls
+
+
+def _source_literal(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _java_type_name(type_name: str) -> str:
+    return {
+        "integer": "int",
+        "String": "String",
+        "string": "String",
+        "boolean": "boolean",
+        "float": "float",
+        "double": "double",
+        "long": "long",
+        "char": "char",
+        "any": "Object",
+    }.get(type_name, "Object")
+
+
+def _java_literal(value: Any, expected_type: str, nested_type: str | None = None) -> str:
+    if expected_type in {"byte", "short", "integer", "double"}:
+        return str(value)
+    if expected_type == "float":
+        return f"{value}f" if isinstance(value, (int, float)) else str(value)
+    if expected_type == "long":
+        return f"{value}L" if isinstance(value, int) else str(value)
+    if expected_type == "boolean":
+        return "true" if value is True else "false" if value is False else str(value)
+    if expected_type in {"String", "char", "any"}:
+        return str(value)
+    if expected_type == "Array" and isinstance(value, list):
+        item_type = nested_type or "any"
+        items = ", ".join(_java_literal(item, item_type) for item in value)
+        return f"new {_java_type_name(item_type)}[]{{{items}}}"
+    if expected_type == "ArrayList" and isinstance(value, list):
+        item_type = nested_type or "any"
+        items = ", ".join(
+            json.dumps(item, ensure_ascii=False)
+            if item_type in {"String", "char"}
+            else _java_literal(item, item_type)
+            for item in value
+        )
+        return f"new ArrayList<>(Arrays.asList({items}))"
+    if expected_type == "HashMap" and isinstance(value, dict):
+        puts = "; ".join(
+            f"put({json.dumps(str(key), ensure_ascii=False)}, {_source_literal(val)})"
+            for key, val in value.items()
+        )
+        return f"new HashMap<>() {{{{ {puts}; }}}}"
+    return str(value)
+
+
+def _js_literal(value: Any, expected_type: str, nested_type: str | None = None) -> str:
+    if expected_type == "Bigint":
+        return f"{value}n" if isinstance(value, int) else str(value)
+    if expected_type == "Boolean":
+        return "true" if value is True else "false" if value is False else str(value)
+    if expected_type in {"integer", "float"}:
+        return str(value)
+    if expected_type in {"array", "dict"}:
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def _coerce_apertus_calls_for_language(
+    calls: list[dict], functions: list[dict], language: str
+) -> list[dict]:
+    if language == "Python":
+        return calls
+
+    function_by_name = {function["name"]: function for function in functions}
+    coerced = []
+    for call in calls:
+        if not isinstance(call, dict) or len(call) != 1:
+            coerced.append(call)
+            continue
+        name, arguments = next(iter(call.items()))
+        function = function_by_name.get(name)
+        if not function or not isinstance(arguments, dict):
+            coerced.append(call)
+            continue
+
+        param_details = function["parameters"]["properties"]
+        coerced_arguments = {}
+        for param, value in arguments.items():
+            details = param_details.get(param)
+            if not details:
+                coerced_arguments[param] = value
+                continue
+            expected_type = details["type"]
+            nested_type = details.get("items", {}).get("type")
+            if language == "Java":
+                coerced_arguments[param] = _java_literal(
+                    value, expected_type, nested_type
+                )
+            elif language == "JavaScript":
+                coerced_arguments[param] = _js_literal(value, expected_type, nested_type)
+            else:
+                coerced_arguments[param] = value
+        coerced.append({name: coerced_arguments})
+    return coerced
+
+
+def _canonical_calls_to_python_call_strings(calls: list[dict]) -> list[str]:
+    call_strings = []
+    for call in calls:
+        if not isinstance(call, dict) or len(call) != 1:
+            continue
+        name, arguments = next(iter(call.items()))
+        if not isinstance(arguments, dict):
+            arguments = {}
+        args = ", ".join(f"{key}={value!r}" for key, value in arguments.items())
+        call_strings.append(f"{name}({args})")
+    return call_strings
 
 
 def _parse_python_calls(text: str) -> list[dict]:
@@ -247,6 +466,7 @@ class BFCLV3Task(ConfigurableTask):
         metadata = dict(config.get("metadata") or {})
         self.bfcl_category = metadata["bfcl_category"]
         self.bfcl_language = metadata.get("bfcl_language", "Python")
+        self.bfcl_tool_format = metadata.get("bfcl_tool_format", "prompt")
         super().__init__(config=config, **kwargs)
 
     def download(self, dataset_kwargs: dict[str, Any] | None = None, **kwargs) -> None:
@@ -281,9 +501,18 @@ class BFCLV3Task(ConfigurableTask):
         return self.dataset["test"]
 
     def doc_to_text(self, doc):
-        functions = _prompt_functions(doc.get("function", []), self.bfcl_category)
-        function_text = json.dumps(functions, ensure_ascii=False)
+        raw_functions = doc.get("function", [])
         messages = doc["question"][0]
+        if self.bfcl_tool_format == "apertus":
+            return _render_apertus_prompt(
+                raw_functions,
+                messages,
+                self.bfcl_category,
+                multi_turn=_is_multi_turn(self.bfcl_category),
+            )
+
+        functions = _prompt_functions(raw_functions, self.bfcl_category)
+        function_text = json.dumps(functions, ensure_ascii=False)
         system_prompt = (
             DEFAULT_MULTI_TURN_SYSTEM_PROMPT_WITHOUT_FUNC_DOC
             if _is_multi_turn(self.bfcl_category)
@@ -305,6 +534,11 @@ class BFCLV3Task(ConfigurableTask):
         arguments = deepcopy(self.config.generation_kwargs)
         arguments.setdefault("until", ["\n\n"])
         arguments.setdefault("max_gen_toks", 512)
+        if (
+            self.bfcl_tool_format == "apertus"
+            and APERTUS_ASSISTANT_END not in arguments["until"]
+        ):
+            arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
         return Instance(
             request_type=self.OUTPUT_TYPE,
             doc=doc,
@@ -350,7 +584,7 @@ class BFCLV3Task(ConfigurableTask):
         state["raw_responses"][-1].append(response)
 
         try:
-            decoded = extract_function_call_strings(response)
+            decoded = self._decode_multiturn_calls(response)
         except Exception:  # noqa: BLE001 - unparsable model text is a failed turn.
             decoded = []
 
@@ -365,13 +599,11 @@ class BFCLV3Task(ConfigurableTask):
             long_context="long_context" in self.bfcl_category,
         )
         state["execution_results"][-1].append(execution_results)
-        state["history"].append(
-            {
-                "role": "user",
-                "content": "Execution results:\n"
-                + json.dumps(execution_results, ensure_ascii=False),
-            }
+        execution_content = "Execution results:\n" + json.dumps(
+            execution_results, ensure_ascii=False
         )
+        execution_role = "tool" if self.bfcl_tool_format == "apertus" else "user"
+        state["history"].append({"role": execution_role, "content": execution_content})
 
         if len(state["raw_responses"][-1]) >= MAXIMUM_STEP_LIMIT:
             self._finish_turn(state)
@@ -418,6 +650,14 @@ class BFCLV3Task(ConfigurableTask):
             state["done"] = True
 
     def _render_multiturn_prompt(self, state: dict) -> str:
+        if self.bfcl_tool_format == "apertus":
+            return _render_apertus_prompt(
+                state["functions"],
+                state["history"],
+                self.bfcl_category,
+                multi_turn=True,
+            )
+
         functions = _prompt_functions(state["functions"], self.bfcl_category)
         function_text = json.dumps(functions, ensure_ascii=False)
         return (
@@ -427,12 +667,22 @@ class BFCLV3Task(ConfigurableTask):
             f"{_flatten_messages(state['history'])}\nAssistant:"
         )
 
-    def _decode(self, text: str) -> list[dict]:
+    def _decode(self, text: str, doc: dict | None = None) -> list[dict]:
+        if self.bfcl_tool_format == "apertus":
+            calls = _parse_apertus_calls(text)
+            return _coerce_apertus_calls_for_language(
+                calls, (doc or {}).get("function", []), self.bfcl_language
+            )
         if self.bfcl_language == "Java":
             return _parse_java_calls(text)
         if self.bfcl_language == "JavaScript":
             return _parse_js_calls(text)
         return _parse_python_calls(text)
+
+    def _decode_multiturn_calls(self, text: str) -> list[str]:
+        if self.bfcl_tool_format == "apertus":
+            return _canonical_calls_to_python_call_strings(_parse_apertus_calls(text))
+        return extract_function_call_strings(text)
 
     def process_results(self, doc, results):
         raw = results[0]
@@ -447,7 +697,7 @@ class BFCLV3Task(ConfigurableTask):
             return {"acc": int(checker_result["valid"])}
 
         try:
-            decoded = self._decode(raw)
+            decoded = self._decode(raw, doc)
         except Exception:  # noqa: BLE001 - unparsable model text scores as incorrect.
             decoded = None
 

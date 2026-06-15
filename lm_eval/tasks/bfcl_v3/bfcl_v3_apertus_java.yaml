@@ -1,0 +1,9 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_apertus_java
+class: !function task.BFCLV3Task
+metadata:
+  version: 3
+  bfcl_category: java
+  bfcl_language: Java
+  bfcl_tool_format: apertus
+
