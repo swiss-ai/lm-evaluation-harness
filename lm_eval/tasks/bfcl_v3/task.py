@@ -63,10 +63,6 @@ DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
 
 APERTUS_SYSTEM_PROMPT = """You are an expert tool-calling assistant. Use the available tools to satisfy the user's request.
 If no tool can be used, or the request lacks required parameters, do not emit a tool call.
-When you call tools, emit only an Apertus tool block in this exact format:
-<|tools_prefix|>[{"<available_function_name>": {"<parameter_name>": <parameter_value>}}]<|tools_suffix|>
-Do not use the literal placeholder names <available_function_name> or <parameter_name>; replace them with an available function name and real parameter names.
-For multiple calls, include multiple single-key objects in the array.
 """
 
 
