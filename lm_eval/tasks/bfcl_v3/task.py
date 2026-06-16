@@ -283,7 +283,7 @@ def _try_parse_apertus_json_array(text: str, start: int) -> tuple[Any | None, in
     return parsed if isinstance(parsed, list) else [parsed], end
 
 
-def _parse_apertus_calls(text: str) -> list[dict]:
+def _parse_apertus_calls(text: str, *, strict: bool = True) -> list[dict]:
     calls = []
     cursor = 0
     while True:
@@ -294,16 +294,34 @@ def _parse_apertus_calls(text: str) -> list[dict]:
         if parsed is None:
             raise ValueError("Malformed Apertus tool block.")
         suffix_pos = text.find(APERTUS_TOOL_SUFFIX, json_end)
-        if suffix_pos == -1:
-            raise ValueError("Apertus tool block is missing suffix.")
         for item in parsed:
             if not isinstance(item, dict) or not item:
                 continue
             name = next(iter(item))
             arguments = item.get(name) or {}
             calls.append({name: arguments})
+        if suffix_pos == -1:
+            if strict:
+                raise ValueError("Apertus tool block is missing suffix.")
+            break
         cursor = suffix_pos + len(APERTUS_TOOL_SUFFIX)
-    return calls or _parse_raw_apertus_json_calls(text)
+    if strict:
+        return calls
+    return calls or _parse_function_calls_tagged(text) or _parse_raw_apertus_json_calls(
+        text
+    )
+
+
+def _parse_function_calls_tagged(text: str) -> list[dict]:
+    matches = re.finditer(r"<function_calls>(.*?)</function_calls>", text, re.DOTALL)
+    calls = []
+    for match in matches:
+        try:
+            parsed = json.loads(match.group(1).strip())
+        except json.JSONDecodeError:
+            continue
+        calls.extend(_normalize_apertus_call_payload(parsed, allow_multi_key=True))
+    return calls
 
 
 def _parse_raw_apertus_json_calls(text: str) -> list[dict]:
@@ -321,14 +339,20 @@ def _parse_raw_apertus_json_calls(text: str) -> list[dict]:
     return []
 
 
-def _normalize_apertus_call_payload(parsed: Any) -> list[dict]:
+def _normalize_apertus_call_payload(
+    parsed: Any, allow_multi_key: bool = False
+) -> list[dict]:
     parsed_calls = parsed if isinstance(parsed, list) else [parsed]
     calls = []
     for item in parsed_calls:
-        if not isinstance(item, dict) or len(item) != 1:
+        if not isinstance(item, dict) or not item:
             continue
-        name, arguments = next(iter(item.items()))
-        calls.append({name: arguments if isinstance(arguments, dict) else {}})
+        if allow_multi_key:
+            for name, arguments in item.items():
+                calls.append({name: arguments if isinstance(arguments, dict) else {}})
+        elif len(item) == 1:
+            name, arguments = next(iter(item.items()))
+            calls.append({name: arguments if isinstance(arguments, dict) else {}})
     return calls
 
 
@@ -659,6 +683,8 @@ class BFCLV3Task(ConfigurableTask):
             and APERTUS_ASSISTANT_END not in arguments["until"]
         ):
             arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
+        if self.bfcl_tool_format == "apertus":
+            arguments["max_gen_toks"] = max(arguments["max_gen_toks"], 2048)
         return Instance(
             request_type=self.OUTPUT_TYPE,
             doc=doc,
@@ -804,9 +830,11 @@ class BFCLV3Task(ConfigurableTask):
             f"{_flatten_messages(state['history'])}\nAssistant:"
         )
 
-    def _decode(self, text: str, doc: dict | None = None) -> list[dict]:
+    def _decode(
+        self, text: str, doc: dict | None = None, *, strict: bool = True
+    ) -> list[dict]:
         if self.bfcl_tool_format == "apertus":
-            calls = _parse_apertus_calls(text)
+            calls = _parse_apertus_calls(text, strict=strict)
             return _coerce_apertus_calls_for_language(
                 calls, (doc or {}).get("function", []), self.bfcl_language
             )
@@ -831,21 +859,30 @@ class BFCLV3Task(ConfigurableTask):
                 self.bfcl_category,
                 model_name="prompt",
             )
-            return {"acc": int(checker_result["valid"])}
+            acc = int(checker_result["valid"])
+            return {"acc": acc, "acc_lenient": acc}
 
+        acc = self._score_single_turn(doc, raw, strict=True)
+        acc_lenient = (
+            self._score_single_turn(doc, raw, strict=False)
+            if self.bfcl_tool_format == "apertus"
+            else acc
+        )
+        return {"acc": acc, "acc_lenient": acc_lenient}
+
+    def _score_single_turn(self, doc: dict, raw: str, *, strict: bool) -> int:
         try:
-            decoded = self._decode(raw, doc)
+            decoded = self._decode(raw, doc, strict=strict)
         except Exception:  # noqa: BLE001 - unparsable model text scores as incorrect.
             decoded = None
-
         if "relevance" in self.bfcl_category or "irrelevance" in self.bfcl_category:
             contains_call = decoded is not None and not _is_empty_output(decoded)
             if "irrelevance" in self.bfcl_category:
-                return {"acc": int(not contains_call)}
-            return {"acc": int(contains_call)}
+                return int(not contains_call)
+            return int(contains_call)
 
         if decoded is None or not _is_function_calling_format(decoded):
-            return {"acc": 0}
+            return 0
 
         checker_result = ast_checker(
             doc["function"],
@@ -855,10 +892,10 @@ class BFCLV3Task(ConfigurableTask):
             self.bfcl_category,
             model_name="prompt",
         )
-        return {"acc": int(checker_result["valid"])}
+        return int(checker_result["valid"])
 
     def aggregation(self):
-        return {"acc": np.mean}
+        return {"acc": np.mean, "acc_lenient": np.mean}
 
     def higher_is_better(self):
-        return {"acc": True}
+        return {"acc": True, "acc_lenient": True}

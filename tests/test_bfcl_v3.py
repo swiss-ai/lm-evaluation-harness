@@ -16,7 +16,12 @@ def _make_task(category="simple", language="Python"):
                     "metric": "acc",
                     "aggregation": "mean",
                     "higher_is_better": True,
-                }
+                },
+                {
+                    "metric": "acc_lenient",
+                    "aggregation": "mean",
+                    "higher_is_better": True,
+                },
             ],
             "generation_kwargs": {
                 "until": ["\n\n"],
@@ -44,7 +49,12 @@ def _make_apertus_task(category="simple", language="Python"):
                     "metric": "acc",
                     "aggregation": "mean",
                     "higher_is_better": True,
-                }
+                },
+                {
+                    "metric": "acc_lenient",
+                    "aggregation": "mean",
+                    "higher_is_better": True,
+                },
             ],
             "generation_kwargs": {
                 "until": ["\n\n"],
@@ -101,13 +111,15 @@ def test_bfcl_v3_apertus_prompt_and_scores_reference_call():
     assert "<|tools_prefix|>" not in prompt
     assert "<|developer_start|>" not in prompt
     assert "Find the area of a triangle" in prompt
-    assert task.process_results(
+    results = task.process_results(
         doc,
         [
             '<|tools_prefix|>[{"calculate_triangle_area": '
             '{"base": 10, "height": 5}}]<|tools_suffix|>'
         ],
-    )["acc"]
+    )
+    assert results["acc"]
+    assert results["acc_lenient"]
     assert not task.process_results(
         doc,
         ['<|tools_prefix|>[{"wrong": {"base": 10, "height": 5}}]<|tools_suffix|>'],
@@ -275,27 +287,105 @@ def test_bfcl_v3_apertus_scores_raw_json_call_without_tool_markers():
     task = _make_apertus_task()
     doc = next(doc for doc in task.test_docs() if doc["id"] == "simple_158")
 
-    assert task.process_results(
+    results = task.process_results(
         doc,
         [
             '{"get_criminal_records": {"name": "Mr. X", '
             '"location": "New York, NY", "from_year": 2012, "to_year": 2015}}}\n'
         ],
-    )["acc"]
+    )
+
+    assert not results["acc"]
+    assert results["acc_lenient"]
+
+
+def test_bfcl_v3_apertus_scores_tool_block_without_suffix():
+    task = _make_apertus_task()
+    doc = next(doc for doc in task.test_docs() if doc["id"] == "simple_5")
+
+    results = task.process_results(
+        doc,
+        [
+            "I'll call the tool now."
+            '<|tools_prefix|>[{"solve_quadratic": '
+            '{"a": 3, "b": -11, "c": -4, "root_type": "all"}}]'
+        ],
+    )
+
+    assert not results["acc"]
+    assert results["acc_lenient"]
+
+
+def test_bfcl_v3_apertus_scores_function_calls_tag():
+    task = _make_apertus_task()
+    doc = {
+        "function": [
+            {
+                "name": "court_case.search",
+                "description": "Search court cases.",
+                "parameters": {
+                    "type": "dict",
+                    "properties": {
+                        "docket_number": {"type": "string"},
+                        "location": {"type": "string"},
+                        "full_text": {"type": "boolean"},
+                    },
+                    "required": ["docket_number", "location"],
+                },
+            }
+        ],
+        "ground_truth": [
+            {
+                "court_case.search": {
+                    "docket_number": ["123456"],
+                    "location": ["Texas"],
+                    "full_text": [False],
+                }
+            }
+        ],
+    }
+
+    results = task.process_results(
+        doc,
+        [
+            "<function_calls>{\n"
+            '"court_case.search": {\n'
+            '"docket_number": "123456",\n'
+            '"location": "Texas",\n'
+            '"full_text": false\n'
+            "}\n"
+            "}</function_calls>"
+        ],
+    )
+
+    assert not results["acc"]
+    assert results["acc_lenient"]
 
 
 def test_bfcl_v3_apertus_scores_json_call_after_thought_text():
     task = _make_apertus_task()
     doc = next(doc for doc in task.test_docs() if doc["id"] == "simple_158")
 
-    assert task.process_results(
+    results = task.process_results(
         doc,
         [
             "<think>Okay, let's tackle this request.</think>\n"
             '{"get_criminal_records": {"name": "Mr. X", '
             '"location": "New York, NY", "from_year": 2012, "to_year": 2015}}'
         ],
-    )["acc"]
+    )
+
+    assert not results["acc"]
+    assert results["acc_lenient"]
+
+
+def test_bfcl_v3_apertus_construct_requests_uses_larger_generation_budget():
+    task = _make_apertus_task()
+    doc = task.test_docs()[0]
+
+    request = task.construct_requests(doc, ctx="prompt")
+
+    assert request.arguments[1]["max_gen_toks"] == 2048
 
 
 def test_bfcl_v3_apertus_irrelevance_scores_absence_of_tool_block():
