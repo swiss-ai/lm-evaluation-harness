@@ -218,6 +218,12 @@ def _json_schema_type(type_name: str) -> str:
     }.get(type_name, type_name)
 
 
+def _apertus_template_default(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
 def _json_schema(schema: Any) -> Any:
     if isinstance(schema, list):
         return [_json_schema(item) for item in schema if item is not None]
@@ -226,6 +232,9 @@ def _json_schema(schema: Any) -> Any:
     converted = {}
     for key, value in schema.items():
         if value is None:
+            continue
+        if key == "default":
+            converted[key] = _apertus_template_default(_json_schema(value))
             continue
         if key == "type" and isinstance(value, str):
             converted[key] = _json_schema_type(value)
