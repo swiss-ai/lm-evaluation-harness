@@ -136,6 +136,43 @@ def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
     assert seen["messages"][1]["content"]["parts"][0]["type"] == "text"
 
 
+def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
+    task = _make_apertus_task("live_simple")
+    doc = next(doc for doc in task.test_docs() if doc["id"] == "live_simple_70-34-0")
+    seen = {}
+
+    task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(
+            {"messages": messages, "kwargs": kwargs}
+        )
+        or "templated",
+    )
+
+    properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
+    assert "default" not in properties["startingAfter"]
+    assert "default" not in properties["endingBefore"]
+    assert properties["timespan"]["default"] == 86400
+
+    task = _make_apertus_task("live_irrelevance")
+    doc = next(
+        doc for doc in task.test_docs() if doc["id"] == "live_irrelevance_7-0-7"
+    )
+    task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(
+            {"messages": messages, "kwargs": kwargs}
+        )
+        or "templated",
+    )
+    properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
+    assert properties["auth"]["default"] == []
+
+
 def test_bfcl_v3_apertus_fewshot_context_requires_chat_template():
     task = _make_apertus_task()
     doc = task.test_docs()[0]

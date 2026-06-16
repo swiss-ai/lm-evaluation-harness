@@ -219,10 +219,14 @@ def _json_schema_type(type_name: str) -> str:
 
 
 def _json_schema(schema: Any) -> Any:
+    if isinstance(schema, list):
+        return [_json_schema(item) for item in schema if item is not None]
     if not isinstance(schema, dict):
         return schema
     converted = {}
     for key, value in schema.items():
+        if value is None:
+            continue
         if key == "type" and isinstance(value, str):
             converted[key] = _json_schema_type(value)
         elif key in {"properties", "$defs", "definitions"} and isinstance(value, dict):
@@ -230,7 +234,9 @@ def _json_schema(schema: Any) -> Any:
         elif key == "items":
             converted[key] = _json_schema(value)
         else:
-            converted[key] = _json_schema(value) if isinstance(value, dict) else value
+            converted[key] = (
+                _json_schema(value) if isinstance(value, (dict, list)) else value
+            )
     return converted
 
 
@@ -238,7 +244,7 @@ def _apertus_tools(functions: list[dict], category: str) -> list[dict]:
     tools = []
     for function in _prompt_functions(functions, category):
         tool = deepcopy(function)
-        tool["parameters"] = _json_schema(tool.get("parameters", {}))
+        tool["parameters"] = _json_schema(tool.get("parameters") or {})
         tools.append(tool)
     return tools
 
