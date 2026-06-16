@@ -320,7 +320,10 @@ class TemplateAPI(TemplateLM):
         return ""
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str | JsonChatStr | list[dict]:
         """Applies a chat template to a list of chat history between user and model."""
         if self.tokenizer_backend == "huggingface" and self.tokenized_requests:
@@ -329,6 +332,7 @@ class TemplateAPI(TemplateLM):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **kwargs,
             )
         elif self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history

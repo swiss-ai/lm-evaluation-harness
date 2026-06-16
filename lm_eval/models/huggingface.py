@@ -1521,7 +1521,10 @@ class HFLM(TemplateLM):
         return res
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """Method to apply a chat template to a list of chat history between user and model."""
         try:
@@ -1531,6 +1534,7 @@ class HFLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
+                **kwargs,
             )
         except jinja2.exceptions.TemplateError:
             eval_logger.warning(
@@ -1543,6 +1547,7 @@ class HFLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
+                **kwargs,
             )
 
         return chat_templated

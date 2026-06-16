@@ -24,10 +24,13 @@ The Apertus variants expect tool calls in this format:
 <|tools_prefix|>[{"calculate_triangle_area": {"base": 10, "height": 5}}]<|tools_suffix|>
 ```
 
-They render prompts with Apertus conversation tokens and parse Apertus tool blocks
-back into BFCL's canonical call structure before scoring. Java and JavaScript
-variants additionally translate JSON argument values into the language-literal
-strings expected by the existing BFCL Java/JavaScript checkers.
+They pass structured messages and the per-document BFCL function list through
+the model tokenizer's `apply_chat_template(..., tools=[...])` path, so
+`bfcl_v3_apertus` tasks require `--apply_chat_template`. The emitted Apertus
+tool blocks are parsed back into BFCL's canonical call structure before scoring.
+Java and JavaScript variants additionally translate JSON argument values into
+the language-literal strings expected by the existing BFCL Java/JavaScript
+checkers.
 
 Scoring uses the BFCL v3 AST and multi-turn checkers vendored from the reference
 implementation.

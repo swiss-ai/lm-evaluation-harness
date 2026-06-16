@@ -173,43 +173,92 @@ def _message_content_to_text(content: Any) -> str:
     return str(content)
 
 
-def _render_apertus_messages(messages: list[dict]) -> str:
-    rendered = []
-    for message in messages:
-        role = message.get("role", "user")
-        content = _message_content_to_text(message.get("content", ""))
-        if role == "system":
-            rendered.append(f"<|system_start|>{content}<|system_end|>")
-        elif role == "assistant":
-            rendered.append(f"<|assistant_start|>{content}{APERTUS_ASSISTANT_END}")
-        elif role == "tool":
-            rendered.append(content)
+def _apertus_message(message: dict) -> dict:
+    role = message.get("role", "user")
+    content = message.get("content", "")
+    if role == "system":
+        return {"role": "system", "content": {"text": _message_content_to_text(content)}}
+    if role == "tool":
+        return {"role": "tool", "content": _message_content_to_text(content)}
+    if role == "assistant":
+        return {
+            "role": "assistant",
+            "content": {
+                "blocks": [
+                    {"type": "response", "text": _message_content_to_text(content)}
+                ]
+            },
+        }
+    return {
+        "role": "user",
+        "content": {
+            "parts": [{"type": "text", "text": _message_content_to_text(content)}]
+        },
+    }
+
+
+def _json_schema_type(type_name: str) -> str:
+    return {
+        "dict": "object",
+        "tuple": "array",
+        "Array": "array",
+        "ArrayList": "array",
+        "HashMap": "object",
+        "Hashtable": "object",
+        "String": "string",
+        "Boolean": "boolean",
+        "Bigint": "integer",
+        "integer": "integer",
+        "float": "number",
+        "double": "number",
+        "long": "integer",
+        "boolean": "boolean",
+        "array": "array",
+        "any": "string",
+    }.get(type_name, type_name)
+
+
+def _json_schema(schema: Any) -> Any:
+    if not isinstance(schema, dict):
+        return schema
+    converted = {}
+    for key, value in schema.items():
+        if key == "type" and isinstance(value, str):
+            converted[key] = _json_schema_type(value)
+        elif key in {"properties", "$defs", "definitions"} and isinstance(value, dict):
+            converted[key] = {name: _json_schema(item) for name, item in value.items()}
+        elif key == "items":
+            converted[key] = _json_schema(value)
         else:
-            rendered.append(f"<|user_start|>{content}<|user_end|>")
-    return "\n".join(rendered)
+            converted[key] = _json_schema(value) if isinstance(value, dict) else value
+    return converted
 
 
-def _render_apertus_prompt(
+def _apertus_tools(functions: list[dict], category: str) -> list[dict]:
+    tools = []
+    for function in _prompt_functions(functions, category):
+        tool = deepcopy(function)
+        tool["parameters"] = _json_schema(tool.get("parameters", {}))
+        tools.append(tool)
+    return tools
+
+
+def _apertus_messages(
     functions: list[dict], messages: list[dict], category: str, multi_turn: bool
-) -> str:
-    functions = _prompt_functions(functions, category)
-    function_text = json.dumps(functions, ensure_ascii=False)
+) -> list[dict]:
     multi_turn_instruction = (
         "\nContinue calling tools until the current user turn is complete. "
         "When no further tool call is needed, finish without emitting another tool block."
         if multi_turn
         else ""
     )
-    return (
-        f"<s><|system_start|>{APERTUS_SYSTEM_PROMPT}{multi_turn_instruction}"
-        f"<|system_end|>\n"
-        "<|developer_start|>Deliberation: enabled\n"
-        "Tool Capabilities: enabled\n"
-        "Available tools are provided as JSON below.\n"
-        f"{function_text}<|developer_end|>\n"
-        f"{_render_apertus_messages(messages)}\n"
-        "<|assistant_start|>"
-    )
+    return [
+        {
+            "role": "system",
+            "content": {"text": APERTUS_SYSTEM_PROMPT + multi_turn_instruction},
+        },
+        *[_apertus_message(message) for message in messages],
+    ]
 
 
 def _try_parse_apertus_json_array(text: str, start: int) -> tuple[Any | None, int]:
@@ -243,6 +292,32 @@ def _parse_apertus_calls(text: str) -> list[dict]:
             arguments = item.get(name) or {}
             calls.append({name: arguments})
         cursor = suffix_pos + len(APERTUS_TOOL_SUFFIX)
+    return calls or _parse_raw_apertus_json_calls(text)
+
+
+def _parse_raw_apertus_json_calls(text: str) -> list[dict]:
+    stripped = _strip_code_fence(text)
+    for index, char in enumerate(stripped):
+        if char not in "[{":
+            continue
+        try:
+            parsed, _ = json.JSONDecoder().raw_decode(stripped, index)
+        except json.JSONDecodeError:
+            continue
+        calls = _normalize_apertus_call_payload(parsed)
+        if calls:
+            return calls
+    return []
+
+
+def _normalize_apertus_call_payload(parsed: Any) -> list[dict]:
+    parsed_calls = parsed if isinstance(parsed, list) else [parsed]
+    calls = []
+    for item in parsed_calls:
+        if not isinstance(item, dict) or len(item) != 1:
+            continue
+        name, arguments = next(iter(item.items()))
+        calls.append({name: arguments if isinstance(arguments, dict) else {}})
     return calls
 
 
@@ -512,7 +587,23 @@ class BFCLV3Task(ConfigurableTask):
         gen_prefix: str | None = None,
     ):
         if self.bfcl_tool_format == "apertus":
-            return self.doc_to_text(doc)
+            if not (apply_chat_template and chat_template):
+                raise ValueError(
+                    "bfcl_v3_apertus tasks require --apply_chat_template so "
+                    "the model tokenizer can render the Apertus tool schema."
+                )
+            return chat_template(
+                _apertus_messages(
+                    doc.get("function", []),
+                    doc["question"][0],
+                    self.bfcl_category,
+                    multi_turn=_is_multi_turn(self.bfcl_category),
+                ),
+                tools=_apertus_tools(
+                    doc.get("function", []),
+                    self.bfcl_category,
+                ),
+            )
         return super().fewshot_context(
             doc,
             num_fewshot,
@@ -527,12 +618,7 @@ class BFCLV3Task(ConfigurableTask):
         raw_functions = doc.get("function", [])
         messages = doc["question"][0]
         if self.bfcl_tool_format == "apertus":
-            return _render_apertus_prompt(
-                raw_functions,
-                messages,
-                self.bfcl_category,
-                multi_turn=_is_multi_turn(self.bfcl_category),
-            )
+            return _flatten_messages(messages)
 
         functions = _prompt_functions(raw_functions, self.bfcl_category)
         function_text = json.dumps(functions, ensure_ascii=False)
@@ -570,10 +656,19 @@ class BFCLV3Task(ConfigurableTask):
             **kwargs,
         )
 
-    def init_multiturn_state(self, doc: dict, ctx: str, gen_kwargs: dict) -> dict:
+    def init_multiturn_state(
+        self,
+        doc: dict,
+        ctx: str,
+        gen_kwargs: dict,
+        apply_chat_template: bool = False,
+        chat_template=None,
+    ) -> dict:
         return {
             "doc": doc,
             "gen_kwargs": gen_kwargs,
+            "apply_chat_template": apply_chat_template,
+            "chat_template": chat_template,
             "functions": deepcopy(doc["function"]),
             "history": [],
             "turn_idx": 0,
@@ -674,11 +769,19 @@ class BFCLV3Task(ConfigurableTask):
 
     def _render_multiturn_prompt(self, state: dict) -> str:
         if self.bfcl_tool_format == "apertus":
-            return _render_apertus_prompt(
-                state["functions"],
-                state["history"],
-                self.bfcl_category,
-                multi_turn=True,
+            if not (state.get("apply_chat_template") and state.get("chat_template")):
+                raise ValueError(
+                    "bfcl_v3_apertus tasks require --apply_chat_template so "
+                    "the model tokenizer can render the Apertus tool schema."
+                )
+            return state["chat_template"](
+                _apertus_messages(
+                    state["functions"],
+                    state["history"],
+                    self.bfcl_category,
+                    multi_turn=True,
+                ),
+                tools=_apertus_tools(state["functions"], self.bfcl_category),
             )
 
         functions = _prompt_functions(state["functions"], self.bfcl_category)

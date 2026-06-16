@@ -318,7 +318,10 @@ class VLLM(TemplateLM):
         return self._max_gen_toks
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
@@ -332,6 +335,7 @@ class VLLM(TemplateLM):
                 chat_template=self.hf_chat_template,
                 enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
+                **kwargs,
             )
         except jinja2.exceptions.TemplateError:
             eval_logger.warning(
@@ -345,6 +349,7 @@ class VLLM(TemplateLM):
                 chat_template=self.hf_chat_template,
                 enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
+                **kwargs,
             )
 
         return cast("str", chat_templated)

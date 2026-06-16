@@ -1,3 +1,5 @@
+import pytest
+
 from lm_eval.tasks import TaskManager
 from lm_eval.tasks.bfcl_v3.task import BFCLV3Task
 
@@ -96,9 +98,9 @@ def test_bfcl_v3_apertus_prompt_and_scores_reference_call():
     doc = task.test_docs()[0]
 
     prompt = task.doc_to_text(doc)
-    assert "<|tools_prefix|>" in prompt
-    assert "<|developer_start|>" in prompt
-    assert "calculate_triangle_area" in prompt
+    assert "<|tools_prefix|>" not in prompt
+    assert "<|developer_start|>" not in prompt
+    assert "Find the area of a triangle" in prompt
     assert task.process_results(
         doc,
         [
@@ -112,21 +114,61 @@ def test_bfcl_v3_apertus_prompt_and_scores_reference_call():
     )["acc"]
 
 
-def test_bfcl_v3_apertus_fewshot_context_bypasses_outer_chat_template():
+def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
     task = _make_apertus_task()
     doc = task.test_docs()[0]
+    seen = {}
 
     prompt = task.fewshot_context(
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **_: "WRAPPED:" + repr(messages),
+        chat_template=lambda messages, **kwargs: seen.update(
+            {"messages": messages, "kwargs": kwargs}
+        )
+        or "templated",
     )
 
-    assert prompt.startswith("<s><|system_start|>")
-    assert "WRAPPED:" not in prompt
-    assert "<|user_start|><s><|system_start|>" not in prompt
-    assert prompt.count("<|assistant_start|>") == 1
+    assert prompt == "templated"
+    assert seen["kwargs"]["tools"][0]["name"] == "calculate_triangle_area"
+    assert seen["kwargs"]["tools"][0]["parameters"]["type"] == "object"
+    assert seen["messages"][0]["role"] == "system"
+    assert seen["messages"][1]["content"]["parts"][0]["type"] == "text"
+
+
+def test_bfcl_v3_apertus_fewshot_context_requires_chat_template():
+    task = _make_apertus_task()
+    doc = task.test_docs()[0]
+
+    with pytest.raises(ValueError, match="require --apply_chat_template"):
+        task.fewshot_context(doc, num_fewshot=0, apply_chat_template=False)
+
+
+def test_bfcl_v3_apertus_multi_turn_uses_tool_chat_template():
+    task = _make_apertus_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = {}
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(
+            {"messages": messages, "kwargs": kwargs}
+        )
+        or "templated-multiturn",
+    )
+
+    prompt, _ = task.multiturn_next_request(state)
+
+    assert prompt == "templated-multiturn"
+    assert seen["kwargs"]["tools"]
+    assert seen["messages"][0]["role"] == "system"
+    assert any(
+        part["type"] == "text"
+        for message in seen["messages"]
+        for part in message.get("content", {}).get("parts", [])
+    )
 
 
 def test_bfcl_v3_apertus_scores_nested_dict_call():
@@ -172,6 +214,33 @@ def test_bfcl_v3_apertus_scores_nested_dict_call():
             '<|tools_prefix|>[{"update_user_info": {"user_id": 43523, '
             '"update_info": {"name": "John Doe", "email": "johndoe@email.com"}, '
             '"database": "CustomerInfo"}}]<|tools_suffix|>'
+        ],
+    )["acc"]
+
+
+def test_bfcl_v3_apertus_scores_raw_json_call_without_tool_markers():
+    task = _make_apertus_task()
+    doc = next(doc for doc in task.test_docs() if doc["id"] == "simple_158")
+
+    assert task.process_results(
+        doc,
+        [
+            '{"get_criminal_records": {"name": "Mr. X", '
+            '"location": "New York, NY", "from_year": 2012, "to_year": 2015}}}\n'
+        ],
+    )["acc"]
+
+
+def test_bfcl_v3_apertus_scores_json_call_after_thought_text():
+    task = _make_apertus_task()
+    doc = next(doc for doc in task.test_docs() if doc["id"] == "simple_158")
+
+    assert task.process_results(
+        doc,
+        [
+            "<think>Okay, let's tackle this request.</think>\n"
+            '{"get_criminal_records": {"name": "Mr. X", '
+            '"location": "New York, NY", "from_year": 2012, "to_year": 2015}}'
         ],
     )["acc"]
 

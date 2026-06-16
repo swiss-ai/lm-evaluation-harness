@@ -401,7 +401,10 @@ class SGLangLM(TemplateLM):
         pass
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
@@ -411,6 +414,7 @@ class SGLangLM(TemplateLM):
             tokenize=False,
             add_generation_prompt=add_generation_prompt,
             continue_final_message=not add_generation_prompt,
+            **kwargs,
         )
 
         return chat_templated
