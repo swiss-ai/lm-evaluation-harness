@@ -30,6 +30,11 @@ filter_list:
   - name: "score-first"
     filter:
       - function: "take_first"
+  # mean@8 (avg@k): score each of the 8 samples individually and average accuracy
+  - name: "mean@8"
+    filter:
+      - function: "take_first_k"
+        k: 8
   # self-consistency: majority vote over all 8 sampled answers
   - name: "maj@8"
     filter:

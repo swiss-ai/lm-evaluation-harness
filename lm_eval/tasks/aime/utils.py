@@ -111,21 +111,29 @@ class MajorityVoteFilter:
         return map(lambda r: [select(r)], resps)
 
 
-def process_results(doc: dict, results: list[str]) -> dict[str, int]:
-    retval = 0
+def _score_response(response: str, target: str) -> int:
+    """1 if the response's extracted answer matches the target, else 0."""
+    return int(is_equiv(extract_answer(response), target))
+
+
+def process_results(doc: dict, results: list) -> dict[str, float]:
+    # A filter may collapse the repeats to a single response (e.g. take_first,
+    # maj@k) or pass them all through (e.g. take_first_k for mean@k). Normalize to
+    # a list so a single metric path handles both.
     response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
 
-    answer = extract_answer(response)
-
-    # Check if answer matches target
     answer_key = next(k for k in doc.keys() if k.lower() == "answer")
     target = str(doc[answer_key])
-    if is_equiv(answer, target):
-        retval = 1
+
+    # For a single response this is just 0/1 (per-sample accuracy); for the full
+    # set of k samples it is the mean accuracy over the k attempts (mean@k / avg@k).
+    scores = [_score_response(r, target) for r in responses]
+    degens = [int(is_degenerating_text(r.lower())) for r in responses]
 
     return {
-        "exact_match": retval,
-        "degeneration": int(is_degenerating_text(response.lower())),
+        "exact_match": sum(scores) / len(scores),
+        "degeneration": sum(degens) / len(degens),
     }
 
 
