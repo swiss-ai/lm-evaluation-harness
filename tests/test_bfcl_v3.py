@@ -145,6 +145,7 @@ def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
     assert seen["kwargs"]["tools"][0]["name"] == "calculate_triangle_area"
     assert seen["kwargs"]["tools"][0]["parameters"]["type"] == "object"
     assert seen["messages"][0]["role"] == "system"
+    assert "<|tools_suffix|>" in seen["messages"][0]["content"]["text"]
     assert "<available_function_name>" not in seen["messages"][0]["content"]["text"]
     assert "<parameter_name>" not in seen["messages"][0]["content"]["text"]
     assert seen["messages"][1]["content"]["parts"][0]["type"] == "text"
