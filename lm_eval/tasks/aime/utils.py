@@ -50,13 +50,13 @@ def process_2024(dataset: Dataset) -> Dataset:
     return dataset.filter(filter_by_year)
 
 
+from collections import Counter
+
 from lm_eval.api.metrics import is_degenerating_text
 
 
-def process_results(doc: dict, results: list[str]) -> dict[str, int]:
-    retval = 0
-    response = results[0]
-
+def extract_answer(response: str) -> str:
+    """Extract the final answer from a response (``$...$`` then ``\\boxed{}``)."""
     # Try to extract answer from $...$ format first
     indices = [pos for pos, char in enumerate(response) if char == "$"]
     if len(indices) <= 1:
@@ -73,6 +73,49 @@ def process_results(doc: dict, results: list[str]) -> dict[str, int]:
                 answer = boxed_content
         except (AssertionError, IndexError):
             pass
+
+    return answer
+
+
+def _normalize_answer(response: str) -> str:
+    """Extract and normalize a response's answer so answers can be compared/voted."""
+    try:
+        return strip_string(extract_answer(response))
+    except Exception:
+        return extract_answer(response)
+
+
+class MajorityVoteFilter:
+    """Self-consistency (maj@k) filter for AIME.
+
+    Reuses the task's answer extraction to vote: for each problem it extracts and
+    normalizes the answer of every sampled response, takes the majority vote, and
+    returns a representative *full* response whose answer matches the winner.
+    Returning the full text (rather than the bare answer) keeps the downstream
+    ``process_results`` extraction and the ``degeneration`` metric working unchanged.
+    Chain a ``take_first`` after this filter to unwrap the single voted response.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list):
+            normalized = [_normalize_answer(r) for r in resp_list]
+            winner = Counter(normalized).most_common(1)[0][0]
+            for resp, norm in zip(resp_list, normalized):
+                if norm == winner:
+                    return resp
+            return resp_list[0]
+
+        return map(lambda r: [select(r)], resps)
+
+
+def process_results(doc: dict, results: list[str]) -> dict[str, int]:
+    retval = 0
+    response = results[0]
+
+    answer = extract_answer(response)
 
     # Check if answer matches target
     answer_key = next(k for k in doc.keys() if k.lower() == "answer")
