@@ -321,7 +321,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
     print("[LONGWIKI] Phase 3 done.", flush=True)
 
 
-def _run_all(items, max_workers=64):
+def _run_all(items, max_workers=16):
     results = [None] * len(items)
 
     # Check cache for all items first
@@ -394,8 +394,7 @@ def get_score(doc, predictions, **kwargs):
 
 # --- precise_wiki ---
 
-
-def hallu_rate_agg(items, max_workers=64):
+def hallu_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["hallu_rate"] for r in results if not np.isnan(r.get("hallu_rate", np.nan))
@@ -403,7 +402,7 @@ def hallu_rate_agg(items, max_workers=64):
     return sum(scores) / len(scores) if scores else np.nan
 
 
-def refusal_rate_agg(items, max_workers=64):
+def refusal_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["refusal_rate"]
@@ -413,7 +412,7 @@ def refusal_rate_agg(items, max_workers=64):
     return sum(scores) / len(scores) if scores else np.nan
 
 
-def correct_rate_agg(items, max_workers=64):
+def correct_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["correct_rate"]
@@ -425,8 +424,7 @@ def correct_rate_agg(items, max_workers=64):
 
 # --- longwiki ---
 
-
-def abstained_agg(items, max_workers=64):
+def abstained_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["abstained"] for r in results if not np.isnan(r.get("abstained", np.nan))
@@ -434,7 +432,7 @@ def abstained_agg(items, max_workers=64):
     return sum(scores) / len(scores) if scores else np.nan
 
 
-def precision_agg(items, max_workers=64):
+def precision_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["precision"] for r in results if not np.isnan(r.get("precision", np.nan))
@@ -442,13 +440,13 @@ def precision_agg(items, max_workers=64):
     return sum(scores) / len(scores) if scores else np.nan
 
 
-def recall_agg(items, max_workers=64):
+def recall_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [r["recall"] for r in results if not np.isnan(r.get("recall", np.nan))]
     return sum(scores) / len(scores) if scores else np.nan
 
 
-def f1_agg(items, max_workers=64):
+def f1_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [r["f1"] for r in results if not np.isnan(r.get("f1", np.nan))]
     return sum(scores) / len(scores) if scores else np.nan
@@ -456,8 +454,7 @@ def f1_agg(items, max_workers=64):
 
 # --- nonsense entities ---
 
-
-def abstention_agg(items, max_workers=64):
+def abstention_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
     scores = [
         r["abstention"] for r in results if not np.isnan(r.get("abstention", np.nan))

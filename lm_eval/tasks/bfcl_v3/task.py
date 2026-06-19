@@ -63,6 +63,7 @@ DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
 
 APERTUS_SYSTEM_PROMPT = """You are an expert tool-calling assistant. Use the available tools to satisfy the user's request.
 If no tool can be used, or the request lacks required parameters, do not emit a tool call.
+When calling tools, put the tool-call JSON array between <|tools_prefix|> and <|tools_suffix|>.
 """
 
 

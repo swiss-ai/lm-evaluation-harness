@@ -11,8 +11,7 @@ API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "Qwen/Qwen3.5-27B"
 
-
-def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10):
+def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=20):
     """
     Attempt to generate text from the SwissAI API.
     Returns the text if successful, raises an exception otherwise.
@@ -28,13 +27,14 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                # Disable Qwen3 thinking traces so the judge returns the
+                # structured answer directly (avoids parse-skips where the
+                # reasoning trace hides the expected JSON/verdict).
+                "chat_template_kwargs": {"enable_thinking": False},
             }
 
             resp = requests.post(
-                f"{API_URL}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=2000,
+                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=3000
             )
 
             if resp.status_code == 200:
@@ -49,7 +49,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
             print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2**attempt, 60)
+            wait = min(2 ** attempt, 120)
             print(f"Retrying in {wait}s...")
             time.sleep(wait)
 
