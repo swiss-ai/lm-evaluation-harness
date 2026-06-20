@@ -1,6 +1,7 @@
 import logging
 import re
 import signal
+from collections import Counter
 from importlib.metadata import version
 
 import datasets
@@ -93,6 +94,87 @@ def process_results(doc: dict, results: list[str]) -> dict[str, int]:
         "math_verify": mathval,
     }
     return res
+
+
+# --- Self-consistency (score-first / mean@k / maj@k / pass@k) -----------------
+# The filters below collapse the k repeats to one representative response; the
+# mean@k filter (take_first_k) instead passes them all through, and
+# process_results_sc averages exact_match / math_verify over the list.
+
+
+def _sc_answer(response: str) -> str:
+    """Normalized final answer extracted from a response (for voting / equivalence)."""
+    return normalize_final_answer(get_unnormalized_answer(response))
+
+
+def _is_correct(response: str, doc: dict) -> bool:
+    return is_equiv(_sc_answer(response), doc["answer"])
+
+
+class MajorityVoteFilter:
+    """maj@k: majority vote over the normalized answers, returning a representative
+    full response whose answer matches the winner (empty answers ignored unless all
+    are empty). Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list):
+            answers = [_sc_answer(r) for r in resp_list]
+            votable = [a for a in answers if a] or answers
+            winner = Counter(votable).most_common(1)[0][0]
+            for resp, ans in zip(resp_list, answers):
+                if ans == winner:
+                    return resp
+            return resp_list[0]
+
+        return [[select(r)] for r in resps]
+
+
+class PassAtKFilter:
+    """pass@k: returns a correct response if any of the k exists, else the first
+    (correctness via ``is_equiv``). With n == k this is the unbiased pass@k.
+    Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            for resp in resp_list:
+                if _is_correct(resp, doc):
+                    return resp
+            return resp_list[0]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
+
+
+def process_results_sc(doc: dict, results: list) -> dict[str, float]:
+    """Self-consistency-aware variant of ``process_results``.
+
+    Handles a single response (take_first / maj@k / pass@k) or the full set of k
+    samples (take_first_k for mean@k), averaging exact_match and math_verify over
+    the list. For a single response this reduces to the same 0/1 as
+    ``process_results``.
+    """
+    response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
+
+    em, mv = [], []
+    for cand in responses:
+        answer = normalize_final_answer(get_unnormalized_answer(cand))
+        em.append(1 if is_equiv(answer, doc["answer"]) else 0)
+        try:
+            ok = verify(gold=parse(doc["solution"]), target=parse(cand))
+        except Exception:
+            ok = False
+        mv.append(1 if ok else 0)
+
+    return {
+        "exact_match": sum(em) / len(em),
+        "math_verify": sum(mv) / len(mv),
+    }
 
 
 def last_boxed_only_string(string: str) -> str | None:

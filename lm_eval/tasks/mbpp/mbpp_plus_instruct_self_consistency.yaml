@@ -1,0 +1,33 @@
+include: mbpp_plus_instruct.yaml
+task: mbpp_plus_instruct_self_consistency
+# Zero-shot, sampled. For code, pass@k is native via code_eval:
+#   pass@1 over the 8 samples == mean@8 (average pass rate); pass@8 == any-correct.
+# (Majority-vote isn't meaningful for code, so it is intentionally omitted.)
+num_fewshot: 0
+repeats: 8
+generation_kwargs:
+  max_gen_toks: 2048
+  until: []
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.95
+metric_list:
+  - metric: !function utils.pass_at_k_metric
+    aggregation: mean
+    higher_is_better: true
+    k: [1, 8]
+filter_list:
+  # all 8 samples -> pass@1 (== mean@8) and pass@8
+  - name: "all"
+    filter:
+      - function: "custom"
+        filter_fn: !function utils.build_predictions
+  # first sample only -> pass@1 (first-choice)
+  - name: "first"
+    filter:
+      - function: "take_first_k"
+        k: 1
+      - function: "custom"
+        filter_fn: !function utils.build_predictions
+metadata:
+  version: 1.0
