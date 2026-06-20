@@ -116,15 +116,45 @@ def _score_response(response: str, target: str) -> int:
     return int(is_equiv(extract_answer(response), target))
 
 
+def _doc_target(doc: dict) -> str:
+    """The gold answer as a string, regardless of the answer field's casing."""
+    answer_key = next(k for k in doc.keys() if k.lower() == "answer")
+    return str(doc[answer_key])
+
+
+class PassAtKFilter:
+    """pass@k filter for AIME.
+
+    A problem counts as solved if *any* of the k sampled responses is correct.
+    Using the gold answer (available via ``docs``), this returns a correct sample
+    when one exists, else the first sample, so the downstream single-response
+    scoring in ``process_results`` yields 1 iff at least one attempt was correct.
+    With n == k samples this equals the standard unbiased pass@k estimator.
+    Chain a ``take_first`` after this filter to unwrap the selected response.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            target = _doc_target(doc)
+            for resp in resp_list:
+                if _score_response(resp, target):
+                    return resp
+            return resp_list[0]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
+
+
 def process_results(doc: dict, results: list) -> dict[str, float]:
     # A filter may collapse the repeats to a single response (e.g. take_first,
-    # maj@k) or pass them all through (e.g. take_first_k for mean@k). Normalize to
-    # a list so a single metric path handles both.
+    # maj@k, pass@k) or pass them all through (e.g. take_first_k for mean@k).
+    # Normalize to a list so a single metric path handles both.
     response = results[0]
     responses = list(response) if isinstance(response, list) else [response]
 
-    answer_key = next(k for k in doc.keys() if k.lower() == "answer")
-    target = str(doc[answer_key])
+    target = _doc_target(doc)
 
     # For a single response this is just 0/1 (per-sample accuracy); for the full
     # set of k samples it is the mean accuracy over the k attempts (mean@k / avg@k).

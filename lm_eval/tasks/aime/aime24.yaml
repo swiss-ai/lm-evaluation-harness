@@ -20,7 +20,7 @@ metric_list:
 generation_kwargs:
   do_sample: true
   temperature: 0.7
-  top_p: 0.9
+  top_p: 0.95
   max_gen_toks: 32768
   until:
     - "Question:"
@@ -42,6 +42,11 @@ filter_list:
   - name: "maj@8"
     filter:
       - function: !function utils.MajorityVoteFilter
+      - function: "take_first"
+  # pass@8: solved if any of the 8 samples is correct
+  - name: "pass@8"
+    filter:
+      - function: !function utils.PassAtKFilter
       - function: "take_first"
 num_fewshot: 0
 metadata:
