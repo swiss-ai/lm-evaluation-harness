@@ -102,6 +102,10 @@ class LongWikiRetrieval(object):
         encoder = SentenceTransformer(
             "sentence-transformers/" + self.retrieval_type, device=0
         )
+        # Force fp32: some checkpoints/transformers versions load the encoder in
+        # half precision, which causes "expected scalar type Float but found Half"
+        # in encode() during prewarm. Casting to float keeps the matmuls consistent.
+        encoder = encoder.float()
         self.encoder = encoder
         assert self.batch_size is not None
 
