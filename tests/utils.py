@@ -1,5 +1,4 @@
 import os
-from typing import List, Union
 
 from lm_eval.utils import load_yaml_config
 
@@ -11,8 +10,8 @@ from lm_eval.utils import load_yaml_config
 
 # reads a text file and returns a list of words
 # used to read the output of the changed txt from tj-actions/changed-files
-def load_changed_files(file_path: str) -> List[str]:
-    with open(file_path, "r", encoding="utf-8") as f:
+def load_changed_files(file_path: str) -> list[str]:
+    with open(file_path, encoding="utf-8") as f:
         content = f.read()
         words_list = list(content.split())
     return words_list
@@ -22,7 +21,7 @@ def load_changed_files(file_path: str) -> List[str]:
 # if file ends with .yaml then check yaml and load the config.
 # if the config task is a string, it's a task config.
 # if the config task is a list, it's a group config.
-def parser(full_path: List[str]) -> List[str]:
+def parser(full_path: list[str]) -> list[str]:
     _output = set()
     for x in full_path:
         if x.endswith(".yaml") and os.path.exists(x):
@@ -31,10 +30,13 @@ def parser(full_path: List[str]) -> List[str]:
                 _output.add(config["task"])
             elif isinstance(config["task"], list):
                 _output.add(config["group"])
-    return list(_output)
+    # Sorted (not list(set)) so the parametrization order is deterministic:
+    # under `pytest -n=auto` every xdist worker must collect tasks in the same
+    # order, else collection mismatches ("Different tests were collected").
+    return sorted(_output)
 
 
-def new_tasks() -> Union[List[str], None]:
+def new_tasks() -> list[str] | None:
     FILENAME = ".github/outputs/tasks_all_changed_and_modified_files.txt"
     if os.path.exists(FILENAME):
         # If tasks folder has changed then we get the list of files from FILENAME
