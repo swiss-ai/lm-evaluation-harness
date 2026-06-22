@@ -1,0 +1,7 @@
+include: _tensortrust_template_yaml
+task: realguardrails_tensortrust_extraction
+dataset_kwargs:
+  data_files:
+    # Pinned to the upstream "Code release" commit; see _tensortrust_template_yaml.
+    test: "https://raw.githubusercontent.com/normster/RealGuardrails/887ccf8e53a39c7067b5e9c5ad0534e1a1bc0798/evals/tensortrust/inputs/extraction.jsonl"
+process_results: !function utils.process_extraction

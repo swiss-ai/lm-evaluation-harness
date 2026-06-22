@@ -1,0 +1,40 @@
+task: realguardrails_s_ifeval
+dataset_path: json
+dataset_kwargs:
+  data_files:
+    # Pinned to the "Code release" commit (2025-02-17) — the JSONL inputs
+    # have not been touched since. Bump only if upstream republishes a
+    # new evaluation set; bumping silently changes the row count.
+    test: "https://raw.githubusercontent.com/normster/RealGuardrails/887ccf8e53a39c7067b5e9c5ad0534e1a1bc0798/evals/ifeval/inputs/sys_ifeval.jsonl"
+test_split: test
+output_type: generate_until
+process_docs: !function utils.process_docs
+description: "{{ messages[0]['content'] }}"
+doc_to_text: "{{ messages[1]['content'] }}"
+doc_to_target: ""
+process_results: !function utils.process_results
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 1280
+  # `until: []` is intentional — chat template stop tokens are handled
+  # by the backing model wrapper.
+  until: []
+metric_list:
+  - metric: prompt_level_strict_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: inst_level_strict_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: prompt_level_loose_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: inst_level_loose_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+metadata:
+  # RealGuardrails needs an authoritative system prompt; the evaluator
+  # warns if the model is run without the system-prompt authority check.
+  requires_system_prompt_authority: true
+  version: 0.1

@@ -11,10 +11,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-import lm_eval.api.metrics
 import lm_eval.api.model
 import lm_eval.api.registry
-import lm_eval.api.task
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
 from lm_eval.evaluator_utils import (
@@ -47,6 +45,42 @@ if TYPE_CHECKING:
     from lm_eval.loggers import EvaluationTracker
 
 eval_logger = logging.getLogger(__name__)
+
+
+def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
+    """Warn when a task needs an authoritative system prompt but the model's
+    system-prompt authority check was not activated (it is OFF by default).
+
+    A task opts in with ``metadata: {requires_system_prompt_authority: true}``.
+    HF/vLLM set ``lm.system_prompt_authority_handled`` to ``True`` when any of
+    ``check_system_prompt_authority`` / ``strip_system_boilerplate`` /
+    ``allow_system_boilerplate`` is passed; backends without the concept lack
+    the attribute (treated as handled → no warning). Returns the offending task
+    names (``[]`` if none), so the behaviour is unit-testable.
+    """
+    if getattr(lm, "system_prompt_authority_handled", True):
+        return []
+    needy = []
+    for to in get_task_list(task_dict):
+        # Group placeholders can carry a falsy/None task; read defensively.
+        cfg = getattr(getattr(to, "task", None), "config", None)
+        metadata = getattr(cfg, "metadata", None)
+        if isinstance(metadata, dict) and metadata.get(
+            "requires_system_prompt_authority"
+        ):
+            needy.append(to.task_name)
+    if needy:
+        eval_logger.warning(
+            "Task(s) %s expect an authoritative system prompt, but the "
+            "system-prompt authority check is not active for this model (OFF by "
+            "default). Chat-template boilerplate (e.g. Llama 3.x date headers) "
+            "can silently skew these scores. Pass `check_system_prompt_authority=true` to "
+            "verify, `strip_system_boilerplate=true` to auto-fix Llama 3.x "
+            "boilerplate, or `allow_system_boilerplate=true` to acknowledge and "
+            "silence this warning.",
+            needy,
+        )
+    return needy
 
 
 @positional_deprecated
@@ -306,7 +340,14 @@ def simple_evaluate(
                 }
 
             else:
-                if task_obj.get_config("output_type") == "generate_until":
+                if task_obj.get_config("output_type") in (
+                    "generate_until",
+                    "multi_turn_generate",
+                ):
+                    # multi_turn_generate also issues generate_until calls per
+                    # turn (see run_multi_turn_rollout), reading the task's
+                    # generation_kwargs — so the CLI override must reach it too,
+                    # e.g. `--gen_kwargs until=<|im_end|>` to add a stop token.
                     if gen_kwargs is not None:
                         task_obj.set_config(
                             key="generation_kwargs", value=gen_kwargs, update=True
@@ -348,6 +389,11 @@ def simple_evaluate(
         return adjusted_task_dict
 
     task_dict = _adjust_config(task_dict)
+
+    # Rank 0 only — `simple_evaluate` runs on every rank under accelerate/DDP,
+    # so guard to avoid one identical warning per process.
+    if getattr(lm, "rank", 0) == 0:
+        _warn_if_system_prompt_authority_inactive(lm, task_dict)
 
     if check_integrity:
         run_task_tests(task_list=tasks)
@@ -578,6 +624,17 @@ def evaluate(
             # todo: may not account for padding in cases like SquadV2 which has multiple req types
             padding_requests[reqtype] += numpad
 
+    ### Iterative multi-turn rollout (output_type: multi_turn_generate) ###
+    # Runs BEFORE the standard one-shot dispatch so the turn-indexed
+    # `Instance` objects it builds end up on each task's `_instances` list
+    # and flow through the existing filter + process_results + sample-log
+    # path unchanged. Tasks without multi_turn_generate are unaffected.
+    _mt_task_outputs = [
+        to for to in eval_tasks if to.task.OUTPUT_TYPE == "multi_turn_generate"
+    ]
+    if _mt_task_outputs:
+        run_multi_turn_rollout(lm, _mt_task_outputs)
+
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
     for reqtype, reqs in requests.items():
@@ -607,12 +664,17 @@ def evaluate(
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output, limit in zip(eval_tasks, limits, strict=True):
         task = task_output.task
-        task.apply_filters()
 
-        # Skip post-processing for ranks with no instances (data parallel with small datasets)
-        # The gather will collect empty results from this rank
+        # Skip post-processing for ranks with no instances (data parallel with
+        # small datasets, or multi_turn_generate when world_size > docs-for-task,
+        # leaving some ranks an empty shard). Must come BEFORE apply_filters():
+        # Filter.apply does `zip(*(... for inst in instances))`, which raises
+        # `ValueError: not enough values to unpack` on an empty instance list.
+        # The gather will collect empty results from this rank.
         if len(task.instances) == 0:
             continue
+
+        task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
         # # unpack results and sort back in order and return control to Task
@@ -692,11 +754,20 @@ def evaluate(
                         itertools.chain.from_iterable(full_samples)
                     )
 
-            # then collect metrics across all ranks
-            for metrics in task_output.sample_metrics:
+            # then collect metrics across all ranks. Agree on a consistent key
+            # set first: a rank with an empty shard (world_size > docs-for-task,
+            # reachable for multi_turn_generate on small/limited tasks, or any DP
+            # run with fewer docs than ranks) has no `sample_metrics` keys and
+            # would otherwise issue fewer `gather_object` collectives than its
+            # peers — desyncing the gather and deadlocking the job.
+            local_keys = list(task_output.sample_metrics.keys())
+            gathered_keys = [None] * WORLD_SIZE
+            torch.distributed.all_gather_object(gathered_keys, local_keys)
+            all_keys = sorted({k for keys in gathered_keys for k in keys})
+            for metrics in all_keys:
                 metric_list = [None] * WORLD_SIZE if RANK == 0 else None
                 torch.distributed.gather_object(
-                    obj=task_output.sample_metrics[metrics],
+                    obj=task_output.sample_metrics.get(metrics, []),
                     object_gather_list=metric_list,
                     dst=0,
                 )
@@ -789,6 +860,224 @@ def evaluate(
 
     else:
         return None
+
+
+# Defensive cap on multi-turn rollout depth against a task whose
+# ``next_user_turn`` never returns ``None``. No real benchmark exceeds ~10
+# turns; 64 is comfortable headroom. Expose via task config if ever needed.
+MAX_SAFETY_TURNS = 64
+
+
+def _gather_ints(lm, value: int) -> list[int]:
+    """Collective ``accelerator.gather`` of one per-rank integer, returned as
+    a plain list (length == world_size). All ranks must call together. The
+    caller applies the reduction (``any`` / ``max``).
+    """
+    import torch
+
+    t = torch.tensor(int(value), device=lm.device)
+    return lm.accelerator.gather(t).cpu().detach().numpy().tolist()
+
+
+def _any_rank_has_pending(lm, pending) -> bool:
+    """Collective entry guard. True iff any rank has docs."""
+    return any(_gather_ints(lm, bool(pending)))
+
+
+def _gather_max_live(lm, local_n: int) -> int:
+    """Collective per-turn gather. Returns ``max(live_n across ranks)``,
+    used both for global termination (``== 0``) and pad-to-global-max.
+    """
+    return max(_gather_ints(lm, local_n))
+
+
+def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
+    """Iterative multi-turn rollout driver for ``output_type: multi_turn_generate``.
+
+    Per turn, for each pending doc: ask the task for the next user turn
+    via ``task.next_user_turn`` (None → mark done), render the growing
+    history through ``lm.apply_chat_template``, build one
+    ``Instance(idx=turn_idx)``, and batch all pending instances across
+    all multi-turn tasks into a single ``lm.generate_until`` call. The
+    response is appended to history and ``task._instances``, then
+    ``task.should_stop`` decides early-exit. Loop stops when no docs
+    are pending; the standard post-process loop in ``evaluate()`` then
+    consumes the variable-length per-doc instance lists the same way
+    it handles ``multiple_choice``'s N-instances-per-doc.
+
+    Distributed (``accelerate launch``) is supported when the LM
+    exposes ``lm.accelerator``. Three coordination points keep
+    collectives even-batched: a collective entry guard, a per-turn
+    ``gather`` of live counts (drives termination and pad size), and
+    sentinel-dummy padding for ranks with fewer live docs than the
+    global max. Backends with internal DP (vLLM ``data_parallel_size``,
+    SGLang / openai ``num_concurrent``) expose ``world_size == 1`` and
+    take the non-distributed branch.
+
+    Full architecture, hook contract, backend matrix, and limits:
+    ``docs/multi_turn_rollout.md``.
+    """
+    from copy import deepcopy
+
+    from lm_eval.api.instance import Instance
+    from lm_eval.api.utils import Message
+
+    if not mt_task_outputs:
+        return
+
+    # Docs are already sharded across ranks by
+    # `task.doc_iterator(rank, world_size)` in
+    # `_build_initial_multi_turn_states`; the coordination rules live in
+    # the docstring above.
+    is_distributed = lm.world_size > 1
+    if is_distributed and not hasattr(lm, "accelerator"):
+        raise NotImplementedError(
+            "multi_turn_generate with world_size > 1 requires an "
+            "`accelerator` attribute on the LM (HuggingFace + `accelerate "
+            "launch`). Backends that do their own data parallelism "
+            "internally should expose world_size=1."
+        )
+
+    # Each (task_output, doc_id, state) so the response routes back to
+    # the right task.
+    pending: list[tuple] = []
+    for to in mt_task_outputs:
+        for doc_id, state in to.task._multi_turn_states.items():
+            pending.append((to, doc_id, state))
+
+    # `build_all_requests` already errored if --apply_chat_template was
+    # forgotten; this catches backends that don't implement it at all.
+    if not hasattr(lm, "apply_chat_template"):
+        raise RuntimeError(
+            "multi_turn_generate requires `lm.apply_chat_template`; "
+            "backend does not provide it."
+        )
+
+    # Entry guard — collective so ranks with empty shards don't strand
+    # peers at the next gather. Both early-return sites must clear
+    # `_multi_turn_states` (otherwise the histories built by
+    # `_build_initial_multi_turn_states` leak past short-circuit).
+    if is_distributed:
+        if not _any_rank_has_pending(lm, pending):
+            _clear_multi_turn_states(mt_task_outputs)
+            return
+    elif not pending:
+        _clear_multi_turn_states(mt_task_outputs)
+        return
+
+    # Pad sentinel: 1-token throwaway request used by ranks whose live
+    # batch is below the global max. Response is discarded.
+    dummy_instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("<pad>", {"max_gen_toks": 1, "until": []}),
+        idx=-1,
+        metadata=("__multi_turn_dp_pad__", -1, 1),
+    )
+
+    turn_idx = 0
+    while True:
+        live: list[tuple] = []
+        this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
+
+        for to, doc_id, state in pending:
+            user_text = to.task.next_user_turn(state.doc, state.history, turn_idx)
+            if user_text is None:
+                state.done = True
+                continue
+
+            state.history.append(Message("user", user_text))
+
+            prompt = lm.apply_chat_template(
+                [m.to_dict() for m in state.history],
+                add_generation_prompt=True,
+            )
+            gen_kwargs = deepcopy(to.task.config.generation_kwargs or {})
+
+            inst = Instance(
+                request_type="generate_until",
+                doc=state.doc,
+                arguments=(prompt, gen_kwargs),
+                idx=turn_idx,
+                metadata=(
+                    to.task.config.task,
+                    doc_id,
+                    to.task.config.repeats or 1,
+                ),
+            )
+            this_turn_batch.append((to, state, inst))
+            live.append((to, doc_id, state))
+
+        # Termination: distributed requires EVERY rank's batch to be
+        # empty before breaking (else the next gather deadlocks).
+        local_n = len(this_turn_batch)
+        if is_distributed:
+            global_max = _gather_max_live(lm, local_n)
+            if global_max == 0:
+                break
+        else:
+            if local_n == 0:
+                break
+            global_max = local_n
+
+        # Safety cap deliberately checked AFTER the per-turn gather so a
+        # future refactor that diverges `turn_idx` across ranks cannot
+        # cause an asymmetric break that deadlocks the next gather.
+        # Today `turn_idx` is identical on every rank — all ranks break
+        # together — but the order matters for that invariant.
+        if turn_idx >= MAX_SAFETY_TURNS:
+            eval_logger.warning(
+                "multi_turn_generate driver hit safety cap of %d turns; "
+                "%d docs still pending — stopping.",
+                MAX_SAFETY_TURNS,
+                len(pending),
+            )
+            break
+
+        cloned = [inst for _, _, inst in this_turn_batch]
+        numpad = global_max - local_n
+        if numpad > 0:
+            cloned.extend([dummy_instance] * numpad)
+
+        responses = lm.generate_until(cloned)
+
+        if is_distributed:
+            lm.accelerator.wait_for_everyone()
+
+        for (to, state, inst), resp in zip(
+            this_turn_batch, responses[:local_n], strict=True
+        ):
+            inst.resps.append(resp)
+            state.history.append(Message("assistant", resp))
+            to.task._instances.append(inst)
+
+            if to.task.should_stop(state.doc, state.history, turn_idx):
+                state.done = True
+
+        pending = [(to, did, st) for to, did, st in live if not st.done]
+        turn_idx += 1
+
+    eval_logger.info(
+        "multi_turn_generate driver completed: %d task(s), %d total turns "
+        "across %d initial docs",
+        len(mt_task_outputs),
+        turn_idx,
+        sum(len(to.task._multi_turn_states) for to in mt_task_outputs),
+    )
+
+    _clear_multi_turn_states(mt_task_outputs)
+
+
+def _clear_multi_turn_states(mt_task_outputs) -> None:
+    """Release per-doc conversation histories. Called at end-of-loop
+    AND each early-return in :func:`run_multi_turn_rollout`; task
+    objects can persist across ``simple_evaluate`` calls (notebook /
+    test flows) and would otherwise retain full N-turn histories
+    indefinitely.
+    """
+    for to in mt_task_outputs:
+        if hasattr(to.task, "_multi_turn_states"):
+            del to.task._multi_turn_states
 
 
 def request_caching_arg_to_dict(cache_requests: str) -> dict:

@@ -1,0 +1,8 @@
+include: _s_rules_template_yaml
+task: realguardrails_s_rules_basic_helpful
+class: !function task.SRulesTask
+dataset_kwargs:
+  data_files:
+    # Resolved against this module's directory by SRulesTask.download()
+    # so the task works regardless of the caller's CWD.
+    test: data/basic_helpful.jsonl

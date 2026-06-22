@@ -31,9 +31,12 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
+    check_system_boilerplate,
     configure_pad_token,
+    get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
+    maybe_strip_system_boilerplate,
     normalize_gen_kwargs,
     postprocess_generated_text,
 )
@@ -107,6 +110,9 @@ class HFLM(TemplateLM):
         # splits to get response after this token (if provided).
         think_end_token: str | int | None = None,
         enable_thinking: bool | None = None,
+        strip_system_boilerplate: bool = False,
+        allow_system_boilerplate: bool = False,
+        check_system_prompt_authority: bool = False,
         chat_template_args: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
@@ -256,10 +262,36 @@ class HFLM(TemplateLM):
         self.vocab_size = self.tokenizer.vocab_size
         # select (or create) a pad token to use
         self.tokenizer = configure_pad_token(self.tokenizer, model_config=self.config)
-        self.chat_template_args = (
-            chat_template_args or {} | dict(enable_thinking=enable_thinking)
-            if enable_thinking is not None
-            else {}
+
+        chat_template_args = maybe_strip_system_boilerplate(
+            chat_template_source=getattr(self.tokenizer, "chat_template", None),
+            chat_template_args=chat_template_args,
+            strip=strip_system_boilerplate,
+        )
+
+        self.chat_template_args = chat_template_args
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
+
+        # System-prompt authority probe — OFF by default. Run it only when the
+        # caller opts in via `check_system_prompt_authority` (and hasn't waived it with
+        # `allow_system_boilerplate`). Tasks that need an authoritative system
+        # prompt warn (in the evaluator) when none of these flags is set.
+        if (
+            check_system_prompt_authority
+            and not allow_system_boilerplate
+            and getattr(self.tokenizer, "chat_template", None)
+        ):
+            check_system_boilerplate(
+                self.apply_chat_template,
+                special_tokens=get_template_special_tokens(self.tokenizer),
+            )
+        # Did the caller engage with system-prompt authority at all (verify /
+        # auto-fix / waive)? Drives the per-task "check inactive" warning.
+        self.system_prompt_authority_handled = bool(
+            check_system_prompt_authority
+            or strip_system_boilerplate
+            or allow_system_boilerplate
         )
 
         self.add_bos_token = add_bos_token

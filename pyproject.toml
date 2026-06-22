@@ -87,6 +87,10 @@ multilingual = ["nagisa>=0.2.7", "jieba>=0.42.1", "pycountry"]
 #]
 ruler = ["nltk", "wonderwords", "scipy"]
 wmt_translation = ["subset2evaluate", "unbabel-comet"]
+# SystemCheck / RealGuardrails single-turn sub-suites. `openai` powers the
+# OpenAI-compatible `local-chat-completions` backend used to serve models
+# for these tasks; the IFEval verifier registry powers S-IFEval.
+sysp_eval = ["openai", "lm_eval[ifeval]"]
 sentencepiece = ["sentencepiece>=0.1.98"]
 discrim_eval = ["statsmodels==0.14.4"]
 unitxt = ["unitxt==1.26.9"]
@@ -97,6 +101,7 @@ tasks = [
     "lm_eval[arena_hard]",
     "lm_eval[discrim_eval]",
     "lm_eval[ifeval]",
+    "lm_eval[sysp_eval]",
     "lm_eval[japanese_leaderboard]",
     "lm_eval[longbench]",
     "lm_eval[libra]",
@@ -189,6 +194,10 @@ ignore = [
     "F403",   # undefined-local-with-import-star
     "F405",   # undefined-local-with-import-star-usage
 ]
+# Vendored from github.com/normster/llm_rules (Apache-2.0, SHA f627e56).
+# Kept verbatim; do not lint upstream style.
+"lm_eval/tasks/realguardrails/s_rules/message.py" = ["ALL"]
+"lm_eval/tasks/realguardrails/s_rules/scenarios/**/*.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

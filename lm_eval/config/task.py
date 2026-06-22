@@ -129,9 +129,9 @@ class TaskConfig(dict):
 
     def __post_init__(self) -> None:
         if self.generation_kwargs is not None:
-            if self.output_type != "generate_until":
+            if self.output_type not in ("generate_until", "multi_turn_generate"):
                 eval_logger.warning(
-                    f"[{self.task}] passed `generation_kwargs`, but not using `output_type: generate_until`!"
+                    f"[{self.task}] passed `generation_kwargs`, but `output_type` is neither `generate_until` nor `multi_turn_generate`!"
                 )
 
             if "temperature" in self.generation_kwargs:
@@ -148,6 +148,16 @@ class TaskConfig(dict):
             if self.output_type == "generate_until":
                 # ensure that we greedily generate in absence of explicit arguments otherwise
                 self.generation_kwargs = default_gen_kwargs(self.fewshot_delimiter)
+                eval_logger.warning(
+                    f"{self.task}: No `generation_kwargs` specified in task config, defaulting to {self.generation_kwargs}"
+                )
+            elif self.output_type == "multi_turn_generate":
+                # Same greedy defaults as generate_until, but until=[] (None):
+                # multi-turn relies on the model's own turn-end token to stop
+                # each turn — a fewshot_delimiter stop ("\n\n") would truncate
+                # mid-response. Ensures generation_kwargs is always a dict so a
+                # CLI --gen_kwargs override has something to merge into.
+                self.generation_kwargs = default_gen_kwargs(None)
                 eval_logger.warning(
                     f"{self.task}: No `generation_kwargs` specified in task config, defaulting to {self.generation_kwargs}"
                 )

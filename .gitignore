@@ -25,11 +25,17 @@ dist/
 profile_default/
 ipython_config.py
 
-# Output and data
-output/
-data/
-temp/
-test_logs/
+# Output and data — root-only patterns so they catch dev-scratch
+# directories at the repo root (output/, data/, temp/, results/, etc.)
+# without silently ignoring nested benchmark data such as
+# lm_eval/tasks/realguardrails/s_rules/data/, which is vendored and
+# must be tracked. (Git cannot re-include children of an ignored
+# directory, so the parent patterns themselves must be anchored.)
+/output/
+/data/
+/temp/
+/test_logs/
+/results/
 
 # Caching
 lm_eval/caching/.cache
