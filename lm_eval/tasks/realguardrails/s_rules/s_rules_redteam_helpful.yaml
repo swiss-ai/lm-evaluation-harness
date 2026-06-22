@@ -1,4 +1,4 @@
-include: _s_rules_template.yaml
+include: _s_rules_template_yaml
 task: realguardrails_s_rules_redteam_helpful
 class: !function task.SRulesTask
 dataset_kwargs:

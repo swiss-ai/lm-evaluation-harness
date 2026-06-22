@@ -474,7 +474,7 @@ The complete change set:
 + `lm_eval/api/multi_turn.py` (new) — `MultiTurnState` dataclass.
 + `lm_eval/evaluator.py` — `run_multi_turn_rollout(lm, mt_task_outputs)` driver; `_any_rank_has_pending` / `_gather_max_live` / `_clear_multi_turn_states` helpers; 4-line insertion in `evaluate()` to call the driver before the standard request dispatch.
 + `lm_eval/config/task.py` — multi-turn default `generation_kwargs` (`until=[]`); CLI `--gen_kwargs` override extended to multi-turn (upstream commit `504922b38`).
-+ `lm_eval/tasks/realguardrails/s_rules/{task.py,utils.py,_s_rules_template.yaml}` — SRulesTask migration to the new path.
++ `lm_eval/tasks/realguardrails/s_rules/{task.py,utils.py,_s_rules_template_yaml}` — SRulesTask migration to the new path.
 + `lm_eval/tasks/realguardrails/README.md` — Limits section: multi-turn parallelism pointer + Anthropic/Google caveat.
 + `tests/test_multi_turn_rollout.py` (new) — 20 driver tests (10 single-rank + 4 distributed + 4 helper unit + asymmetric-DP + safety-cap) plus 1 documented real-DP smoke placeholder.
 + `tests/test_s_rules.py` — multi-turn hook + `process_results` tests added.
