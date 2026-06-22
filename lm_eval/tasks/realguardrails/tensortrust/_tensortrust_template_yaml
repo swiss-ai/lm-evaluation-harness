@@ -27,6 +27,10 @@ process_docs: !function utils.filter_no_post
 description: "{{ messages[0]['content'] }}"
 doc_to_text: "{{ messages[1]['content'] }}"
 doc_to_target: ""
+# The attack prompt (doc_to_text) can end in whitespace and there is no
+# target to delimit (scored by process_results), so use an empty target
+# delimiter rather than the default space.
+target_delimiter: ""
 generation_kwargs:
   do_sample: false
   temperature: 0.0

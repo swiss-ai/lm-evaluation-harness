@@ -72,7 +72,13 @@ class SRulesTask(ConfigurableTask):
         ``lm-eval`` is invoked from anywhere other than the repo root.
         Anchor to ``Path(__file__).parent`` here and let the parent
         download() do everything else unchanged.
+
+        Falls back to the configured ``dataset_kwargs`` on a bare
+        ``download()`` (e.g. the CI task-scan test) so the anchoring still
+        runs — otherwise the parent would reload the unanchored relative path.
         """
+        if dataset_kwargs is None and self.config.dataset_kwargs:
+            dataset_kwargs = self.config.dataset_kwargs
         if dataset_kwargs and "data_files" in dataset_kwargs:
             data_files = dataset_kwargs["data_files"]
             base = Path(__file__).parent

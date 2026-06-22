@@ -933,10 +933,21 @@ class ConfigurableTask(Task):
                     )
 
     def download(self, dataset_kwargs: dict[str, Any] | None = None, **kwargs) -> None:
+        import copy
         import re
         import time
 
         from packaging.version import parse as vparse
+
+        # A bare ``download()`` (e.g. a re-download, or the CI task-scan test
+        # which calls ``download()`` with no args) must reload the same dataset
+        # as ``__init__``. Fall back to the configured ``dataset_kwargs`` so
+        # datasets that require ``data_files`` (e.g. ``dataset_path: json``)
+        # don't error on an empty file list. Deep-copied to avoid mutating the
+        # config; only triggers when ``dataset_kwargs`` is actually configured,
+        # so HF-hub tasks are unaffected.
+        if dataset_kwargs is None and self.config.dataset_kwargs:
+            dataset_kwargs = copy.deepcopy(self.config.dataset_kwargs)
 
         if dataset_kwargs and vparse(datasets.__version__) >= vparse("4.0.0"):
             dataset_kwargs.pop("trust_remote_code", None)
