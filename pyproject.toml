@@ -87,9 +87,9 @@ multilingual = ["nagisa>=0.2.7", "jieba>=0.42.1", "pycountry"]
 #]
 ruler = ["nltk", "wonderwords", "scipy"]
 wmt_translation = ["subset2evaluate", "unbabel-comet"]
-# SystemCheck / RealGuardrails single-turn sub-suites. `openai` is needed
-# by the shared judge client (lm_eval/api/judge.py) used by FollowBench
-# in a later milestone; the IFEval verifier registry powers S-IFEval.
+# SystemCheck / RealGuardrails single-turn sub-suites. `openai` powers the
+# OpenAI-compatible `local-chat-completions` backend used to serve models
+# for these tasks; the IFEval verifier registry powers S-IFEval.
 sysp_eval = ["openai", "lm_eval[ifeval]"]
 sentencepiece = ["sentencepiece>=0.1.98"]
 discrim_eval = ["statsmodels==0.14.4"]

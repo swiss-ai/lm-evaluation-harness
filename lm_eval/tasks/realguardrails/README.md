@@ -4,8 +4,8 @@
 
 - Title: *A Closer Look at System Prompt Robustness*
 - Authors: Norman Mu, Jonathan Lu, Michael Lavery, David Wagner
-- Abstract: arXiv preprint arXiv:2502.12197
-- Homepage: https://github.com/normster/RealGuardrails
+- Paper: https://arxiv.org/abs/2502.12197
+- Repo: https://github.com/normster/RealGuardrails
 
 The project was originally released as **RealGuardrails** and later
 renamed to **SystemCheck**; the GitHub repository still resolves at the
@@ -16,17 +16,6 @@ the single-turn evaluation inputs covered here ship as JSONL files in the
 GitHub repo (and in [`normster/llm_rules`](https://github.com/normster/llm_rules)
 for S-RuLES, vendored in-tree at SHA
 [`f627e56`](https://github.com/normster/llm_rules/tree/f627e569146015d7fd6f200bb758b2591f9eb6c6)).
-
-### Citation
-
-```bibtex
-@article{mu2025systemcheck,
-  title={A Closer Look at System Prompt Robustness},
-  author={Mu, Norman and Lu, Jonathan and Lavery, Michael and Wagner, David},
-  journal={arXiv preprint arXiv:2502.12197},
-  year={2025}
-}
-```
 
 ### Implementation Details
 
@@ -109,8 +98,8 @@ the upstream flags `--system_instructions` and
   per-doc booleans in `samples_*.jsonl` to produce CIs.
 - **Judge-based multi-turn suites still deferred** (RealGuardrails
   handwritten / distractors / Monkey Island) — need an LLM-judge call
-  from inside the rollout loop. The judge client exists at
-  `lm_eval/api/judge.py`; the wiring is a separate PR.
+  from inside the rollout loop. Both the judge client and its wiring are
+  a separate PR.
 
 ### Dataset
 
@@ -296,9 +285,9 @@ lm-eval run \
 ```
 
 The IFEval verifier deps (`langdetect`, `immutabledict`, `nltk>=3.9.1`,
-`spacy`) ship under the `lm_eval[sysp_eval]` extra. The `openai` SDK is
-required at runtime for any judge-based task that lands in a later
-milestone but is not exercised by the rule-based sub-suites here.
+`spacy`) ship under the `lm_eval[sysp_eval]` extra, which also pulls in
+the `openai` SDK for the OpenAI-compatible `local-chat-completions`
+backend shown above. The rule-based sub-suites here don't call it directly.
 
 ### Checklist
 
