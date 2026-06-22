@@ -214,7 +214,7 @@ that rank's `LM` instance uses.
     --batch_size 8 \
     --output_path ./results/
   ```
-  
+
 + **Single GPU / single host** → no special config needed; the
 in-process per-turn batched call already exploits the device.
 
@@ -435,7 +435,7 @@ for first-time multi-turn task authors:
   predicate (e.g. "skip rows with no trailing user turns") can use
   this as the natural skip mechanism — no early-exit hook needed.
 + **`generation_kwargs` is shared across all turns.** The driver
-  re-uses the task's single `generation_kwargs` block (`max_gen_toks`,
+  reuses the task's single `generation_kwargs` block (`max_gen_toks`,
   `until`, `temperature`, etc.) on every turn. Per-turn variation
   isn't supported in v1 — see the Limits section. For tasks that need
   it (rare), add a `next_gen_kwargs(turn_idx)` hook on the task and a
