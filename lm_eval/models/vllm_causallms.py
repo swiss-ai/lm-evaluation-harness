@@ -25,7 +25,9 @@ from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
     check_system_boilerplate,
+    compute_generation_length_info,
     configure_pad_token,
+    detect_think_end_token,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
@@ -250,6 +252,13 @@ class VLLM(TemplateLM):
         self.enable_thinking = self.chat_template_args.pop(
             "enable_thinking", enable_thinking
         )
+        # Default the reasoning-strip token from the model's chat template when the
+        # caller didn't set it explicitly, so the deliberation span is stripped before
+        # scoring (and measured for length) without the caller knowing the token.
+        if self.think_end_token is None:
+            self.think_end_token = detect_think_end_token(
+                getattr(self.tokenizer, "chat_template", None)
+            )
 
         if parse_version(version("vllm")) >= parse_version("0.8.3"):
             kwargs_resolve_hf_chat_template = {
@@ -667,6 +676,10 @@ class VLLM(TemplateLM):
     ) -> list[str]:
         assert self.tokenizer
         res = []
+        # Parallel to `res`: per-response length info measured on the RAW generation
+        # (before postprocess_generated_text strips the thinking span). Carried back
+        # to the originating Instances at the end so the evaluator can log it.
+        length_res = []
 
         # batch tokenize contexts
         context, all_gen_kwargs = zip(*(req.args for req in requests), strict=True)
@@ -743,6 +756,17 @@ class VLLM(TemplateLM):
             # cache generations
             for output, _context in zip(cont, context, strict=True):
                 generated_text: str = output.outputs[0].text
+                # Measure length on the RAW generation (before the thinking span is
+                # stripped below), so response/thinking length survive thinking mode.
+                # Response token count comes from the exact generated token_ids.
+                length_res.append(
+                    compute_generation_length_info(
+                        generated_text,
+                        token_ids=getattr(output.outputs[0], "token_ids", None),
+                        think_end_token=self.think_end_token,
+                        tokenizer=self.tokenizer,
+                    )
+                )
                 # use secondary stop seqs to cut off should-have-been-stopped content post-hoc
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
@@ -755,7 +779,14 @@ class VLLM(TemplateLM):
 
         pbar.close()
         # reorder all group of results back to original unsorted form
-        return re_ords.get_original(res)
+        res = re_ords.get_original(res)
+        # Carry the parallel length info back to the originating Instances, in the
+        # same (restored) order as `res`. Appends one entry per response, mirroring
+        # how the evaluator appends `resps`; downstream logging reads req.length_info.
+        length_res = re_ords.get_original(length_res)
+        for req, info in zip(requests, length_res, strict=True):
+            req.length_info.append(info)
+        return res
 
     def _loglikelihood_tokens(
         self,

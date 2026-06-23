@@ -22,6 +22,10 @@ class Instance:
     )
     resps: list = field(default_factory=list)
     filtered_resps: dict = field(default_factory=dict)
+    # Per-response generation length (response/thinking length in words/chars/tokens),
+    # populated by generation models that measure it (e.g. vLLM) on the raw text before
+    # any thinking-strip. One entry per response, mirroring `resps`; empty otherwise.
+    length_info: list = field(default_factory=list)
 
     # initialized after init
     task_name: str | None = None

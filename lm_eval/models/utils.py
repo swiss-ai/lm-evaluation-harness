@@ -1156,6 +1156,65 @@ def postprocess_generated_text(
     return generation
 
 
+def compute_generation_length_info(
+    raw_text: str,
+    token_ids: list | None = None,
+    think_end_token: str | None = None,
+    tokenizer=None,
+) -> dict:
+    """Length of a raw generation (and its thinking span) for per-sample logging.
+
+    Computed on the RAW generation, BEFORE ``postprocess_generated_text`` discards the
+    thinking span — so response/thinking length survive thinking-mode scoring (which
+    keeps only the text after ``think_end_token``). The response covers the full
+    generation (reasoning + answer); the thinking span is everything up to and
+    including ``think_end_token`` (the model emits reasoning first).
+
+    Always returns ``response_length_{words,chars}`` (plus ``_tokens`` from the exact
+    generated ``token_ids`` when available); adds ``thinking_length_{words,chars}``
+    (plus ``_tokens`` by re-encoding the span when a ``tokenizer`` is given) only when
+    the text contains a ``think_end_token``. Never raises — length logging must not
+    break generation.
+    """
+    info: dict = {}
+    # never let length logging break generation
+    with contextlib.suppress(Exception):
+        info["response_length_words"] = len(raw_text.split())
+        info["response_length_chars"] = len(raw_text)
+        if token_ids is not None:
+            info["response_length_tokens"] = len(token_ids)
+        if think_end_token and think_end_token in raw_text:
+            thinking_text = raw_text.split(think_end_token, 1)[0] + think_end_token
+            info["thinking_length_words"] = len(thinking_text.split())
+            info["thinking_length_chars"] = len(thinking_text)
+            if tokenizer is not None:
+                # token count is best-effort
+                with contextlib.suppress(Exception):
+                    info["thinking_length_tokens"] = len(
+                        tokenizer.encode(thinking_text, add_special_tokens=False)
+                    )
+    return info
+
+
+def detect_think_end_token(chat_template: str | None) -> str | None:
+    """Derive the reasoning *close* token (``think_end_token``) from a chat template.
+
+    Apertus-style templates declare the reasoning open/close as ``inner_token`` /
+    ``outer_token`` (e.g. ``<think>``/``</think>``, or ``<|inner_prefix|>``/
+    ``<|inner_suffix|>`` on some checkpoints). Returns the close token when the
+    template declares one (last assignment wins), else None. Used by the causal LMs
+    to default ``think_end_token`` when the caller didn't set it explicitly, so the
+    deliberation span is stripped before scoring without the caller having to know
+    the model-specific token. Templates that declare no reasoning tokens -> None ->
+    no auto-strip (and for a non-thinking run the token simply never appears, so the
+    strip is a harmless no-op).
+    """
+    if not chat_template:
+        return None
+    matches = re.findall(r"""outer_token\s*=\s*['"]([^'"]+)['"]""", chat_template)
+    return matches[-1] if matches else None
+
+
 def has_bos_prefix(sequence: str, bos_str: str | Iterable[str] | None = None) -> bool:
     if bos_str is None:
         return False

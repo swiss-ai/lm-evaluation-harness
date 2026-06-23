@@ -716,6 +716,10 @@ def evaluate(
                         "filtered_resps": [
                             req.filtered_resps[filter_key] for req in requests
                         ],
+                        # Per-response generation length measured before any
+                        # thinking-strip (populated by generation models that support
+                        # it, e.g. vLLM; empty list otherwise).
+                        "length_info": [req.length_info for req in requests],
                         "filter": filter_key,
                         "metrics": list(metrics.keys()),
                         "doc_hash": hash_string(

@@ -32,7 +32,9 @@ from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
     check_system_boilerplate,
+    compute_generation_length_info,
     configure_pad_token,
+    detect_think_end_token,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
@@ -272,6 +274,14 @@ class HFLM(TemplateLM):
         self.chat_template_args = chat_template_args
         if enable_thinking is not None:
             self.chat_template_args["enable_thinking"] = enable_thinking
+
+        # Default the reasoning-strip token from the model's chat template when the
+        # caller didn't set it explicitly (a string close token; the int/str handling
+        # above only applies to an explicitly-passed token).
+        if self.think_end_token is None:
+            self.think_end_token = detect_think_end_token(
+                getattr(self.tokenizer, "chat_template", None)
+            )
 
         # System-prompt authority probe — OFF by default. Run it only when the
         # caller opts in via `check_system_prompt_authority` (and hasn't waived it with
@@ -1408,6 +1418,9 @@ class HFLM(TemplateLM):
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
         res = []
+        # Parallel to `res`: per-response length measured on the RAW generation
+        # (before the thinking span is stripped), carried back to the Instances.
+        length_res = []
 
         def _collate(req: tuple[str, dict]):
             """Defines the key for the sorted method"""
@@ -1517,15 +1530,45 @@ class HFLM(TemplateLM):
                 if self.backend == "causal":
                     cont_toks = cont_toks[context_enc.shape[1] :]
 
-                # Handle integer think_end_token: find last occurrence and strip tokens after it
+                # Locate the thinking boundary once (int think_end_token = token id);
+                # reused for both length logging and the strip below.
+                think_token_indices = (
+                    [i for i, t in enumerate(cont_toks) if t == self.think_end_token]
+                    if isinstance(self.think_end_token, int)
+                    else None
+                )
+
+                # Length of the RAW generation (full cont_toks, before the thinking
+                # span is stripped below), for per-sample logging. think_end_token may
+                # be a token id (int) or a string; both mark the same boundary.
                 if isinstance(self.think_end_token, int):
-                    think_token_indices = [
-                        i
-                        for i, token in enumerate(cont_toks)
-                        if token == self.think_end_token
-                    ]
+                    len_info = compute_generation_length_info(
+                        self.tok_decode(cont_toks, skip_special_tokens=False),
+                        token_ids=cont_toks,
+                    )
                     if think_token_indices:
-                        cont_toks = cont_toks[think_token_indices[-1] + 1 :]
+                        n_think = think_token_indices[-1] + 1
+                        think_text = self.tok_decode(
+                            cont_toks[:n_think], skip_special_tokens=False
+                        )
+                        len_info["thinking_length_tokens"] = n_think
+                        len_info["thinking_length_words"] = len(think_text.split())
+                        len_info["thinking_length_chars"] = len(think_text)
+                    length_res.append(len_info)
+                else:
+                    length_res.append(
+                        compute_generation_length_info(
+                            self.tok_decode(cont_toks, skip_special_tokens=False),
+                            token_ids=cont_toks,
+                            think_end_token=self.think_end_token,
+                            tokenizer=self.tokenizer,
+                        )
+                    )
+
+                # Strip thinking tokens for scoring: keep only tokens after the last
+                # think_end_token occurrence (int mode; reuses the indices above).
+                if think_token_indices:
+                    cont_toks = cont_toks[think_token_indices[-1] + 1 :]
 
                 s = self.tok_decode(cont_toks)
 
@@ -1547,6 +1590,11 @@ class HFLM(TemplateLM):
                 pbar.update(1)
         # reorder this group of results back to original unsorted form
         res = re_ords.get_original(res)
+        # Carry the parallel length info back to the originating Instances, in the
+        # same (restored) order as `res`; one entry per response, mirroring `resps`.
+        length_res = re_ords.get_original(length_res)
+        for req, info in zip(requests, length_res, strict=True):
+            req.length_info.append(info)
 
         pbar.close()
 

@@ -10,6 +10,8 @@ from lm_eval.api.model import TemplateLM
 from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
+    compute_generation_length_info,
+    detect_think_end_token,
     handle_stop_sequences,
     postprocess_generated_text,
 )
@@ -112,6 +114,11 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
+        # Default the reasoning-strip token from the chat template when caller unset it.
+        if self.think_end_token is None:
+            self.think_end_token = detect_think_end_token(
+                getattr(self.tokenizer, "chat_template", None)
+            )
         self._max_gen_toks = max_gen_toks
         self.add_bos_token = add_bos_token
         if "gemma" in pretrained.lower():
@@ -194,6 +201,10 @@ class SGLangLM(TemplateLM):
         self, requests: List[Instance], disable_tqdm: bool = False
     ) -> List[str]:
         res = []
+        # Keep the original Instances (the `requests` name is reassigned below) and a
+        # parallel length list, so generation length can be carried back per sample.
+        instances = requests
+        length_res = []
 
         # batch tokenize contexts
         context, all_gen_kwargs = zip(*(req.args for req in requests))
@@ -272,6 +283,19 @@ class SGLangLM(TemplateLM):
             # cache generations
             for output, context in zip(cont, context):
                 generated_text = output.get("text", "")
+                # Length on the RAW generation (before the thinking span is stripped).
+                # sglang returns no token_ids here; use the exact completion_tokens
+                # count from meta_info when present for response_length_tokens.
+                _len_info = compute_generation_length_info(
+                    generated_text,
+                    token_ids=None,
+                    think_end_token=self.think_end_token,
+                    tokenizer=self.tokenizer,
+                )
+                _ct = (output.get("meta_info") or {}).get("completion_tokens")
+                if isinstance(_ct, int):
+                    _len_info["response_length_tokens"] = _ct
+                length_res.append(_len_info)
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
                 )
@@ -283,7 +307,13 @@ class SGLangLM(TemplateLM):
 
         pbar.close()
         # reorder all group of results back to original unsorted form
-        return re_ords.get_original(res)
+        res = re_ords.get_original(res)
+        # Carry the parallel length info back to the original Instances, in the same
+        # (restored) order as `res`; one entry per response, mirroring `resps`.
+        length_res = re_ords.get_original(length_res)
+        for req, info in zip(instances, length_res, strict=True):
+            req.length_info.append(info)
+        return res
 
     def _model_generate(
         self,
