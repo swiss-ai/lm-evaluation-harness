@@ -1,8 +1,5 @@
 include: humaneval_instruct.yaml
 task: humaneval_instruct_self_consistency
-# Zero-shot, sampled. For code, pass@k is native via code_eval:
-#   pass@1 over the 8 samples == mean@8 (average pass rate); pass@8 == any-correct.
-# (Majority-vote isn't meaningful for code, so it is intentionally omitted.)
 num_fewshot: 0
 repeats: 8
 generation_kwargs:
