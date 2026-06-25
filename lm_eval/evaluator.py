@@ -61,22 +61,25 @@ def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
     return task.init_multiturn_state(doc, ctx, gen_kwargs)
 
 
-def _run_generate_until_multiturn_requests(
+def run_multi_turn_rollout(
     lm: LM,
     eval_tasks,
     requests: list,
     apply_chat_template: bool = False,
     chat_template=None,
 ) -> None:
-    """Run interactive generation episodes in batched waves.
+    """Run interactive multi-turn generation episodes in batched waves.
 
-    A ``generate_until_multiturn`` task still uses the model's regular
+    A ``multi_turn_generate`` task still uses the model's regular
     ``generate_until`` method. The task owns episode state and decides which prompt
-    to issue next after each response.
+    to issue next after each response. Turn ``t+1``'s prompt contains turn ``t``'s
+    response, so each wave is a synchronization barrier; within a wave all pending
+    episodes across all multi-turn tasks share a single batched ``generate_until``
+    call.
     """
     if lm.world_size > 1:
         raise NotImplementedError(
-            "generate_until_multiturn does not currently support distributed "
+            "multi_turn_generate does not currently support distributed "
             "evaluation. Please run with world_size=1."
         )
 
@@ -141,7 +144,7 @@ def _run_generate_until_multiturn_requests(
             break
 
         eval_logger.info(
-            f"Running generate_until_multiturn wave with {len(wave_requests)} requests"
+            f"Running multi_turn_generate wave with {len(wave_requests)} requests"
         )
         responses = lm.generate_until(wave_requests)
         for response, (episode, request) in zip(responses, active, strict=True):
@@ -155,7 +158,7 @@ def _run_generate_until_multiturn_requests(
         )
         if unfinished:
             eval_logger.warning(
-                f"{unfinished} generate_until_multiturn episodes reached the "
+                f"{unfinished} multi_turn_generate episodes reached the "
                 f"maximum step limit ({max_steps})."
             )
 
@@ -163,6 +166,42 @@ def _run_generate_until_multiturn_requests(
         episode["instance"].resps.append(
             episode["task"].multiturn_result(episode["state"])
         )
+
+
+def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
+    """Warn when a task needs an authoritative system prompt but the model's
+    system-prompt authority check was not activated (it is OFF by default).
+
+    A task opts in with ``metadata: {requires_system_prompt_authority: true}``.
+    HF/vLLM set ``lm.system_prompt_authority_handled`` to ``True`` when any of
+    ``check_system_prompt_authority`` / ``strip_system_boilerplate`` /
+    ``allow_system_boilerplate`` is passed; backends without the concept lack
+    the attribute (treated as handled → no warning). Returns the offending task
+    names (``[]`` if none), so the behaviour is unit-testable.
+    """
+    if getattr(lm, "system_prompt_authority_handled", True):
+        return []
+    needy = []
+    for to in get_task_list(task_dict):
+        # Group placeholders can carry a falsy/None task; read defensively.
+        cfg = getattr(getattr(to, "task", None), "config", None)
+        metadata = getattr(cfg, "metadata", None)
+        if isinstance(metadata, dict) and metadata.get(
+            "requires_system_prompt_authority"
+        ):
+            needy.append(to.task_name)
+    if needy:
+        eval_logger.warning(
+            "Task(s) %s expect an authoritative system prompt, but the "
+            "system-prompt authority check is not active for this model (OFF by "
+            "default). Chat-template boilerplate (e.g. Llama 3.x date headers) "
+            "can silently skew these scores. Pass `check_system_prompt_authority=true` to "
+            "verify, `strip_system_boilerplate=true` to auto-fix Llama 3.x "
+            "boilerplate, or `allow_system_boilerplate=true` to acknowledge and "
+            "silence this warning.",
+            needy,
+        )
+    return needy
 
 
 @positional_deprecated
@@ -422,7 +461,14 @@ def simple_evaluate(
                 }
 
             else:
-                if task_obj.get_config("output_type") == "generate_until":
+                if task_obj.get_config("output_type") in (
+                    "generate_until",
+                    "multi_turn_generate",
+                ):
+                    # multi_turn_generate also issues generate_until calls per
+                    # turn (see run_multi_turn_rollout), reading the task's
+                    # generation_kwargs — so the CLI override must reach it too,
+                    # e.g. `--gen_kwargs until=<|im_end|>` to add a stop token.
                     if gen_kwargs is not None:
                         task_obj.set_config(
                             key="generation_kwargs", value=gen_kwargs, update=True
@@ -464,6 +510,11 @@ def simple_evaluate(
         return adjusted_task_dict
 
     task_dict = _adjust_config(task_dict)
+
+    # Rank 0 only — `simple_evaluate` runs on every rank under accelerate/DDP,
+    # so guard to avoid one identical warning per process.
+    if getattr(lm, "rank", 0) == 0:
+        _warn_if_system_prompt_authority_inactive(lm, task_dict)
 
     if check_integrity:
         run_task_tests(task_list=tasks)
@@ -696,10 +747,15 @@ def evaluate(
 
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
-    multiturn_requests = requests.pop("generate_until_multiturn", [])
+    # Iterative multi-turn rollout (output_type: multi_turn_generate): turn
+    # t+1's prompt contains turn t's response, so the task owns episode state
+    # and the driver issues regular `generate_until` calls one wave at a time.
+    # Pulled out of the standard dispatch loop below so the per-turn barrier
+    # is handled explicitly.
+    multiturn_requests = requests.pop("multi_turn_generate", [])
     if multiturn_requests:
-        eval_logger.info("Running generate_until_multiturn requests")
-        _run_generate_until_multiturn_requests(
+        eval_logger.info("Running multi_turn_generate requests")
+        run_multi_turn_rollout(
             lm,
             eval_tasks,
             multiturn_requests,
@@ -736,12 +792,17 @@ def evaluate(
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
     for task_output, limit in zip(eval_tasks, limits, strict=True):
         task = task_output.task
-        task.apply_filters()
 
-        # Skip post-processing for ranks with no instances (data parallel with small datasets)
-        # The gather will collect empty results from this rank
+        # Skip post-processing for ranks with no instances (data parallel with
+        # small datasets, or multi_turn_generate when world_size > docs-for-task,
+        # leaving some ranks an empty shard). Must come BEFORE apply_filters():
+        # Filter.apply does `zip(*(... for inst in instances))`, which raises
+        # `ValueError: not enough values to unpack` on an empty instance list.
+        # The gather will collect empty results from this rank.
         if len(task.instances) == 0:
             continue
+
+        task.apply_filters()
 
         ### Collect values of metrics on all datapoints ###
         # # unpack results and sort back in order and return control to Task
@@ -821,11 +882,20 @@ def evaluate(
                         itertools.chain.from_iterable(full_samples)
                     )
 
-            # then collect metrics across all ranks
-            for metrics in task_output.sample_metrics:
+            # then collect metrics across all ranks. Agree on a consistent key
+            # set first: a rank with an empty shard (world_size > docs-for-task,
+            # reachable for multi_turn_generate on small/limited tasks, or any DP
+            # run with fewer docs than ranks) has no `sample_metrics` keys and
+            # would otherwise issue fewer `gather_object` collectives than its
+            # peers — desyncing the gather and deadlocking the job.
+            local_keys = list(task_output.sample_metrics.keys())
+            gathered_keys = [None] * WORLD_SIZE
+            torch.distributed.all_gather_object(gathered_keys, local_keys)
+            all_keys = sorted({k for keys in gathered_keys for k in keys})
+            for metrics in all_keys:
                 metric_list = [None] * WORLD_SIZE if RANK == 0 else None
                 torch.distributed.gather_object(
-                    obj=task_output.sample_metrics[metrics],
+                    obj=task_output.sample_metrics.get(metrics, []),
                     object_gather_list=metric_list,
                     dst=0,
                 )

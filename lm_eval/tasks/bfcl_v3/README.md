@@ -40,12 +40,12 @@ Java, JavaScript, and multi-turn categories require the `bfcl` optional extra:
 pip install -e ".[bfcl]"
 ```
 
-Multi-turn categories use the harness `generate_until_multiturn` output type, which
+Multi-turn categories use the harness `multi_turn_generate` output type, which
 batches active conversations by wave. Each BFCL episode alternates model generation,
 constrained parsing of prompt-mode or Apertus tool calls, execution against
 simulated BFCL tool APIs, and appending execution results to the conversation. The
 executor uses an AST dispatcher over the vendored simulated tools rather than
 evaluating arbitrary model text directly.
 
-Distributed multi-turn evaluation is not supported yet; run `generate_until_multiturn`
+Distributed multi-turn evaluation is not supported yet; run `multi_turn_generate`
 tasks with `world_size=1`.

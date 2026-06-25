@@ -6,8 +6,8 @@ OutputType = Literal[
     "loglikelihood",
     "loglikelihood_rolling",
     "generate_until",
-    "generate_until_multiturn",
     "multiple_choice",
+    "multi_turn_generate",
 ]
 
 

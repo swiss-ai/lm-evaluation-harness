@@ -428,8 +428,8 @@ def test_bfcl_v3_apertus_javascript_scores_reference_call():
 
 def test_bfcl_v3_multi_turn_scores_ground_truth_calls():
     task = _make_task("multi_turn_base")
-    task.config.output_type = "generate_until_multiturn"
-    task.OUTPUT_TYPE = "generate_until_multiturn"
+    task.config.output_type = "multi_turn_generate"
+    task.OUTPUT_TYPE = "multi_turn_generate"
     doc = task.test_docs()[0]
     result = {
         "decoded_responses": [[turn] for turn in doc["ground_truth"]],

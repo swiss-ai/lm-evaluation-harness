@@ -30,7 +30,10 @@ def parser(full_path: list[str]) -> list[str]:
                 _output.add(config["task"])
             elif isinstance(config["task"], list):
                 _output.add(config["group"])
-    return list(_output)
+    # Sorted (not list(set)) so the parametrization order is deterministic:
+    # under `pytest -n=auto` every xdist worker must collect tasks in the same
+    # order, else collection mismatches ("Different tests were collected").
+    return sorted(_output)
 
 
 def new_tasks() -> list[str] | None:

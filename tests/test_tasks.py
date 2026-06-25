@@ -26,7 +26,7 @@ def get_new_tasks_else_default():
     # CI: new_tasks checks if any modifications have been made
     task_classes = new_tasks()
     # Check if task_classes is empty
-    return task_classes if task_classes else TASKS
+    return task_classes or TASKS
 
 
 def task_class(task_names=None, task_manager=None) -> ConfigurableTask:
@@ -128,13 +128,16 @@ class BaseTasks:
         _array_target = [task.doc_to_target(doc) for doc in arr]
         if task._config.output_type == "multiple_choice":
             # TODO<baber>: label can be string or int; add better test conditions
-            assert all(
-                (isinstance(label, int) or isinstance(label, str))
-                for label in _array_target
-            )
+            assert all(isinstance(label, (int, str)) for label in _array_target)
 
     def test_build_all_requests(self, task_class, limit):
-        task_class.build_all_requests(rank=1, limit=limit, world_size=1)
+        # multi_turn_generate tasks require a chat template — the per-doc
+        # system prompt would otherwise become a plain-text prefix — so the
+        # rollout driver (and thus request-building) enforces it.
+        apply_chat_template = task_class.OUTPUT_TYPE == "multi_turn_generate"
+        task_class.build_all_requests(
+            rank=1, limit=limit, world_size=1, apply_chat_template=apply_chat_template
+        )
         assert task_class.instances is not None
 
     # ToDO: Add proper testing

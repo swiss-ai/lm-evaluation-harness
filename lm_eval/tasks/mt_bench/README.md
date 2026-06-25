@@ -1,7 +1,7 @@
 # MT-Bench
 
 This task integrates the FastChat MT-Bench question set in single-model scoring
-mode. It uses the harness `generate_until_multiturn` output type to collect two
+mode. It uses the harness `multi_turn_generate` output type to collect two
 assistant turns per question, then defers LLM-as-judge scoring to aggregation.
 When `--apply_chat_template` is enabled, each turn is rendered with the evaluated
 model's chat template; otherwise the task falls back to a simple plain-text

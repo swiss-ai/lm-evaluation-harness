@@ -1,6 +1,6 @@
 task: mt_bench
 class: !function task.MTBenchTask
-output_type: generate_until_multiturn
+output_type: multi_turn_generate
 test_split: test
 doc_to_target: ""
 metric_list:

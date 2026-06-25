@@ -22,7 +22,7 @@ def _make_task():
     return MTBenchTask(
         config={
             "task": "mt_bench",
-            "output_type": "generate_until_multiturn",
+            "output_type": "multi_turn_generate",
             "test_split": "test",
             "num_fewshot": 0,
             "metric_list": [

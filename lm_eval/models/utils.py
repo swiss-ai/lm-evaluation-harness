@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import collections
+import contextlib
 import fnmatch
 import itertools
 import logging
+import re
 import time
 from functools import wraps
 from typing import (
@@ -540,7 +542,7 @@ def configure_pad_token(
         # handle special cases
         if model_config and getattr(model_config, "model_type", None) == "qwen":
             # Qwen's trust_remote_code tokenizer does not allow for adding special tokens
-            tokenizer.pad_token = "<|endoftext|>"
+            tokenizer.pad_token = "<|endoftext|>"  # noqa: S105 (pad token, not a secret)
         elif (
             tokenizer.__class__.__name__ == "RWKVWorldTokenizer"
             or tokenizer.__class__.__name__ == "Rwkv5Tokenizer"
@@ -555,6 +557,224 @@ def configure_pad_token(
             tokenizer.add_special_tokens({"pad_token": "<|pad|>"})
 
     return tokenizer
+
+
+def strip_system_boilerplate_from_template(template_source: str | None) -> str | None:
+    r"""Strip Llama 3.x date/knowledge boilerplate from a Jinja chat template.
+
+    Llama 3.x chat templates unconditionally inject "Cutting Knowledge Date"
+    and "Today Date" headers into the system message. For benchmarks that
+    evaluate system-prompt robustness (e.g. TensorTrust) this dilutes
+    prompt authority and causes scores to diverge from paper baselines.
+
+    Three constructs are targeted in the Jinja source:
+      1. The ``{%- if not date_string is defined %}...{%- endif %}`` block
+         (Llama 3.2+ ``strftime_now`` fallback — may contain nested if/endif).
+      2. The ``{{- "Cutting Knowledge Date: ..." }}`` output statement.
+      3. The ``{{- "Today Date: " + date_string + "\\n\\n" }}`` output statement.
+
+    Returns the cleaned template string if any pattern matched, or ``None``
+    if the template was already clean (no patterns found).
+    """
+    if not template_source:
+        return None
+
+    cleaned = template_source
+    changed = False
+
+    # 1. Remove the {%- if not date_string is defined %} ... {%- endif %} block.
+    #    This block may contain nested if/else/endif (Llama 3.2+), so we cannot
+    #    use a single non-greedy regex. Instead, find the opening tag and scan
+    #    forward tracking nesting depth to locate the matching endif.
+    open_pat = re.compile(r"\{%-?\s*if\s+not\s+date_string\s+is\s+defined\s*-?%\}")
+    m = open_pat.search(cleaned)
+    if m:
+        depth = 1
+        pos = m.end()
+        if_tag = re.compile(r"\{%-?\s*if\s")
+        endif_tag = re.compile(r"\{%-?\s*endif\s*-?%\}")
+        while depth > 0 and pos < len(cleaned):
+            next_if = if_tag.search(cleaned, pos)
+            next_endif = endif_tag.search(cleaned, pos)
+            if next_endif is None:
+                break
+            if next_if and next_if.start() < next_endif.start():
+                depth += 1
+                pos = next_if.end()
+            else:
+                depth -= 1
+                if depth == 0:
+                    cleaned = cleaned[: m.start()] + cleaned[next_endif.end() :]
+                    changed = True
+                else:
+                    pos = next_endif.end()
+
+    # 2. Remove {{- "Cutting Knowledge Date: ..." }} output statement.
+    pat2 = re.compile(
+        r"\{\{-?\s*\"Cutting Knowledge Date:.*?\"\s*-?\}\}",
+        re.DOTALL,
+    )
+    result, n = pat2.subn("", cleaned)
+    if n > 0:
+        cleaned = result
+        changed = True
+
+    # 3. Remove {{- "Today Date: " + date_string + "\n\n" }} output statement.
+    pat3 = re.compile(
+        r"\{\{-?\s*\"Today Date:\s*\"\s*\+\s*date_string\s*\+\s*\"\\n\\n\"\s*-?\}\}",
+        re.DOTALL,
+    )
+    result, n = pat3.subn("", cleaned)
+    if n > 0:
+        cleaned = result
+        changed = True
+
+    if changed:
+        eval_logger.info("Stripped Llama 3.x date boilerplate from chat template.")
+        return cleaned
+    return None
+
+
+def maybe_strip_system_boilerplate(
+    chat_template_source: str | None,
+    chat_template_args: dict | None,
+    strip: bool,
+) -> dict:
+    """Apply system boilerplate stripping if requested.
+
+    If *strip* is true and `chat_template_args` does not already contain a
+    ``chat_template`` key, the tokenizer's template source is run through
+    :func:`strip_system_boilerplate_from_template` and the cleaned version
+    is injected into the returned dict.
+
+    Args:
+        chat_template_source: The raw Jinja template string from the tokenizer.
+        chat_template_args: Existing chat-template keyword arguments (may be None).
+        strip: Whether stripping was requested.
+
+    Returns:
+        The (possibly updated) ``chat_template_args`` dict — never ``None``.
+    """
+    chat_template_args = chat_template_args or {}
+    if not strip:
+        return chat_template_args
+
+    if "chat_template" not in chat_template_args:
+        cleaned = strip_system_boilerplate_from_template(chat_template_source)
+        if cleaned is not None:
+            chat_template_args["chat_template"] = cleaned
+        else:
+            eval_logger.info(
+                "strip_system_boilerplate: no boilerplate patterns found; template unchanged."
+            )
+    return chat_template_args
+
+
+def get_template_special_tokens(tokenizer) -> set[str]:
+    """Collect a tokenizer's structural special tokens for the authority probe.
+
+    Returns the union of ``all_special_tokens`` and ``get_added_vocab()`` keys.
+    The former alone misses header tokens such as Llama's
+    ``<|start_header_id|>``/``<|end_header_id|>`` (only registered in the added
+    vocab), while sentencepiece specials (``<s>``/``</s>``) live only in the
+    former. Missing or non-standard tokenizer APIs (e.g. vLLM's Mistral
+    tokenizer) are tolerated — whatever is available is returned.
+    """
+    tokens: set[str] = set()
+    with contextlib.suppress(Exception):
+        tokens |= set(getattr(tokenizer, "all_special_tokens", None) or [])
+    get_added = getattr(tokenizer, "get_added_vocab", None)
+    if callable(get_added):
+        with contextlib.suppress(Exception):
+            tokens |= set(get_added())
+    return tokens
+
+
+def check_system_boilerplate(
+    render_fn: Callable[[list[dict[str, str]]], str],
+    special_tokens: Iterable[str] | None = None,
+) -> None:
+    """Probe a chat template to verify that the system prompt is authoritative.
+
+    A system prompt is "authoritative" when nothing other than the template's
+    own structural framing — role-opening special tokens, the role label, and
+    whitespace/punctuation separators — sits between the system role
+    declaration and the user-supplied system content. Some templates inject
+    extra natural-language text there (e.g. Llama 3.x's "Cutting Knowledge
+    Date" / "Today Date" headers, or a hard-coded preamble), which dilutes the
+    prompt's authority and skews system-prompt-robustness benchmarks.
+
+    The check is template-family agnostic — it works for both special-token
+    templates (Llama, ChatML/Qwen, Phi, Command-R) and plain-text ones
+    (``### System:``):
+
+    1. Render a demo conversation with a unique sentinel as the system content
+       and take everything the template emits before it (the system header).
+    2. Strip the tokenizer's known special tokens from that header — these are
+       legitimate structural markers, whatever family they belong to (e.g.
+       ``<|start_header_id|>``, ``<|im_start|>``, ``<|SYSTEM_TOKEN|>``).
+    3. Remove the role label itself (the one word, ``system``, the template
+       emits to open the turn).
+    4. Whatever remains must contain no alphabetic characters; any letters are
+       natural-language text injected around the system prompt. Whitespace,
+       separators, and punctuation (e.g. ``:``) are fine.
+
+    Stripping the special tokens up front (rather than slicing at the role
+    word) means the check also catches text injected *before* the role label
+    and does not mis-handle templates whose role word lives inside a special
+    token (Command-R).
+
+    Raises ``RuntimeError`` with an actionable message if injection is found.
+
+    Args:
+        render_fn: A callable that takes a list of chat-message dicts and
+            returns the fully rendered template string. Each model backend
+            passes its own ``apply_chat_template`` wrapper here.
+        special_tokens: The tokenizer's known special/added tokens, stripped
+            from the header before the letter check so structural markers are
+            not mistaken for injection. Use :func:`get_template_special_tokens`
+            to build this set from a tokenizer.
+    """
+    role = "system"
+    marker = "__SYS_PROMPT_AUTHORITY_PROBE__"
+    demo = [
+        {"role": role, "content": marker},
+        {"role": "user", "content": "Hello"},
+    ]
+    try:
+        rendered = render_fn(demo)
+    except Exception:
+        # Template doesn't support a system role (or errored) — can't assess.
+        return
+
+    if marker not in rendered:
+        # Template folded/dropped/transformed the system message — can't assess.
+        return
+
+    # The system header is everything the template emits before the content.
+    header = rendered[: rendered.index(marker)]
+
+    # Strip the template's structural special tokens (longest-first so a token
+    # isn't left partially matched by a shorter one), then drop the role label
+    # itself. Anything left should be only whitespace/punctuation; any
+    # alphabetic character is natural-language text injected around the prompt.
+    residual = header
+    for tok in sorted((t for t in (special_tokens or []) if t), key=len, reverse=True):
+        residual = residual.replace(tok, "")
+    residual = re.sub(re.escape(role), "", residual, count=1, flags=re.IGNORECASE)
+
+    if any(ch.isalpha() for ch in residual):
+        raise RuntimeError(
+            "System prompt is not authoritative: the chat template injects "
+            "content between the system role header and the system prompt.\n"
+            "Injected text (with structural tokens and the role label removed):\n"
+            f"---\n{residual.strip()}\n---\n"
+            "This dilutes the system prompt's authority and will skew "
+            "system-prompt-robustness benchmark scores.\n"
+            "To fix, add one of these to model_args:\n"
+            "  strip_system_boilerplate=true  — auto-strip known Llama 3.x date boilerplate\n"
+            "  allow_system_boilerplate=true  — suppress this check (use the template as-is)"
+        )
 
 
 def replace_placeholders(
