@@ -174,7 +174,10 @@ def _apertus_message(message: dict) -> dict:
     role = message.get("role", "user")
     content = message.get("content", "")
     if role == "system":
-        return {"role": "system", "content": {"text": _message_content_to_text(content)}}
+        return {
+            "role": "system",
+            "content": {"text": _message_content_to_text(content)},
+        }
     if role == "tool":
         return {"role": "tool", "content": _message_content_to_text(content)}
     if role == "assistant":
@@ -308,8 +311,10 @@ def _parse_apertus_calls(text: str, *, strict: bool = True) -> list[dict]:
         cursor = suffix_pos + len(APERTUS_TOOL_SUFFIX)
     if strict:
         return calls
-    return calls or _parse_function_calls_tagged(text) or _parse_raw_apertus_json_calls(
-        text
+    return (
+        calls
+        or _parse_function_calls_tagged(text)
+        or _parse_raw_apertus_json_calls(text)
     )
 
 
@@ -379,7 +384,9 @@ def _java_type_name(type_name: str) -> str:
     }.get(type_name, "Object")
 
 
-def _java_literal(value: Any, expected_type: str, nested_type: str | None = None) -> str:
+def _java_literal(
+    value: Any, expected_type: str, nested_type: str | None = None
+) -> str:
     if expected_type in {"byte", "short", "integer", "double"}:
         return str(value)
     if expected_type == "float":
@@ -456,7 +463,9 @@ def _coerce_apertus_calls_for_language(
                     value, expected_type, nested_type
                 )
             elif language == "JavaScript":
-                coerced_arguments[param] = _js_literal(value, expected_type, nested_type)
+                coerced_arguments[param] = _js_literal(
+                    value, expected_type, nested_type
+                )
             else:
                 coerced_arguments[param] = value
         coerced.append({name: coerced_arguments})

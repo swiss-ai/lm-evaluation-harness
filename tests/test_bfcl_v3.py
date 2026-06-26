@@ -186,9 +186,7 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
     assert properties["networkId"]["default"] == "[]"
 
     task = _make_apertus_task("live_irrelevance")
-    doc = next(
-        doc for doc in task.test_docs() if doc["id"] == "live_irrelevance_7-0-7"
-    )
+    doc = next(doc for doc in task.test_docs() if doc["id"] == "live_irrelevance_7-0-7")
     task.fewshot_context(
         doc,
         num_fewshot=0,
