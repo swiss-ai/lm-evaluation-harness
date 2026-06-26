@@ -26,8 +26,8 @@ from lm_eval.models.utils import (
     _add_special_kwargs,
     check_system_boilerplate,
     compute_generation_length_info,
+    compute_thinking_format_info,
     configure_pad_token,
-    detect_think_end_token,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
@@ -35,6 +35,7 @@ from lm_eval.models.utils import (
     maybe_truncate,
     normalize_gen_kwargs,
     postprocess_generated_text,
+    resolve_think_tokens,
     undistribute,
 )
 from lm_eval.utils import (
@@ -161,6 +162,9 @@ class VLLM(TemplateLM):
         check_system_prompt_authority: bool = False,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
+        # Start marker for thinking tags - used for the thinking-format metric. Auto-
+        # detected from the chat template when not set.
+        think_start_token: str | None = None,
         max_lora_rank: int = 16,
         truncation_side: Literal["left", "right", "middle"] = "left",
         **kwargs,
@@ -178,6 +182,7 @@ class VLLM(TemplateLM):
         )
         kwargs.pop("device", None)
         self.think_end_token = think_end_token
+        self.think_start_token = think_start_token
         self.V1 = os.environ.get("VLLM_USE_V1", "1") != "0"
         self._max_length = max_model_len if max_model_len is not None else max_length
         self.tensor_parallel_size = int(tensor_parallel_size)
@@ -252,13 +257,16 @@ class VLLM(TemplateLM):
         self.enable_thinking = self.chat_template_args.pop(
             "enable_thinking", enable_thinking
         )
-        # Default the reasoning-strip token from the model's chat template when the
-        # caller didn't set it explicitly, so the deliberation span is stripped before
-        # scoring (and measured for length) without the caller knowing the token.
-        if self.think_end_token is None:
-            self.think_end_token = detect_think_end_token(
-                getattr(self.tokenizer, "chat_template", None)
-            )
+        # Default the reasoning open/close tokens from the model's chat template when
+        # the caller didn't set them explicitly, so the deliberation span is stripped
+        # before scoring (and measured for length/format) without the caller knowing
+        # the tokens. Fails loud if thinking is on but tokens can't be resolved.
+        self.think_start_token, self.think_end_token = resolve_think_tokens(
+            getattr(self.tokenizer, "chat_template", None),
+            self.enable_thinking,
+            self.think_start_token,
+            self.think_end_token,
+        )
 
         if parse_version(version("vllm")) >= parse_version("0.8.3"):
             kwargs_resolve_hf_chat_template = {
@@ -759,14 +767,23 @@ class VLLM(TemplateLM):
                 # Measure length on the RAW generation (before the thinking span is
                 # stripped below), so response/thinking length survive thinking mode.
                 # Response token count comes from the exact generated token_ids.
-                length_res.append(
-                    compute_generation_length_info(
+                _info = compute_generation_length_info(
+                    generated_text,
+                    token_ids=getattr(output.outputs[0], "token_ids", None),
+                    think_end_token=self.think_end_token,
+                    tokenizer=self.tokenizer,
+                )
+                # Whether the reasoning block is well-formed (open in prompt+gen,
+                # close in gen). think_end_token is already a str|None here.
+                _info.update(
+                    compute_thinking_format_info(
                         generated_text,
-                        token_ids=getattr(output.outputs[0], "token_ids", None),
+                        context=_context,
+                        think_start_token=self.think_start_token,
                         think_end_token=self.think_end_token,
-                        tokenizer=self.tokenizer,
                     )
                 )
+                length_res.append(_info)
                 # use secondary stop seqs to cut off should-have-been-stopped content post-hoc
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token

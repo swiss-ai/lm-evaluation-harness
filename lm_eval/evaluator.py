@@ -23,6 +23,7 @@ from lm_eval.evaluator_utils import (
     get_task_list,
     prepare_print_tasks,
     print_writeout,
+    promote_generation_info_metrics,
     run_task_tests,
 )
 from lm_eval.loggers.utils import add_env_info, add_tokenizer_info, get_git_commit_hash
@@ -115,6 +116,7 @@ def simple_evaluate(
     torch_random_seed: int = DEFAULT_OTHER_SEED,
     fewshot_random_seed: int = DEFAULT_OTHER_SEED,
     confirm_run_unsafe_code: bool = False,
+    log_length_metrics: bool = False,
     metadata: dict | None = None,
 ):
     """Instantiate and evaluate a model on a list of tasks.
@@ -183,6 +185,10 @@ def simple_evaluate(
             If set to None, the seed of generator will be set to None.
         confirm_run_unsafe_code (bool): Whether to confirm running tasks marked
             as unsafe.
+        log_length_metrics (bool): If True, aggregate per-response response/thinking
+            length (from each Instance's length_info) into per-task metrics in the
+            results and W&B, in addition to the always-on thinking-format flags.
+            Off by default (length stays per-sample in the logged samples).
         metadata (dict | None): Additional metadata to be added to the task
             manager. Will get passed to the download function of the task.
 
@@ -424,6 +430,7 @@ def simple_evaluate(
         fewshot_as_multiturn=fewshot_as_multiturn,
         verbosity=verbosity,
         confirm_run_unsafe_code=confirm_run_unsafe_code,
+        log_length_metrics=log_length_metrics,
     )
     if verbosity is not None:
         setup_logging(verbosity=verbosity)
@@ -487,6 +494,7 @@ def evaluate(
     fewshot_as_multiturn: bool = False,
     verbosity: str = "INFO",
     confirm_run_unsafe_code: bool = False,
+    log_length_metrics: bool = False,
 ):
     """Instantiate and evaluate a model on a list of tasks.
 
@@ -737,6 +745,15 @@ def evaluate(
                     task_output.logged_samples.append(example)
                 for metric, value in metrics.items():
                     task_output.sample_metrics[(metric, filter_key)].append(value)
+
+    # Promote per-response generation-info (thinking-format flags always; response/
+    # thinking length when log_length_metrics is set) from each Instance's
+    # length_info into sample_metrics, so they flow through the SAME gather -> mean
+    # -> consolidate -> W&B path as ordinary metrics and surface as per-task numbers
+    # in results.json / make_table / W&B — no external aggregation needed. Runs per
+    # rank before the gather below; independent of log_samples.
+    for task_output in eval_tasks:
+        promote_generation_info_metrics(task_output, include_length=log_length_metrics)
 
     if WORLD_SIZE > 1:
         import torch

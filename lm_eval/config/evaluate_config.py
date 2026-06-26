@@ -112,6 +112,13 @@ class EvaluatorConfig:
     log_samples: bool = field(
         default=False, metadata={"help": "Save model outputs and inputs"}
     )
+    log_length_metrics: bool = field(
+        default=False,
+        metadata={
+            "help": "Aggregate per-response response/thinking length into per-task "
+            "metrics in results and W&B (thinking-format flags are always logged)."
+        },
+    )
     output_path: str | None = field(
         default=None, metadata={"help": "Dir path where result metrics will be saved"}
     )

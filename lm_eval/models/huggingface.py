@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from datetime import timedelta
@@ -33,14 +34,15 @@ from lm_eval.models.utils import (
     _add_special_kwargs,
     check_system_boilerplate,
     compute_generation_length_info,
+    compute_thinking_format_info,
     configure_pad_token,
-    detect_think_end_token,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
     maybe_strip_system_boilerplate,
     normalize_gen_kwargs,
     postprocess_generated_text,
+    resolve_think_tokens,
 )
 from lm_eval.models.utils_hf import (
     clear_torch_cache,
@@ -111,6 +113,9 @@ class HFLM(TemplateLM):
         # end token for thinking, either the string or int token id.
         # splits to get response after this token (if provided).
         think_end_token: str | int | None = None,
+        # start token for thinking (string) - used for the thinking-format metric.
+        # Auto-detected from the chat template when not set.
+        think_start_token: str | None = None,
         enable_thinking: bool | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
@@ -275,13 +280,34 @@ class HFLM(TemplateLM):
         if enable_thinking is not None:
             self.chat_template_args["enable_thinking"] = enable_thinking
 
-        # Default the reasoning-strip token from the model's chat template when the
-        # caller didn't set it explicitly (a string close token; the int/str handling
-        # above only applies to an explicitly-passed token).
+        # Resolve the reasoning open/close tokens from the model's chat template when
+        # the caller didn't set them. self.think_end_token may be an int (token id)
+        # used by the token-level strip below; self.think_end_token_str is always the
+        # *string* close used by the thinking-format metric — including when an int
+        # token id was supplied, in which case we decode it so the format metric and
+        # the strip reference the same boundary (and so a valid int close never
+        # triggers the fail-loud guard meant for an unresolvable close).
+        _chat_template = getattr(self.tokenizer, "chat_template", None)
+        _forced_close_str = None
+        if isinstance(self.think_end_token, str):
+            _forced_close_str = self.think_end_token
+        elif isinstance(self.think_end_token, int):
+            with contextlib.suppress(Exception):
+                _forced_close_str = (
+                    self.tok_decode([self.think_end_token], skip_special_tokens=False)
+                    or None
+                )
+        # Default to True (like vLLM/SGLang) so the fail-loud close-token guard is
+        # consistent across backends: it still only fires for reasoning-declaring
+        # templates, and a user can disable it with enable_thinking=False.
+        self.think_start_token, self.think_end_token_str = resolve_think_tokens(
+            _chat_template,
+            self.chat_template_args.get("enable_thinking", True),
+            think_start_token,
+            _forced_close_str,
+        )
         if self.think_end_token is None:
-            self.think_end_token = detect_think_end_token(
-                getattr(self.tokenizer, "chat_template", None)
-            )
+            self.think_end_token = self.think_end_token_str
 
         # System-prompt authority probe — OFF by default. Run it only when the
         # caller opts in via `check_system_prompt_authority` (and hasn't waived it with
@@ -1541,9 +1567,10 @@ class HFLM(TemplateLM):
                 # Length of the RAW generation (full cont_toks, before the thinking
                 # span is stripped below), for per-sample logging. think_end_token may
                 # be a token id (int) or a string; both mark the same boundary.
+                raw_gen_text = self.tok_decode(cont_toks, skip_special_tokens=False)
                 if isinstance(self.think_end_token, int):
                     len_info = compute_generation_length_info(
-                        self.tok_decode(cont_toks, skip_special_tokens=False),
+                        raw_gen_text,
                         token_ids=cont_toks,
                     )
                     if think_token_indices:
@@ -1554,16 +1581,25 @@ class HFLM(TemplateLM):
                         len_info["thinking_length_tokens"] = n_think
                         len_info["thinking_length_words"] = len(think_text.split())
                         len_info["thinking_length_chars"] = len(think_text)
-                    length_res.append(len_info)
                 else:
-                    length_res.append(
-                        compute_generation_length_info(
-                            self.tok_decode(cont_toks, skip_special_tokens=False),
-                            token_ids=cont_toks,
-                            think_end_token=self.think_end_token,
-                            tokenizer=self.tokenizer,
-                        )
+                    len_info = compute_generation_length_info(
+                        raw_gen_text,
+                        token_ids=cont_toks,
+                        think_end_token=self.think_end_token,
+                        tokenizer=self.tokenizer,
                     )
+                # Whether the reasoning block is well-formed. Uses string tokens (the
+                # open from the template / arg; the string close), with the open
+                # searched across prompt+generation since templates prefill it.
+                len_info.update(
+                    compute_thinking_format_info(
+                        raw_gen_text,
+                        context=context,
+                        think_start_token=self.think_start_token,
+                        think_end_token=self.think_end_token_str,
+                    )
+                )
+                length_res.append(len_info)
 
                 # Strip thinking tokens for scoring: keep only tokens after the last
                 # think_end_token occurrence (int mode; reuses the indices above).

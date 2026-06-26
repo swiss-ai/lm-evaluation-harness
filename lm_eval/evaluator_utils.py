@@ -14,6 +14,7 @@ from lm_eval.api.metrics import (
 from lm_eval.api.task import Task
 from lm_eval.utils import positional_deprecated
 
+
 eval_logger = logging.getLogger(__name__)
 
 
@@ -110,7 +111,12 @@ class TaskOutput:
                 agg_fn = mean
             metric_key = f"{metric},{filter_key}"
             self.agg_metrics[metric_key] = agg_fn(items)
-            self.sample_len = len(items)  # TODO: same sample size for each metric?
+            # Report the largest per-metric sample count as the task's sample size.
+            # Most metrics share the doc count, but promoted per-response info
+            # metrics (e.g. thinking_length only on docs that reasoned) can be
+            # sparser; a plain last-wins assignment would undercount `samples` and
+            # mis-weight group pooling.
+            self.sample_len = max(self.sample_len or 0, len(items))
             if isinstance(bootstrap_iters, int):
                 stderr_fn = stderr_for_metric(
                     metric=agg_fn,
@@ -137,6 +143,69 @@ class TaskOutput:
             f"task_alias={self.task_alias}, "
             f"group_alias={self.group_alias})"
         )
+
+
+# Prefixes of per-response keys (produced in each Instance.length_info by the
+# generation backends, see lm_eval/models/utils.py) that this module promotes to
+# per-task metrics. Kept here as the single source of truth for the consumer-side
+# filter; the producers must emit keys under these prefixes.
+THINKING_FORMAT_PREFIX = "thinking_format_"
+LENGTH_PREFIXES = ("response_length_", "thinking_length_")
+
+
+def promote_generation_info_metrics(
+    task_output: "TaskOutput", include_length: bool = False
+) -> None:
+    """Promote per-response generation-info into per-task metrics in ``sample_metrics``.
+
+    The generation backends store per-response dicts in each ``Instance.length_info``:
+    always the ``thinking_format_*`` 0/1 flags, and (with ``include_length``) the
+    ``response_length_*`` / ``thinking_length_*`` measurements.
+
+    For each DOC we emit ONE value per metric — the mean over that doc's responses —
+    so the appended count equals the number of docs, matching ordinary metrics
+    (a per-response append would inflate it by ``repeats`` and mis-weight group
+    means). Instances are grouped by ``doc_id`` because ``multi_turn_generate`` uses
+    one Instance per turn; DP padding clones beyond ``repeats`` are ignored. Routed
+    under the ``none`` filter, the values flow through the existing gather ->
+    ``calculate_aggregate_metric`` (unknown metric -> mean) -> ``consolidate_results``
+    -> W&B path, surfacing as per-task numbers with no external aggregation.
+
+    Appends on each call (not idempotent); intended to run exactly once per rank
+    before the multi-rank gather.
+    """
+    task = task_output.task
+    if task is None:
+        return
+
+    def _is_promoted(key: str) -> bool:
+        if key.startswith(THINKING_FORMAT_PREFIX):
+            return True
+        return include_length and key.startswith(LENGTH_PREFIXES)
+
+    by_doc: dict = collections.defaultdict(list)
+    for inst in getattr(task, "instances", []):
+        by_doc[inst.doc_id].append(inst)
+    for insts in by_doc.values():
+        per_key: dict = collections.defaultdict(list)
+        for inst in insts:
+            infos = getattr(inst, "length_info", None) or []
+            # cap at the intended sample count; DP padding can append extra clones.
+            n = getattr(inst, "repeats", None)
+            if isinstance(n, int) and n > 0:
+                infos = infos[:n]
+            for info in infos:
+                if not isinstance(info, dict):
+                    continue
+                for key, value in info.items():
+                    if (
+                        _is_promoted(key)
+                        and isinstance(value, (int, float))
+                        and not isinstance(value, bool)
+                    ):
+                        per_key[key].append(float(value))
+        for key, values in per_key.items():
+            task_output.sample_metrics[(key, "none")].append(mean(values))
 
 
 def get_task_list(task_dict: dict) -> list[TaskOutput]:

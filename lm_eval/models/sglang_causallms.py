@@ -1,7 +1,7 @@
 import copy
 import logging
 from importlib.util import find_spec
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -11,9 +11,10 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     compute_generation_length_info,
-    detect_think_end_token,
+    compute_thinking_format_info,
     handle_stop_sequences,
     postprocess_generated_text,
+    resolve_think_tokens,
 )
 from lm_eval.utils import (
     get_rolling_token_windows,
@@ -40,30 +41,33 @@ class SGLangLM(TemplateLM):
         self,
         pretrained: str,
         # batch args from lm-eval interface:  https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md
-        batch_size: Union[str, int] = 1,
+        batch_size: str | int = 1,
         max_batch_size=None,
         max_model_len: int = None,
         max_gen_toks: int = 256,
-        add_bos_token: Optional[bool] = False,
+        add_bos_token: bool | None = False,
         ########## SGlang native args ##########
         # Todo(Jinwei): Include more args of SGLang Engine if needed. Refer to https://docs.sglang.ai/backend/server_arguments.html .
-        tokenizer_path: Optional[str] = None,
+        tokenizer_path: str | None = None,
         tokenizer_mode: str = "auto",
         load_format: str = "auto",
         trust_remote_code: bool = True,
         dtype: str = "auto",
         kv_cache_dtype: str = "auto",
-        context_length: Optional[int] = None,
+        context_length: int | None = None,
         device: str = "cuda",
         chunked_prefill_size: int = -1,
         # Memory and scheduling
-        mem_fraction_static: Optional[float] = None,
+        mem_fraction_static: float | None = None,
         # parallelism
         dp_size: int = 1,
         tp_size: int = 1,
-        prefix_token_id: Optional[int] = None,
+        prefix_token_id: int | None = None,
         # End marker for thinking tags - splits to get response after this token (if provided).
-        think_end_token: Optional[str] = None,
+        think_end_token: str | None = None,
+        # Start marker for thinking tags - used for the thinking-format metric. Auto-
+        # detected from the chat template when not set.
+        think_start_token: str | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -80,6 +84,7 @@ class SGLangLM(TemplateLM):
         )
         # Initialize your sglang model here
         self.think_end_token = think_end_token
+        self.think_start_token = think_start_token
         self._max_length = (
             max_model_len if max_model_len is not None else context_length
         )
@@ -114,11 +119,17 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
-        # Default the reasoning-strip token from the chat template when caller unset it.
-        if self.think_end_token is None:
-            self.think_end_token = detect_think_end_token(
-                getattr(self.tokenizer, "chat_template", None)
-            )
+        # Default the reasoning open/close tokens from the chat template when the
+        # caller didn't set them. SGLang has no enable_thinking toggle, so treat a
+        # template that declares reasoning tokens as thinking-intended (fail loud if
+        # such a template's tokens can't be resolved).
+        _chat_template = getattr(self.tokenizer, "chat_template", None)
+        self.think_start_token, self.think_end_token = resolve_think_tokens(
+            _chat_template,
+            enable_thinking=True,
+            think_start_token=self.think_start_token,
+            think_end_token=self.think_end_token,
+        )
         self._max_gen_toks = max_gen_toks
         self.add_bos_token = add_bos_token
         if "gemma" in pretrained.lower():
@@ -129,8 +140,8 @@ class SGLangLM(TemplateLM):
         self.custom_prefix_token_id = prefix_token_id
 
     def loglikelihood_rolling(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[float]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[float]:
         adaptive_batch_size = None
         if self.batch_size == "auto":
             adaptive_batch_size = len(requests)
@@ -145,7 +156,7 @@ class SGLangLM(TemplateLM):
                 disable=(disable_tqdm or (self.rank != 0)),
             )
         ):
-            rolling_token_windows: List[Tuple[List[int], List[int]]] = list(
+            rolling_token_windows: list[tuple[list[int], list[int]]] = list(
                 map(
                     make_disjoint_window,
                     get_rolling_token_windows(
@@ -198,8 +209,8 @@ class SGLangLM(TemplateLM):
         return loglikelihoods
 
     def generate_until(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[str]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[str]:
         res = []
         # Keep the original Instances (the `requests` name is reassigned below) and a
         # parallel length list, so generation length can be carried back per sample.
@@ -208,7 +219,7 @@ class SGLangLM(TemplateLM):
 
         # batch tokenize contexts
         context, all_gen_kwargs = zip(*(req.args for req in requests))
-        context_encoding: List[List[int]] = self.tok_encode(
+        context_encoding: list[list[int]] = self.tok_encode(
             context, add_special_tokens=self.add_bos_token
         )
         requests = [
@@ -295,6 +306,16 @@ class SGLangLM(TemplateLM):
                 _ct = (output.get("meta_info") or {}).get("completion_tokens")
                 if isinstance(_ct, int):
                     _len_info["response_length_tokens"] = _ct
+                # Whether the reasoning block is well-formed (open in prompt+gen,
+                # close in gen).
+                _len_info.update(
+                    compute_thinking_format_info(
+                        generated_text,
+                        context=context,
+                        think_start_token=self.think_start_token,
+                        think_end_token=self.think_end_token,
+                    )
+                )
                 length_res.append(_len_info)
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
@@ -317,9 +338,9 @@ class SGLangLM(TemplateLM):
 
     def _model_generate(
         self,
-        requests: List[List[int]] = None,
+        requests: list[list[int]] = None,
         generate: bool = False,
-        sampling_params: Union[List[Dict], Dict, None] = None,
+        sampling_params: list[dict] | dict | None = None,
         return_logprob: bool = False,
         top_logprobs_num: int = 1,
         logprob_start_len: int = -1,
@@ -333,7 +354,7 @@ class SGLangLM(TemplateLM):
                     "max_new_tokens": 1,
                 }
             )
-        if not isinstance(sampling_params, List):
+        if not isinstance(sampling_params, list):
             sampling_params = [sampling_params] * len(requests)
         # Refer to:  https://docs.sglang.ai/backend/offline_engine_api.html
         outputs = self.model.generate(
@@ -376,14 +397,14 @@ class SGLangLM(TemplateLM):
 
     def tok_encode(
         self,
-        string: Union[str, List[str]],
+        string: str | list[str],
         left_truncate_len: int = None,
         add_special_tokens: bool = False,
         truncation: bool = False,
-    ) -> Union[List[int], List[List[int]]]:
+    ) -> list[int] | list[list[int]]:
         if not add_special_tokens:
             add_special_tokens = False or self.add_bos_token
-        encoding: Union[List[List[int]], List[int]] = self.tokenizer(
+        encoding: list[list[int]] | list[int] = self.tokenizer(
             string,
             add_special_tokens=add_special_tokens,
             truncation=truncation,
@@ -399,7 +420,7 @@ class SGLangLM(TemplateLM):
 
         return encoding
 
-    def tok_decode(self, tokens: List[int]) -> str:
+    def tok_decode(self, tokens: list[int]) -> str:
         # Implement token-to-text decoding
         pass
 
@@ -414,7 +435,7 @@ class SGLangLM(TemplateLM):
         """
         pass
 
-    def chat_template(self, chat_template: Union[bool, str] = False) -> str:
+    def chat_template(self, chat_template: bool | str = False) -> str:
         """
         Get the appropriate chat template for the model based on the `chat_template` argument.
 
@@ -436,7 +457,7 @@ class SGLangLM(TemplateLM):
         pass
 
     def apply_chat_template(
-        self, chat_history: List[Dict[str, str]], add_generation_prompt: bool = True
+        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
     ) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
@@ -452,9 +473,9 @@ class SGLangLM(TemplateLM):
 
     def _loglikelihood_tokens(
         self,
-        requests: List[Tuple[Tuple[str, str], List[int], List[int]]],
+        requests: list[tuple[tuple[str, str], list[int], list[int]]],
         disable_tqdm: bool = False,
-    ) -> List[Tuple[float, bool]]:
+    ) -> list[tuple[float, bool]]:
         res = []
 
         def _collate(x):
@@ -510,7 +531,7 @@ class SGLangLM(TemplateLM):
         return re_ord.get_original(res)
 
     @staticmethod
-    def _parse_logprobs(tokens: List, outputs, ctxlen: int) -> Tuple[float, bool]:
+    def _parse_logprobs(tokens: list, outputs, ctxlen: int) -> tuple[float, bool]:
         """Process logprobs and tokens.
 
         :param tokens: list
