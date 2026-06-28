@@ -99,6 +99,7 @@ lm-eval run --config my_config.yaml --tasks mmlu
 | `--output_path` | `-o` | Output directory or JSON file for results. Required with `--log_samples`. |
 | `--log_samples` | `-s` | Save all model inputs/outputs for post-hoc analysis. |
 | `--samples` | `-E` | JSON mapping task names to sample indices, e.g., `'{"task1": [0,1,2]}'`. Incompatible with `--limit`. |
+| `--log_length_metrics` | | Aggregate per-response response/thinking length into per-task metrics in the results and W&B. See [Generation length & thinking-format metrics](#generation-length--thinking-format-metrics). |
 
 ### Caching and Performance
 
@@ -162,6 +163,50 @@ The `--hf_hub_log_args` argument accepts these keys:
 | `leaderboard_url` | URL to associated leaderboard. |
 | `point_of_contact` | Contact email for results dataset. |
 | `gated` | `True`/`False` - gate the details dataset. |
+
+---
+
+### Generation length & thinking-format metrics
+
+For `generate_until` (and `multi_turn_generate`) tasks, the `hf`, `vllm`, and
+`sglang` backends measure each response on the **raw generation, before the
+reasoning trace is stripped**, and record it per response in the sample's
+`length_info` field (visible with `--log_samples`). Two families are produced:
+
+**Length** (`response_length_*`) — always measured; the `thinking_length_*` pair
+is added only when the response contains the reasoning close token:
+
+| Metric | Meaning |
+|--------|---------|
+| `response_length_words` / `_chars` / `_tokens` | Length of the full generation (reasoning + answer). `_tokens` uses the exact generated token ids when the backend provides them. |
+| `thinking_length_words` / `_chars` / `_tokens` | Length of the reasoning span (start of generation up to and including the close token). Only present when the model actually closed a think block. |
+
+**Thinking-format** (`thinking_format_*`, 0/1 per response) — a well-formedness
+signal for reasoning models:
+
+| Metric | Meaning |
+|--------|---------|
+| `thinking_format_has_open` | The reasoning open token is present in the prompt **or** generation (thinking templates usually prefill the open into the prompt). |
+| `thinking_format_has_close` | The reasoning close token is present in the generation (the model emitted it). |
+| `thinking_format_correct` | Open present, close present, open precedes close, and the block is not re-opened after the close. |
+
+The open/close tokens are auto-detected from the model's chat template
+(`inner_token` / `outer_token` declarations), or set explicitly with the
+`think_start_token` / `think_end_token` **model args**. The close token is also
+what the harness strips before answer extraction; if thinking is enabled but the
+close token cannot be resolved, model construction fails loudly (pass the tokens
+explicitly, or set `enable_thinking=false`).
+
+**Native per-task aggregation.** By default these stay per-sample (in the logged
+samples / jsonl). Pass `--log_length_metrics` to additionally aggregate the
+**length** metrics into per-task numbers in `results.json`, the printed table,
+and W&B (a per-task mean over documents). The `thinking_format_*` metrics are
+**always** aggregated this way (no flag needed). Aggregated keys appear under the
+`none` filter, e.g. `gsm8k/thinking_format_correct,none`.
+
+Caveats: `has_open`/`correct` can over-count under **few-shot** (demo think tags
+in the prompt) and **multi-turn** (a prior turn's unclosed open leaks into the
+next turn's history). For aggregated W&B/per-task upload, pass `--wandb_args`.
 
 ---
 
