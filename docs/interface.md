@@ -168,45 +168,27 @@ The `--hf_hub_log_args` argument accepts these keys:
 
 ### Generation length & thinking-format metrics
 
-For `generate_until` (and `multi_turn_generate`) tasks, the `hf`, `vllm`, and
-`sglang` backends measure each response on the **raw generation, before the
-reasoning trace is stripped**, and record it per response in the sample's
-`length_info` field (visible with `--log_samples`). Two families are produced:
+Options that control the per-response length / thinking-format metrics and the
+reasoning-trace strip for thinking models. See **[Thinking / reasoning
+evals](./thinking_evals.md)** for what these metrics mean, what is logged where,
+malformed/non-thinking handling, and multi-turn behavior.
 
-**Length** (`response_length_*`) — always measured; the `thinking_length_*` pair
-is added only when the response contains the reasoning close token:
+Added by this feature:
 
-| Metric | Meaning |
-|--------|---------|
-| `response_length_words` / `_chars` / `_tokens` | Length of the full generation (reasoning + answer). `_tokens` uses the exact generated token ids when the backend provides them. |
-| `thinking_length_words` / `_chars` / `_tokens` | Length of the reasoning span (start of generation up to and including the close token). Only present when the model actually closed a think block. |
+| Option | Kind | Description |
+|--------|------|-------------|
+| `--log_length_metrics` | CLI | Aggregate `response_length_*` / `thinking_length_*` into per-task metrics (results.json, table, W&B). Off by default; `thinking_format_*` is aggregated regardless. |
+| `think_start_token` | `--model_args` | Force the reasoning **open** token (str); else auto-detected from the chat template. |
 
-**Thinking-format** (`thinking_format_*`, 0/1 per response) — a well-formedness
-signal for reasoning models:
+Pre-existing options that also affect these metrics:
 
-| Metric | Meaning |
-|--------|---------|
-| `thinking_format_has_open` | The reasoning open token is present in the prompt **or** generation (thinking templates usually prefill the open into the prompt). |
-| `thinking_format_has_close` | The reasoning close token is present in the generation (the model emitted it). |
-| `thinking_format_correct` | Open present, close present, open precedes close, and the block is not re-opened after the close. |
-
-The open/close tokens are auto-detected from the model's chat template
-(`inner_token` / `outer_token` declarations), or set explicitly with the
-`think_start_token` / `think_end_token` **model args**. The close token is also
-what the harness strips before answer extraction; if thinking is enabled but the
-close token cannot be resolved, model construction fails loudly (pass the tokens
-explicitly, or set `enable_thinking=false`).
-
-**Native per-task aggregation.** By default these stay per-sample (in the logged
-samples / jsonl). Pass `--log_length_metrics` to additionally aggregate the
-**length** metrics into per-task numbers in `results.json`, the printed table,
-and W&B (a per-task mean over documents). The `thinking_format_*` metrics are
-**always** aggregated this way (no flag needed). Aggregated keys appear under the
-`none` filter, e.g. `gsm8k/thinking_format_correct,none`.
-
-Caveats: `has_open`/`correct` can over-count under **few-shot** (demo think tags
-in the prompt) and **multi-turn** (a prior turn's unclosed open leaks into the
-next turn's history). For aggregated W&B/per-task upload, pass `--wandb_args`.
+| Option | Kind | Description |
+|--------|------|-------------|
+| `--log_samples` | CLI | Write the per-response `length_info` (all length + thinking-format fields) into the sample jsonl. |
+| `--wandb_args` | CLI (value) | Native W&B upload of the aggregated metrics, e.g. `--wandb_args project=p name=run1`. |
+| `--apply_chat_template` | CLI | Required for the chat/thinking template to render (the reasoning tokens live in it). |
+| `enable_thinking` | `--model_args` | `true`/`false` — model reasoning mode (`vllm`/`hf`). On `hf` the fail-loud close-token guard defaults on. |
+| `think_end_token` | `--model_args` | Force the reasoning **close** token (str; also int token id on `hf`); drives the strip; else auto-detected. |
 
 ---
 
