@@ -1,0 +1,47 @@
+# Shared config for the three TensorTrust leaf tasks. Each leaf overrides
+# `task`, `dataset_kwargs.data_files.test`, and `process_results`.
+#
+# `include:` is a SHALLOW top-level merge (see lm_eval/utils.py
+# `load_yaml_config`). Setting any of `metadata`, `generation_kwargs`,
+# `metric_list`, or `dataset_kwargs` in a leaf will WHOLLY REPLACE the
+# template's value for that key — there is no nested-dict merge. The
+# leaves below deliberately do not redefine `metadata` so they inherit
+# the version pin from this template.
+#
+# Generation params and the headline-filter (`filter_no_post`) come from
+# evals/tensortrust/run_vllm.sh / run_openai.sh in
+# github.com/normster/RealGuardrails. `until: []` is intentional — chat
+# template stop tokens are handled by the backing model wrapper.
+#
+# The leaves pin `data_files` to commit
+# `887ccf8e53a39c7067b5e9c5ad0534e1a1bc0798` (the upstream "Code release"
+# commit, 2025-02-17). The single-turn JSONL inputs are not published on
+# the `normster/SystemCheck` HF dataset — only training data and the
+# multi-turn handwritten / distractors splits are — so the GitHub raw
+# URL is the only authoritative source, and pinning by SHA protects us
+# from a silent corpus change if upstream republishes.
+dataset_path: json
+output_type: generate_until
+test_split: test
+process_docs: !function utils.filter_no_post
+description: "{{ messages[0]['content'] }}"
+doc_to_text: "{{ messages[1]['content'] }}"
+doc_to_target: ""
+# The attack prompt (doc_to_text) can end in whitespace and there is no
+# target to delimit (scored by process_results), so use an empty target
+# delimiter rather than the default space.
+target_delimiter: ""
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 500
+  until: []
+metric_list:
+  - metric: passed
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  # RealGuardrails needs an authoritative system prompt; the evaluator
+  # warns if the model is run without the system-prompt authority check.
+  requires_system_prompt_authority: true
+  version: 0.1

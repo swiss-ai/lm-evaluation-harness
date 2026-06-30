@@ -25,18 +25,18 @@ dist/
 profile_default/
 ipython_config.py
 
-# Output and data
-output/
-data/
-!lm_eval/tasks/swiss_ai_charter_alignment/data/
-!lm_eval/tasks/swiss_ai_charter_alignment/data/reference/
-!lm_eval/tasks/swiss_ai_charter_alignment/data/reference/swiss_ai_charter_llama33_70b_references.jsonl
-!lm_eval/tasks/bfcl_v3/data/
-!lm_eval/tasks/bfcl_v3/data/**
-!lm_eval/tasks/mt_bench/data/
-!lm_eval/tasks/mt_bench/data/**
-temp/
-test_logs/
+# Output and data — root-only patterns so they catch dev-scratch
+# directories at the repo root (output/, data/, temp/, results/, etc.)
+# without silently ignoring nested benchmark data such as
+# lm_eval/tasks/realguardrails/s_rules/data/, lm_eval/tasks/bfcl_v3/data/,
+# or lm_eval/tasks/mt_bench/data/, which are vendored and must be tracked.
+# (Git cannot re-include children of an ignored directory, so the parent
+# patterns themselves must be anchored.)
+/output/
+/data/
+/temp/
+/test_logs/
+/results/
 
 # Caching
 lm_eval/caching/.cache

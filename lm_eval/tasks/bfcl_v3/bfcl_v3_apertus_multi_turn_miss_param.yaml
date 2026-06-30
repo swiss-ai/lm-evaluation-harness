@@ -1,10 +1,9 @@
 include: _bfcl_v3_template.yaml
 task: bfcl_v3_apertus_multi_turn_miss_param
 class: !function task.BFCLV3Task
-output_type: generate_until_multiturn
+output_type: multi_turn_generate
 metadata:
   version: 3
   bfcl_category: multi_turn_miss_param
   bfcl_language: Python
   bfcl_tool_format: apertus
-

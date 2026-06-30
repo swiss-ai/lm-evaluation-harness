@@ -1,0 +1,15 @@
+# Benign sub-group — unweighted mean over the 2 benign buckets. The benign
+# buckets are a sanity baseline (no adversarial pressure); they are excluded
+# from the `_s_rules_br` headline and reported separately here so the umbrella
+# `_s_rules` group can surface br_average AND benign_average side by side.
+group: realguardrails_s_rules_benign
+group_alias: "RealGuardrails / S-RuLES benign (baseline, excluded from headline)"
+task:
+  - realguardrails_s_rules_benign_harmless
+  - realguardrails_s_rules_benign_helpful
+aggregate_metric_list:
+  - metric: passed
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 0.1

@@ -1,0 +1,20 @@
+group: realguardrails_tensortrust
+group_alias: "RealGuardrails / TensorTrust (no-post macro)"
+task:
+  - realguardrails_tensortrust_extraction
+  - realguardrails_tensortrust_hijacking
+  - realguardrails_tensortrust_helpful
+# Macro-average across the three sub-tasks (paper Appendix G.1 headline:
+# "no-post macro-average" of extraction / hijacking / helpful pass rates).
+# Sample counts differ per sub-task (105 / 165 / 239 after filter_no_post),
+# but the published headline is unweighted, so weight_by_size: false.
+aggregate_metric_list:
+  # `higher_is_better` is NOT a valid AggMetricConfig field (see
+  # lm_eval/api/group.py). The leaf tasks declare it on their own
+  # `metric_list` entries — which is where the harness picks it up for
+  # display.
+  - metric: passed
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 0.1

@@ -1,6 +1,13 @@
 import pytest
 
-from lm_eval.models.utils import maybe_truncate, normalize_gen_kwargs, truncate_tokens
+from lm_eval.models.utils import (
+    check_system_boilerplate,
+    get_template_special_tokens,
+    maybe_truncate,
+    normalize_gen_kwargs,
+    strip_system_boilerplate_from_template,
+    truncate_tokens,
+)
 
 
 class TestTruncateTokens:
@@ -299,3 +306,197 @@ class TestNormalizeGenKwargs:
         original_copy = original.copy()
         normalize_gen_kwargs(original)
         assert original == original_copy
+
+
+def _render_fn(header, *, drop_system=False):
+    """Build a render_fn that emits ``header`` before the system content.
+
+    Mimics a chat template: the system content lands right after ``header``.
+    If ``drop_system`` the system message is folded away (marker disappears).
+    """
+
+    def fn(messages):
+        sys = next((m for m in messages if m["role"] == "system"), None)
+        if sys is None or drop_system:
+            return "<|bos|><|eot|>user\nHi<|eot|>"
+        return header + sys["content"] + "<|eot|>user\nHi<|eot|>"
+
+    return fn
+
+
+# Structural special-token sets for the various template families.
+_LLAMA = ["<|bos|>", "<|start_header_id|>", "<|end_header_id|>", "<|eot|>"]
+_CHATML = ["<|im_start|>", "<|im_end|>", "<|eot|>"]
+_COMMANDR = ["<|bos|>", "<|SYSTEM_TOKEN|>", "<|END_OF_TURN_TOKEN|>", "<|eot|>"]
+
+
+class TestCheckSystemBoilerplate:
+    """The probe must pass clean templates and raise on injected text, across
+    special-token and plain-text families (system prompt must be authoritative).
+    """
+
+    @pytest.mark.parametrize(
+        "header,special_tokens",
+        [
+            # multi-token strip + literal role-word removal (Llama)
+            ("<|bos|><|start_header_id|>system<|end_header_id|>\n\n", _LLAMA),
+            # role word lives *inside* a special token, so no literal label
+            # remains after the token strip (Command-R)
+            ("<|bos|><|SYSTEM_TOKEN|>", _COMMANDR),
+            # plain-text family (no special tokens, role-word removal fires)
+            ("### System:\n", []),
+        ],
+    )
+    def test_clean_templates_pass(self, header, special_tokens):
+        # should not raise
+        check_system_boilerplate(_render_fn(header), special_tokens=special_tokens)
+
+    @pytest.mark.parametrize(
+        "header,special_tokens",
+        [
+            # Llama 3.x date boilerplate
+            (
+                "<|bos|><|start_header_id|>system<|end_header_id|>\n\n"
+                "Cutting Knowledge Date: December 2023\n"
+                "Today Date: 26 Jul 2024\n\n",
+                _LLAMA,
+            ),
+            # plain-text preamble
+            ("### System:\nYou are a helpful assistant.\n", []),
+            # injection where the role word lives inside a special token
+            ("<|bos|><|SYSTEM_TOKEN|>Hard-coded preamble\n", _COMMANDR),
+            # injection placed *before* the role declaration
+            (
+                "<|bos|>Sneaky preamble.<|start_header_id|>system<|end_header_id|>\n\n",
+                _LLAMA,
+            ),
+        ],
+    )
+    def test_injected_templates_raise(self, header, special_tokens):
+        with pytest.raises(RuntimeError, match="not authoritative"):
+            check_system_boilerplate(_render_fn(header), special_tokens=special_tokens)
+
+    def test_fail_open_when_render_errors(self):
+        def boom(messages):
+            raise ValueError("no system role")
+
+        # must not propagate — can't assess, so silently passes
+        check_system_boilerplate(boom, special_tokens=[])
+
+    def test_fail_open_when_marker_dropped(self):
+        # template folds the system message away → marker absent → can't assess
+        check_system_boilerplate(
+            _render_fn("<|im_start|>system\n", drop_system=True),
+            special_tokens=_CHATML,
+        )
+
+    def test_purely_numeric_injection_passes(self):
+        # documented limitation: only alphabetic chars are treated as injection
+        check_system_boilerplate(
+            _render_fn("<|im_start|>system\n2024-12-01\n"), special_tokens=_CHATML
+        )
+
+    def test_error_message_contains_injected_text(self):
+        with pytest.raises(RuntimeError) as exc:
+            check_system_boilerplate(
+                _render_fn("<|im_start|>system\nLeaked preamble\n"),
+                special_tokens=_CHATML,
+            )
+        assert "Leaked preamble" in str(exc.value)
+
+    def test_special_tokens_stripped_longest_first(self):
+        # When a shorter token is a prefix of a longer one, stripping
+        # shortest-first would leave the longer token's tail ("X|>") as
+        # alphabetic debris and false-raise. Longest-first removes the whole
+        # token cleanly. This pins the `sorted(..., reverse=True)` ordering.
+        header = "<|HDRX|>system\n"
+        check_system_boilerplate(
+            _render_fn(header), special_tokens=["<|HDR", "<|HDRX|>"]
+        )
+
+
+class TestGetTemplateSpecialTokens:
+    def test_union_of_special_and_added(self):
+        class Tok:
+            all_special_tokens = ["<s>", "</s>"]
+
+            def get_added_vocab(self):
+                return {"<|start_header_id|>": 1, "</s>": 2}
+
+        assert get_template_special_tokens(Tok()) == {
+            "<s>",
+            "</s>",
+            "<|start_header_id|>",
+        }
+
+    def test_missing_get_added_vocab_is_tolerated(self):
+        class Tok:
+            all_special_tokens = ["<s>"]
+
+        assert get_template_special_tokens(Tok()) == {"<s>"}
+
+    def test_get_added_vocab_error_is_tolerated(self):
+        class Tok:
+            all_special_tokens = ["<s>"]
+
+            def get_added_vocab(self):
+                raise RuntimeError("unsupported tokenizer")
+
+        assert get_template_special_tokens(Tok()) == {"<s>"}
+
+
+class TestStripSystemBoilerplate:
+    LLAMA_TEMPLATE = (
+        '{{- bos_token }}{{- "<|start_header_id|>system<|end_header_id|>\\n\\n" }}'
+        "{%- if not date_string is defined %}\n"
+        '    {%- set date_string = "26 Jul 2024" %}\n'
+        "{%- endif %}\n"
+        '{{- "Cutting Knowledge Date: December 2023\\n" }}'
+        '{{- "Today Date: " + date_string + "\\n\\n" }}'
+        "{{- system_message }}"
+    )
+
+    def test_strips_llama_boilerplate(self):
+        cleaned = strip_system_boilerplate_from_template(self.LLAMA_TEMPLATE)
+        assert cleaned is not None
+        assert "Cutting Knowledge Date" not in cleaned
+        assert "Today Date" not in cleaned
+        assert "date_string is defined" not in cleaned
+        # legitimate parts survive
+        assert "system_message" in cleaned
+        assert "<|start_header_id|>system<|end_header_id|>" in cleaned
+
+    # Llama 3.2+ nests if/else/endif inside the date_string block; the
+    # nesting-depth scanner must find the *outer* endif (a naive non-greedy
+    # regex would stop at the inner one and leave a dangling tag).
+    NESTED_TEMPLATE = (
+        '{{- "<|start_header_id|>system<|end_header_id|>\\n\\n" }}'
+        "{%- if not date_string is defined %}\n"
+        "    {%- if tools is defined %}\n"
+        '        {%- set date_string = "26 Jul 2024" %}\n'
+        "    {%- else %}\n"
+        '        {%- set date_string = "26 Jul 2024" %}\n'
+        "    {%- endif %}\n"
+        "{%- endif %}\n"
+        '{{- "Cutting Knowledge Date: December 2023\\n" }}'
+        '{{- "Today Date: " + date_string + "\\n\\n" }}'
+        "{{- system_message }}"
+    )
+
+    def test_strips_nested_date_block(self):
+        cleaned = strip_system_boilerplate_from_template(self.NESTED_TEMPLATE)
+        assert cleaned is not None
+        # the whole outer block (including the nested if) is removed
+        assert "date_string is defined" not in cleaned
+        assert "tools is defined" not in cleaned
+        assert "Cutting Knowledge" not in cleaned
+        assert "system_message" in cleaned
+        # no dangling Jinja tag left behind
+        assert cleaned.count("{%- if") == cleaned.count("{%- endif")
+
+    def test_clean_template_returns_none(self):
+        clean = '{{- "<|im_start|>system\\n" + system_message }}'
+        assert strip_system_boilerplate_from_template(clean) is None
+
+    def test_none_input_returns_none(self):
+        assert strip_system_boilerplate_from_template(None) is None

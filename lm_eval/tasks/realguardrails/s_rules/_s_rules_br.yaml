@@ -1,0 +1,17 @@
+# br_average headline group — paper's "S-RULES" headline number is the
+# unweighted mean of pass rates across the 4 basic/redteam x harmless/helpful
+# buckets (per upstream scripts/read_scores.py). The benign buckets are
+# excluded; they are reported separately by the full _s_rules.yaml group.
+group: realguardrails_s_rules_br
+group_alias: "RealGuardrails / S-RuLES br_average (paper headline)"
+task:
+  - realguardrails_s_rules_basic_harmless
+  - realguardrails_s_rules_basic_helpful
+  - realguardrails_s_rules_redteam_harmless
+  - realguardrails_s_rules_redteam_helpful
+aggregate_metric_list:
+  - metric: passed
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 0.1

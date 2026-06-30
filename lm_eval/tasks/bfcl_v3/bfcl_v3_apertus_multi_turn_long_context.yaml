@@ -1,7 +1,7 @@
 include: _bfcl_v3_template.yaml
 task: bfcl_v3_apertus_multi_turn_long_context
 class: !function task.BFCLV3Task
-output_type: generate_until_multiturn
+output_type: multi_turn_generate
 generation_kwargs:
   until:
     - "\n\n"
@@ -15,4 +15,3 @@ metadata:
   bfcl_category: multi_turn_long_context
   bfcl_language: Python
   bfcl_tool_format: apertus
-
