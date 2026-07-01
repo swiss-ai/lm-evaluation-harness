@@ -1158,9 +1158,10 @@ def postprocess_generated_text(
 
 def compute_generation_length_info(
     raw_text: str,
-    token_ids: list | None = None,
+    token_ids: Sequence | None = None,
     think_end_token: str | None = None,
-    tokenizer=None,
+    tokenizer: Any = None,
+    measure_thinking: bool = True,
 ) -> dict:
     """Length of a raw generation (and its thinking span) for per-sample logging.
 
@@ -1168,23 +1169,26 @@ def compute_generation_length_info(
     thinking span — so response/thinking length survive thinking-mode scoring (which
     keeps only the text after ``think_end_token``). The response covers the full
     generation (reasoning + answer); the thinking span is everything up to and
-    including ``think_end_token`` (the model emits reasoning first).
+    including the LAST ``think_end_token`` — the same boundary the strip uses (which
+    keeps only the text after the last close).
 
     Always returns ``response_length_{words,chars}`` (plus ``_tokens`` from the exact
-    generated ``token_ids`` when available); adds ``thinking_length_{words,chars}``
+    generated ``token_ids`` when available). Adds ``thinking_length_{words,chars}``
     (plus ``_tokens`` by re-encoding the span when a ``tokenizer`` is given) only when
-    the text contains a ``think_end_token``. Never raises — length logging must not
-    break generation.
+    ``measure_thinking`` is True AND the text contains a ``think_end_token``. Callers
+    pass ``measure_thinking`` only for well-formed responses, so the thinking span is
+    never mis-attributed (e.g. a turn that closes a block opened in a prior turn).
+    Never raises — length logging must not break generation.
     """
     info: dict = {}
-    # never let length logging break generation
     with contextlib.suppress(Exception):
         info["response_length_words"] = len(raw_text.split())
         info["response_length_chars"] = len(raw_text)
         if token_ids is not None:
             info["response_length_tokens"] = len(token_ids)
-        if think_end_token and think_end_token in raw_text:
-            thinking_text = raw_text.split(think_end_token, 1)[0] + think_end_token
+        if measure_thinking and think_end_token and think_end_token in raw_text:
+            # up to and including the LAST close, matching the strip
+            thinking_text = raw_text.rsplit(think_end_token, 1)[0] + think_end_token
             info["thinking_length_words"] = len(thinking_text.split())
             info["thinking_length_chars"] = len(thinking_text)
             if tokenizer is not None:
@@ -1196,68 +1200,116 @@ def compute_generation_length_info(
     return info
 
 
+def attach_length_info(requests, length_res) -> None:
+    """Attach each per-response generation-info dict back onto its originating
+    Instance (one entry per response, mirroring how ``resps`` are appended).
+    ``length_res`` must already be in the original request order.
+    """
+    for req, info in zip(requests, length_res, strict=True):
+        req.length_info.append(info)
+
+
 def compute_thinking_format_info(
     generation: str,
-    context: str | None = None,
     think_start_token: str | None = None,
     think_end_token: str | None = None,
+    open_prefilled: bool = False,
 ) -> dict:
     """Whether a generation's reasoning (think) block is well-formed.
 
-    Returns 0/1 flags for per-sample logging (aggregated to a per-task rate):
+    Returns 0/1 flags for per-sample logging (aggregated to a per-task rate). All
+    checks look at the **current turn only** — never the prompt/history — so a prior
+    turn's leaked open cannot inflate the signal (multi-turn correctness):
 
-    - ``thinking_format_has_open``  — the open token is present in the prompt OR the
-      generation. Thinking templates usually *prefill* the open token into the
-      prompt (so the model emits only the close), hence the open is searched across
-      ``context + generation``; a model that emits its own open is covered too.
-      (For prefill templates this is ~always 1 — it still flags the case where the
-      block was never opened, e.g. a non-thinking path.)
+    - ``thinking_format_has_open``  — the open token was opened *this turn*: emitted in
+      the generation, OR injected by the template's generation prompt (``open_prefilled``;
+      a per-model fact, not the rendered history). Only emitted when an open token is
+      known.
     - ``thinking_format_has_close`` — the close token is present in the generation
       (the model must actually emit it).
-    - ``thinking_format_correct``   — open present, close present, open precedes the
-      close, AND the block is not re-opened after the close (catches a stray second
-      open such as ``</think>...<think>...`` that would otherwise pass a bare
-      open<close ordering check when the open is prefilled).
+    - ``thinking_format_correct``:
+        * open+close model — open present (this turn), close present, open precedes the
+          (last) close, AND the block is not re-opened after the (first) close (catches
+          a stray second open such as ``</think>...<think>...``). The close boundary is
+          the LAST close, matching the strip; re-open is probed from the FIRST close.
+        * close-only model (no open token known) — reduces to ``has_close`` (the only
+          available notion of well-formedness is "did it close").
 
-    A flag is only emitted when its token is known, mirroring how
-    ``thinking_length_*`` is gated. Never raises — format logging must not break
-    generation.
-
-    Caveats (over-count cases for ``has_open``/``correct``; both target zero-shot,
-    single-turn, special-token thinking evals):
-    - Few-shot: demonstration think tags in the prompt make ``has_open`` ~1.
-    - Multi-turn: a prior turn's *unclosed* open survives in the rendered history
-      (context), so a later turn that emits only a stray close can read
-      ``correct`` = 1. The signal is per-turn well-formedness modulo prior-turn
-      leakage, not a strict per-turn balance check.
+    ``correct`` is emitted whenever the **close** token is known (open+close OR
+    close-only). Never raises — format logging must not break generation.
     """
     info: dict = {}
     with contextlib.suppress(Exception):
-        context = context or ""
-        # The close must be emitted by the model -> search the generation only.
-        gen_close = generation.find(think_end_token) if think_end_token else -1
+        # The close must be emitted by the model -> search the generation only. Use the
+        # LAST close as the boundary, matching the strip (which keeps text after it).
+        gen_close = generation.rfind(think_end_token) if think_end_token else -1
+        has_close = gen_close != -1
         if think_end_token:
-            info["thinking_format_has_close"] = int(gen_close != -1)
+            info["thinking_format_has_close"] = int(has_close)
         if think_start_token:
-            # The open may be prefilled into the prompt, so accept it in either the
-            # prompt or the generation (no need to allocate context+generation).
-            open_in_context = think_start_token in context
+            # "Opened this turn" = the model emitted the open, or the template prefilled
+            # it into the generation prompt. The rendered history is NOT consulted.
             gen_open = generation.find(think_start_token)
-            has_open = open_in_context or gen_open != -1
+            has_open = open_prefilled or gen_open != -1
             info["thinking_format_has_open"] = int(has_open)
             if think_end_token:
-                has_close = gen_close != -1
                 # open precedes close: a prefilled open is before the generation;
                 # otherwise the open must occur in the generation before the close.
-                open_before_close = open_in_context or (0 <= gen_open < gen_close)
-                # a second open after the close => malformed (re-opened, unbalanced)
+                open_before_close = open_prefilled or (0 <= gen_open < gen_close)
+                # Re-opened after closing => malformed. Probe from the FIRST close so an
+                # open sitting between two closes is still caught.
+                first_close = generation.find(think_end_token)
                 reopened = has_close and (
-                    generation.find(think_start_token, gen_close + len(think_end_token))
+                    generation.find(
+                        think_start_token, first_close + len(think_end_token)
+                    )
                     != -1
                 )
                 info["thinking_format_correct"] = int(
                     has_open and has_close and open_before_close and not reopened
                 )
+        elif think_end_token:
+            # Close-only model: well-formedness reduces to "did it close".
+            info["thinking_format_correct"] = int(has_close)
+    return info
+
+
+def build_length_info(
+    generation: str,
+    *,
+    token_ids: Sequence | None = None,
+    think_start_token: str | None = None,
+    think_end_token: str | None = None,
+    tokenizer: Any = None,
+    open_prefilled: bool = False,
+    track_thinking_metrics: bool = False,
+) -> dict:
+    """Per-response length+format dict for the **string-close** generation paths.
+
+    Computes the thinking-format flags first (current turn only), then the length —
+    passing ``measure_thinking`` so the thinking span is recorded ONLY for well-formed
+    responses (``thinking_format_correct == 1``). Shared by ``vllm``/``sglang`` and the
+    ``hf`` string-close path; the ``hf`` int-token path builds this inline because its
+    close boundary is a token id, not a string.
+    """
+    fmt = (
+        compute_thinking_format_info(
+            generation,
+            think_start_token=think_start_token,
+            think_end_token=think_end_token,
+            open_prefilled=open_prefilled,
+        )
+        if track_thinking_metrics
+        else {}
+    )
+    info = compute_generation_length_info(
+        generation,
+        token_ids=token_ids,
+        think_end_token=think_end_token,
+        tokenizer=tokenizer,
+        measure_thinking=bool(fmt.get("thinking_format_correct", 0)),
+    )
+    info.update(fmt)
     return info
 
 
@@ -1293,6 +1345,14 @@ def detect_think_start_token(chat_template: str | None) -> str | None:
     :func:`detect_think_end_token` for the close counterpart.
     """
     return _detect_template_token(chat_template, "inner_token")
+
+
+def detect_think_end_token(chat_template: str | None) -> str | None:
+    """Derive the reasoning *close* token from a chat template's ``outer_token``
+    declaration (e.g. ``</think>`` / ``<|inner_suffix|>``), or None. The close drives
+    the strip; :func:`resolve_think_tokens` owns the default/fail-loud behaviour.
+    """
+    return _detect_template_token(chat_template, "outer_token")
 
 
 def resolve_think_tokens(
@@ -1336,26 +1396,34 @@ def resolve_think_tokens(
                 eval_logger,
                 "Thinking is enabled but the reasoning open token could not be "
                 "auto-detected from the chat template; the thinking-format "
-                "open/correct metrics will not be tracked. Pass think_start_token= "
-                "in --model_args to enable them.",
+                "has_open metric will not be tracked (correct falls back to "
+                "has_close, close-only style). Pass think_start_token= in "
+                "--model_args to track it.",
             )
     return start, end
 
 
-def detect_think_end_token(chat_template: str | None) -> str | None:
-    """Derive the reasoning *close* token (``think_end_token``) from a chat template.
+def detect_open_prefilled(render_fn, think_start_token: str | None) -> bool:
+    """Whether the chat template injects the reasoning *open* token into the assistant
+    generation prompt (a "prefill" template), as opposed to the model emitting its own
+    open.
 
-    Apertus-style templates declare the reasoning open/close as ``inner_token`` /
-    ``outer_token`` (e.g. ``<think>``/``</think>``, or ``<|inner_prefix|>``/
-    ``<|inner_suffix|>`` on some checkpoints). Returns the close token when the
-    template declares one (last assignment wins), else None. Used by the causal LMs
-    to default ``think_end_token`` when the caller didn't set it explicitly, so the
-    deliberation span is stripped before scoring without the caller having to know
-    the model-specific token. Templates that declare no reasoning tokens -> None ->
-    no auto-strip (and for a non-thinking run the token simply never appears, so the
-    strip is a harmless no-op).
+    Probed once at init by rendering a trivial user-only chat *with* the generation
+    prompt via the backend's own ``apply_chat_template`` (so ``chat_template_args`` /
+    ``enable_thinking`` apply) and checking whether the open token appears — the demo
+    content carries no open token, so any occurrence comes from the template scaffold.
+    Feeds ``compute_thinking_format_info(open_prefilled=...)`` so ``has_open`` reflects
+    "opened this turn" for both prefill and non-prefill models. Never raises (returns
+    ``False`` on any failure, incl. no chat template / no open token).
     """
-    return _detect_template_token(chat_template, "outer_token")
+    if not think_start_token:
+        return False
+    with contextlib.suppress(Exception):
+        rendered = render_fn(
+            [{"role": "user", "content": "x"}], add_generation_prompt=True
+        )
+        return think_start_token in rendered
+    return False
 
 
 def has_bos_prefix(sequence: str, bos_str: str | Iterable[str] | None = None) -> bool:

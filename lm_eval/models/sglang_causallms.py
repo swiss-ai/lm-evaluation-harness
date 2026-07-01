@@ -10,8 +10,9 @@ from lm_eval.api.model import TemplateLM
 from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
-    compute_generation_length_info,
-    compute_thinking_format_info,
+    attach_length_info,
+    build_length_info,
+    detect_open_prefilled,
     handle_stop_sequences,
     postprocess_generated_text,
     resolve_think_tokens,
@@ -119,10 +120,9 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
-        # Default the reasoning open/close tokens from the chat template when the
-        # caller didn't set them. SGLang has no enable_thinking toggle, so treat a
-        # template that declares reasoning tokens as thinking-intended (fail loud if
-        # such a template's tokens can't be resolved).
+        # Auto-detect open/close tokens from the chat template when not forced. SGLang
+        # has no enable_thinking toggle, so a reasoning-declaring template is treated
+        # as thinking-intended (fail loud if its tokens can't be resolved).
         _chat_template = getattr(self.tokenizer, "chat_template", None)
         self.think_start_token, self.think_end_token = resolve_think_tokens(
             _chat_template,
@@ -130,6 +130,15 @@ class SGLangLM(TemplateLM):
             think_start_token=self.think_start_token,
             think_end_token=self.think_end_token,
         )
+        # Whether the template prefills the reasoning open into the generation prompt
+        # (vs the model emitting it); feeds the per-turn has_open check. SGLang's
+        # apply_chat_template is enable_thinking-agnostic, so this reflects its own
+        # rendering. Track thinking metrics whenever a close token is known (SGLang has
+        # no enable_thinking toggle — it is always on).
+        self.think_open_prefilled = detect_open_prefilled(
+            self.apply_chat_template, self.think_start_token
+        )
+        self.track_thinking_metrics = bool(self.think_end_token)
         self._max_gen_toks = max_gen_toks
         self.add_bos_token = add_bos_token
         if "gemma" in pretrained.lower():
@@ -212,8 +221,8 @@ class SGLangLM(TemplateLM):
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
         res = []
-        # Keep the original Instances (the `requests` name is reassigned below) and a
-        # parallel length list, so generation length can be carried back per sample.
+        # Keep the original Instances (`requests` is reassigned below) to carry length
+        # info back per sample.
         instances = requests
         length_res = []
 
@@ -294,29 +303,23 @@ class SGLangLM(TemplateLM):
             # cache generations
             for output, context in zip(cont, context):
                 generated_text = output.get("text", "")
-                # Length on the RAW generation (before the thinking span is stripped).
-                # sglang returns no token_ids here; use the exact completion_tokens
-                # count from meta_info when present for response_length_tokens.
-                _len_info = compute_generation_length_info(
+                # Per-response length + current-turn thinking-format (format-first, so
+                # the thinking span is measured only for well-formed responses).
+                len_info = build_length_info(
                     generated_text,
                     token_ids=None,
+                    think_start_token=self.think_start_token,
                     think_end_token=self.think_end_token,
                     tokenizer=self.tokenizer,
+                    open_prefilled=self.think_open_prefilled,
+                    track_thinking_metrics=self.track_thinking_metrics,
                 )
+                # sglang returns no token_ids -> take the exact response token count
+                # from meta_info when present.
                 _ct = (output.get("meta_info") or {}).get("completion_tokens")
                 if isinstance(_ct, int):
-                    _len_info["response_length_tokens"] = _ct
-                # Whether the reasoning block is well-formed (open in prompt+gen,
-                # close in gen).
-                _len_info.update(
-                    compute_thinking_format_info(
-                        generated_text,
-                        context=context,
-                        think_start_token=self.think_start_token,
-                        think_end_token=self.think_end_token,
-                    )
-                )
-                length_res.append(_len_info)
+                    len_info["response_length_tokens"] = _ct
+                length_res.append(len_info)
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
                 )
@@ -329,11 +332,8 @@ class SGLangLM(TemplateLM):
         pbar.close()
         # reorder all group of results back to original unsorted form
         res = re_ords.get_original(res)
-        # Carry the parallel length info back to the original Instances, in the same
-        # (restored) order as `res`; one entry per response, mirroring `resps`.
-        length_res = re_ords.get_original(length_res)
-        for req, info in zip(instances, length_res, strict=True):
-            req.length_info.append(info)
+        # Carry length info back to the Instances, in the same restored order as `res`.
+        attach_length_info(instances, re_ords.get_original(length_res))
         return res
 
     def _model_generate(

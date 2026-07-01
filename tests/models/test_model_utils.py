@@ -1,8 +1,11 @@
 import pytest
 
 from lm_eval.models.utils import (
+    build_length_info,
     check_system_boilerplate,
+    compute_generation_length_info,
     compute_thinking_format_info,
+    detect_open_prefilled,
     detect_think_end_token,
     detect_think_start_token,
     get_template_special_tokens,
@@ -553,13 +556,14 @@ class TestDetectThinkTokens:
 
 
 class TestComputeThinkingFormatInfo:
-    def test_prefilled_open_in_prompt(self):
-        # open prefilled into the prompt, close emitted by the model
+    def test_prefill_normal(self):
+        # prefill template: the open is injected by the generation prompt (open_prefilled),
+        # the model emits only the close.
         info = compute_thinking_format_info(
             "reasoning</think>answer",
-            context="<think>",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=True,
         )
         assert info == {
             "thinking_format_has_open": 1,
@@ -567,74 +571,246 @@ class TestComputeThinkingFormatInfo:
             "thinking_format_correct": 1,
         }
 
-    def test_open_generated_by_model(self):
+    def test_non_prefill_open_generated_by_model(self):
         info = compute_thinking_format_info(
             "<think>reasoning</think>answer",
-            context="",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=False,
         )
         assert info["thinking_format_has_open"] == 1
         assert info["thinking_format_has_close"] == 1
         assert info["thinking_format_correct"] == 1
 
-    def test_missing_close(self):
+    def test_prefill_missing_close(self):
         info = compute_thinking_format_info(
             "reasoning with no close",
-            context="<think>",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=True,
         )
         assert info["thinking_format_has_open"] == 1
         assert info["thinking_format_has_close"] == 0
         assert info["thinking_format_correct"] == 0
 
-    def test_missing_open(self):
+    def test_non_prefill_open_no_close(self):
         info = compute_thinking_format_info(
-            "reasoning</think>answer",
-            context="",
+            "<think>still reasoning",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_has_close"] == 0
+        assert info["thinking_format_correct"] == 0
+
+    def test_non_prefill_bare_close_not_correct(self):
+        # Multi-turn correctness: a non-prefill turn that emits ONLY a close (open not
+        # this turn) must read has_open=0, correct=0 — the history is never consulted,
+        # so a prior turn's leaked open cannot inflate the signal.
+        info = compute_thinking_format_info(
+            "here is the answer</think>done",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
         )
         assert info["thinking_format_has_open"] == 0
         assert info["thinking_format_has_close"] == 1
         assert info["thinking_format_correct"] == 0
 
     def test_reversed_order_not_correct(self):
-        # close appears before open in the generation -> malformed
+        # close before open in the generation -> malformed
         info = compute_thinking_format_info(
             "</think>stuff<think>",
-            context="",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=False,
         )
         assert info["thinking_format_correct"] == 0
 
     def test_reopen_after_close_with_prefilled_open_not_correct(self):
-        # prefilled open in the prompt, model closes then re-opens -> malformed.
-        # (a bare open<close ordering check would wrongly pass here.)
+        # prefilled open, model closes then re-opens -> malformed.
         info = compute_thinking_format_info(
             "reasoning</think>answer<think>oops",
-            context="<think>",
             think_start_token=OPEN_T,
             think_end_token=CLOSE_T,
+            open_prefilled=True,
         )
         assert info["thinking_format_has_open"] == 1
         assert info["thinking_format_has_close"] == 1
         assert info["thinking_format_correct"] == 0
 
-    def test_no_tokens_known_returns_empty(self):
-        assert compute_thinking_format_info("hi", context="") == {}
-
-    def test_only_close_known(self):
+    def test_multiple_closes_reopen_detected_from_first_close(self):
+        # close, reopen, close again -> the reopen between the two closes must still
+        # be caught (probe from the FIRST close, not the last).
         info = compute_thinking_format_info(
-            "x</think>y", context="", think_end_token=CLOSE_T
+            "<think>a</think>b<think>c</think>d",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
         )
-        assert info == {"thinking_format_has_close": 1}
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 0
+
+    def test_multiple_closes_without_reopen_is_correct(self):
+        # one open, a stray extra close, no second open -> still well-formed.
+        info = compute_thinking_format_info(
+            "<think>a</think>b</think>c",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_correct"] == 1
+
+    def test_close_only_model_correct_equals_has_close(self):
+        # No open token known (close-only model): correct reduces to has_close, and
+        # has_open is not emitted.
+        closed = compute_thinking_format_info(
+            "reasoning</think>answer", think_end_token=CLOSE_T
+        )
+        assert closed == {
+            "thinking_format_has_close": 1,
+            "thinking_format_correct": 1,
+        }
+        not_closed = compute_thinking_format_info(
+            "reasoning, never closed", think_end_token=CLOSE_T
+        )
+        assert not_closed == {
+            "thinking_format_has_close": 0,
+            "thinking_format_correct": 0,
+        }
+
+    def test_no_tokens_known_returns_empty(self):
+        assert compute_thinking_format_info("hi") == {}
 
     def test_never_raises_on_bad_input(self):
         # non-str generation should be swallowed, returning {}
-        assert compute_thinking_format_info(None, context=None) == {}
+        assert compute_thinking_format_info(None) == {}
+
+
+class TestComputeGenerationLengthInfo:
+    def test_response_length_basic(self):
+        info = compute_generation_length_info("one two three", token_ids=[1, 2, 3])
+        assert info["response_length_words"] == 3
+        assert info["response_length_chars"] == len("one two three")
+        assert info["response_length_tokens"] == 3
+        assert "thinking_length_chars" not in info
+
+    def test_no_close_omits_thinking_span(self):
+        info = compute_generation_length_info("no close here", think_end_token=CLOSE_T)
+        assert "thinking_length_chars" not in info
+
+    def test_thinking_span_uses_last_close(self):
+        # the strip keeps text after the LAST close, so the thinking span must too.
+        raw = "<think>a</think>b</think>c"
+        info = compute_generation_length_info(raw, think_end_token=CLOSE_T)
+        expected = "<think>a</think>b</think>"  # up to and including the last close
+        assert info["thinking_length_chars"] == len(expected)
+        assert info["response_length_chars"] == len(raw)
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_thinking_span_measured_without_open_token(self):
+        # multi-turn: a turn may CLOSE a block whose open was prefilled/earlier. The
+        # helper sees only THIS turn's text and measures start..last-close regardless
+        # of whether an open token is present (length is close-driven, open-agnostic).
+        gen = "continued reasoning</think>final answer"
+        info = compute_generation_length_info(gen, think_end_token=CLOSE_T)
+        expected_think = "continued reasoning</think>"
+        assert info["thinking_length_chars"] == len(expected_think)
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_open_without_close_omits_thinking_span(self):
+        # A turn with no close has no boundary, so no thinking_length is recorded
+        # (and it is simply absent from the aggregate, not zero-filled).
+        gen = "<think>still reasoning, no close"
+        info = compute_generation_length_info(gen, think_end_token=CLOSE_T)
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len(gen)
+
+    def test_measure_thinking_false_suppresses_span(self):
+        # The backend passes measure_thinking only for well-formed responses; when
+        # False, the thinking span is not recorded even though a close is present.
+        info = compute_generation_length_info(
+            "r</think>a", think_end_token=CLOSE_T, measure_thinking=False
+        )
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len("r</think>a")
+
+
+class TestDetectOpenPrefilled:
+    def test_prefill_template_detected(self):
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|><think>"  # noqa: E731
+        assert detect_open_prefilled(render, OPEN_T) is True
+
+    def test_non_prefill_template_not_detected(self):
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|>"  # noqa: E731
+        assert detect_open_prefilled(render, OPEN_T) is False
+
+    def test_no_open_token_is_false(self):
+        render = lambda h, add_generation_prompt=True: "<think>"  # noqa: E731
+        assert detect_open_prefilled(render, None) is False
+
+    def test_render_failure_is_false(self):
+        def render(h, add_generation_prompt=True):
+            raise RuntimeError("boom")
+
+        assert detect_open_prefilled(render, OPEN_T) is False
+
+
+class TestBuildLengthInfo:
+    """Shared string-close builder (vllm/sglang/hf): format-first, so the thinking
+    span is recorded only for well-formed responses.
+    """
+
+    def test_well_formed_records_thinking(self):
+        info = build_length_info(
+            "<think>reason</think>ans",
+            token_ids=[1, 2, 3],
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_correct"] == 1
+        assert info["response_length_tokens"] == 3
+        assert "thinking_length_chars" in info
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_malformed_omits_thinking_but_keeps_response(self):
+        # open but no close -> correct=0 -> no thinking_length, response still measured.
+        info = build_length_info(
+            "<think>reason with no close",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_correct"] == 0
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len("<think>reason with no close")
+
+    def test_prefilled_open_records_thinking(self):
+        # non-prefill would read has_open=0 here; open_prefilled=True makes it well-formed.
+        info = build_length_info(
+            "reason</think>ans",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=True,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_correct"] == 1
+        assert "thinking_length_chars" in info
+
+    def test_untracked_emits_only_response_length(self):
+        info = build_length_info(
+            "<think>reason</think>ans",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            track_thinking_metrics=False,
+        )
+        assert not any(k.startswith("thinking_") for k in info)
+        assert info["response_length_chars"] == len("<think>reason</think>ans")
 
 
 class TestResolveThinkTokens:

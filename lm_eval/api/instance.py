@@ -22,12 +22,9 @@ class Instance:
     )
     resps: list = field(default_factory=list)
     filtered_resps: dict = field(default_factory=dict)
-    # Per-response generation info, populated by generation models on the raw text
-    # before any thinking-strip. One dict per response, mirroring `resps`; empty
-    # otherwise. Carries response/thinking length (`*_length_words/chars/tokens`) and
-    # thinking-format flags (`thinking_format_has_open/has_close/correct`, 0/1). These
-    # are aggregated to per-task metrics by
-    # `evaluator_utils.promote_generation_info_metrics`.
+    # Per-response generation info measured on the raw text before any thinking-strip;
+    # one dict per response (mirroring `resps`), empty otherwise. Holds length +
+    # thinking-format keys, aggregated by `evaluator_utils.promote_generation_info_metrics`.
     length_info: list = field(default_factory=list)
 
     # initialized after init

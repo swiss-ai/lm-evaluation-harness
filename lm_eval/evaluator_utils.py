@@ -145,13 +145,7 @@ class TaskOutput:
         )
 
 
-# Prefixes of the per-response keys (produced in each Instance.length_info by the
-# generation backends, see lm_eval/models/utils.py) that this module promotes to
-# per-task metrics; the single source of truth for the consumer-side filter.
-# `thinking_format_*` and `response_length_*` are promoted directly;
-# `thinking_length_*` is NOT promoted on its own — it is paired per-unit with
-# `response_length_*` (see promote_generation_info_metrics), so it never goes
-# through the generic filter.
+# Prefixes of the per-response Instance.length_info keys promoted by `_is_promoted`.
 THINKING_FORMAT_PREFIX = "thinking_format_"
 RESPONSE_LENGTH_PREFIX = "response_length_"
 THINKING_LENGTH_PREFIX = "thinking_length_"
@@ -162,31 +156,26 @@ def promote_generation_info_metrics(
 ) -> None:
     """Promote per-response generation-info into per-task metrics in ``sample_metrics``.
 
-    The generation backends store per-response dicts in each ``Instance.length_info``:
-    always the ``thinking_format_*`` 0/1 flags, and (with ``include_length``) the
-    ``response_length_*`` / ``thinking_length_*`` measurements.
+    Backends store per-response dicts in each ``Instance.length_info``: the
+    ``thinking_format_*`` 0/1 flags (when thinking is tracked), and (with
+    ``include_length``) the ``response_length_*`` measurements plus, **only for
+    well-formed responses** (``thinking_format_correct == 1``, gated upstream at the
+    backend), the ``thinking_length_*`` measurements.
 
-    ``thinking_format_*`` and ``response_length_*`` are promoted directly.
-    ``thinking_length_<unit>`` is instead **paired per-unit with**
-    ``response_length_<unit>``: recorded (its value, or ``0.0`` when this response did
-    not close a thinking block) for EXACTLY the responses that carry
-    ``response_length_<unit>``. So the two share an identical per-response basis and
-    count — thinking length never exceeds response length, every rank emitting
-    response length also emits thinking length (consistent gather key set), and a
-    length-less dict or an orphan thinking unit (no matching response unit) adds
-    neither.
+    Each promoted key is aggregated independently: one value per doc — the mean over
+    that doc's responses **carrying the key**. So ``response_length_*`` averages over
+    all responses, ``thinking_format_*`` (rates) over all responses, and
+    ``thinking_length_*`` over the well-formed responses only — its denominator never
+    includes malformed/incorrect responses (a doc with no well-formed response emits no
+    ``thinking_length_*`` value). Consequence: the aggregate ``thinking_length`` is the
+    mean among well-formed responses and is NOT bounded by the aggregate
+    ``response_length`` (per-sample ``thinking <= response`` still holds).
 
-    For each DOC we emit ONE value per metric — the mean over that doc's responses —
-    so the appended count equals the number of docs, matching ordinary metrics
-    (a per-response append would inflate it by ``repeats`` and mis-weight group
-    means). Instances are grouped by ``doc_id`` because ``multi_turn_generate`` uses
-    one Instance per turn; DP padding clones beyond ``repeats`` are ignored. Routed
-    under the ``none`` filter, the values flow through the existing gather ->
-    ``calculate_aggregate_metric`` (unknown metric -> mean) -> ``consolidate_results``
-    -> W&B path, surfacing as per-task numbers with no external aggregation.
-
-    Appends on each call (not idempotent); intended to run exactly once per rank
-    before the multi-rank gather.
+    Instances are grouped by ``doc_id`` (``multi_turn_generate`` uses one Instance per
+    turn); DP padding clones beyond ``repeats`` are ignored. Routed under the ``none``
+    filter through the existing gather -> mean -> consolidate -> W&B path; the gather
+    unions keys across ranks, so a rank lacking a key (e.g. no well-formed response) is
+    safe. Appends on each call (not idempotent); run once per rank before the gather.
     """
     task = task_output.task
     if task is None:
@@ -197,11 +186,11 @@ def promote_generation_info_metrics(
         return isinstance(v, (int, float)) and not isinstance(v, bool)
 
     def _is_promoted(key: str) -> bool:
-        # thinking_length_* is excluded here on purpose — it is paired with
-        # response_length_* below, not promoted through the generic filter.
         if key.startswith(THINKING_FORMAT_PREFIX):
             return True
-        return include_length and key.startswith(RESPONSE_LENGTH_PREFIX)
+        return include_length and key.startswith(
+            (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
+        )
 
     def _doc_infos(inst) -> list:
         """Per-response dicts for one instance, capped at the intended sample
@@ -224,20 +213,6 @@ def promote_generation_info_metrics(
                 for key, value in info.items():
                     if _is_promoted(key) and _numeric(value):
                         per_key[key].append(float(value))
-                # Emit thinking_length_<unit> paired with response_length_<unit> (its
-                # value, else 0.0), so the two stay on an identical per-response basis
-                # (see docstring; rationale/edge cases in docs/interface.md).
-                if include_length:
-                    for rkey, rval in info.items():
-                        if not rkey.startswith(RESPONSE_LENGTH_PREFIX):
-                            continue
-                        if not _numeric(rval):
-                            continue
-                        unit = rkey[len(RESPONSE_LENGTH_PREFIX) :]
-                        tval = info.get(THINKING_LENGTH_PREFIX + unit, 0.0)
-                        per_key[THINKING_LENGTH_PREFIX + unit].append(
-                            float(tval) if _numeric(tval) else 0.0
-                        )
         for key, values in per_key.items():
             task_output.sample_metrics[(key, "none")].append(mean(values))
 

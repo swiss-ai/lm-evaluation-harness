@@ -24,9 +24,10 @@ up to and including the close token, so only the post-reasoning answer is scored
   model construction raises — pass `think_end_token=` explicitly, or set
   `enable_thinking=false`. This prevents silently scoring un-stripped reasoning.
   (On `hf` the guard defaults to enabled, so a reasoning-declaring template with an
-  unresolvable close raises even if you never set `enable_thinking`.) A missing
-  **open** token only warns — `has_open`/`correct` are then not tracked unless you
-  pass `think_start_token=`.
+  unresolvable close raises even if you never set `enable_thinking`. `sglang` has no
+  `enable_thinking` toggle — a reasoning-declaring template is always thinking-enabled.)
+  A missing **open** token only warns — `has_open` is then not tracked and `correct`
+  falls back to `has_close` (close-only style) unless you pass `think_start_token=`.
 
 > If the close token is wrong/unresolved, the reasoning is **not** stripped and
 > pollutes answer extraction. The metrics below (`thinking_format_has_close`,
@@ -39,21 +40,23 @@ on the **raw generation, before the strip**, and recorded per response in the
 sample's `length_info` field (visible with `--log_samples`). Two families:
 
 **Length** — `response_length_*` is always measured; the `thinking_length_*` pair
-is added only when the response contains the reasoning close token:
+is added only for **well-formed** responses (`thinking_format_correct = 1`), so a
+mis-attributed span (e.g. a close inherited from an earlier turn) is never measured:
 
 | Metric | Meaning |
 |--------|---------|
 | `response_length_words` / `_chars` / `_tokens` | Length of the full generation (reasoning + answer). `_tokens` uses the exact generated token ids, or an exact backend token count (e.g. SGLang's `completion_tokens`), when available — otherwise the `_tokens` variant is omitted for that response. |
-| `thinking_length_words` / `_chars` / `_tokens` | Length of the reasoning span (start of generation up to and including the close token). `_tokens` re-encodes the span with the tokenizer (best-effort). |
+| `thinking_length_words` / `_chars` / `_tokens` | Length of the reasoning span (start of generation up to and including the **last** close token — the same boundary the strip uses). Recorded only when `thinking_format_correct = 1`. `_tokens` is an exact token count on the `hf` int-token path, else a best-effort tokenizer re-encode of the span. |
 
 **Thinking-format** (`thinking_format_*`, 0/1 per response) — a well-formedness
-signal for reasoning models:
+signal for reasoning models, computed on the **current turn only** (the rendered
+history is never consulted, so a prior turn cannot leak into the signal):
 
 | Metric | Meaning |
 |--------|---------|
-| `thinking_format_has_open` | The reasoning open token is present in the prompt **or** generation (thinking templates usually prefill the open into the prompt). |
+| `thinking_format_has_open` | The block was opened **this turn**: the open token is emitted in the generation, or injected by the template's generation prompt (a prefill template). Emitted only when an open token is known. |
 | `thinking_format_has_close` | The reasoning close token is present in the generation (the model emitted it). |
-| `thinking_format_correct` | Open present, close present, open precedes close, and the block is not re-opened after the close. |
+| `thinking_format_correct` | **Open+close models:** open present (this turn), close present, open precedes the (last) close, block not re-opened after the (first) close. **Close-only models** (no open token): reduces to `has_close`. |
 
 ## What is logged, where, and under which flags
 
@@ -64,9 +67,12 @@ signal for reasoning models:
 | W&B (native, by the harness) | `--wandb_args` (uploads whatever was aggregated) | only with `--log_length_metrics` | always (when token resolved) |
 
 Aggregation is a per-task **mean over documents**. "Always (when token resolved)"
-means `thinking_format_*` needs no `--log_length_metrics`, but each flag is only
-produced when its token resolved: `has_open`/`correct` require the open token,
-`has_close`/`correct` the close token (see fail-loud above).
+means `thinking_format_*` needs no `--log_length_metrics`, but the flags are only
+produced when **thinking is enabled** and the relevant token resolved: `has_open`
+requires the open token; `has_close` and `correct` require the close token (`correct`
+is emitted whenever the close is known — for close-only models it equals `has_close`;
+see fail-loud above). With `enable_thinking=false` no `thinking_*` metric is emitted —
+only `response_length_*`.
 
 **Aggregated key naming.** Aggregated metrics carry the `none` filter. In
 `results.json` the key is `thinking_format_correct,none` (nested under the task,
@@ -79,31 +85,47 @@ and the task creates **one `Instance` per turn**. At aggregation, all turns of a
 document are grouped by `doc_id` and averaged into a **single per-doc value**
 (so a 5-turn doc weighs the same as a 1-turn doc, not 5×).
 
+The open is searched in the **current turn only** (the model's generation plus, for
+prefill templates, the turn's own generation-prompt prefill) — never the rendered
+history — so a prior turn's unclosed open cannot inflate `has_open`/`correct`. This
+holds for both prefill and non-prefill models, single- and multi-turn.
+
+**Limitation — no cross-turn thinking blocks.** A reasoning block that opens in one
+turn and closes in a *later* turn is never stitched together. Such turns are
+malformed per-turn (`correct = 0`: the opening turn never closes; the closing turn
+never opened this turn), so neither contributes a (mis-attributed) `thinking_length`
+— only their `response_length` counts. For prefill templates this never arises (every
+turn re-opens its own block).
+
 ## How length is handled for malformed or non-thinking responses
 
-This describes the **aggregated** numbers (`--log_length_metrics`); the raw
-per-sample `length_info` always reflects exactly what was measured. The aggregator
-pairs each `thinking_length_<unit>` with its `response_length_<unit>` on an
-identical per-response basis, so the two always have the same sample count and
-thinking length can never exceed response length:
+This describes the **aggregated** numbers (`--log_length_metrics`). Two separate
+bases — the key design point:
 
-- **No thinking at all** (non-reasoning model/run, or `enable_thinking=false`):
-  `response_length_*` is measured normally; `thinking_length_*` is **0** for every
-  response (it is still emitted, paired with response length — not omitted).
-- **Malformed — opened but never closed** (`thinking_format_has_close = 0`): there
-  is no close token to bound the reasoning span, so `thinking_length_*` counts as
-  **0** for that response (and `thinking_format_correct = 0` flags it). The full
-  reasoning text still counts toward `response_length_*`, and — because the strip
-  keys off the close token — an unclosed block is **not** stripped, so the
-  reasoning remains in the scored text for that response.
-- **Per-doc / repeats:** the per-task value is the mean over documents; within a
-  doc with multiple samples, each is averaged, so a doc that closed on some
-  samples and not others gets a fractional `thinking_length` (e.g. `mean(90, 0)`).
-- **Measurement gaps:** a response carrying a `thinking_length_<unit>` with no
-  matching `response_length_<unit>` is dropped for that unit, keeping the bases
-  aligned. Consequence: the `_tokens` family can have a **smaller sample base**
-  than `_words`/`_chars` on backends that don't expose token counts for every
-  response.
+- **`response_length_*`** is averaged over **all** responses.
+- **`thinking_length_*`** is averaged over **well-formed responses only**
+  (`thinking_format_correct = 1`). Malformed/incorrect responses simply do not carry
+  a `thinking_length`, so they are **excluded from its denominator** — the average is
+  never biased by them (no zero-fill).
+
+Cases:
+
+- **No thinking / `enable_thinking=false`:** only `response_length_*` is emitted; no
+  `thinking_format_*` and no `thinking_length_*`.
+- **Malformed — opened but never closed** (`has_close = 0`, `correct = 0`): no
+  `thinking_length` is recorded for that response; it is excluded from the
+  thinking-length average but still counts toward `response_length_*`. Because the
+  strip keys off the close token, an unclosed block is **not** stripped, so the
+  reasoning remains in the scored text.
+- **Per-doc / repeats:** one value per doc — the mean over that doc's responses
+  carrying the key. A doc with **no** well-formed response contributes no
+  `thinking_length` value at all (it leaves the thinking-length denominator too).
+- **Consequence — bases differ:** because the two metrics average over different
+  populations, the aggregate `thinking_length` is **not bounded by** the aggregate
+  `response_length` (it can even exceed it when the well-formed responses are the
+  long ones). The **per-sample** invariant `thinking ≤ response` still always holds.
+- **Measurement gaps:** the `_tokens` family can have a **smaller sample base** than
+  `_words`/`_chars` on backends that don't expose token counts for every response.
 
 ### Impact summary (direction of bias)
 
@@ -112,13 +134,9 @@ As the share of **malformed (opened-but-not-closed)** responses rises:
 | Quantity | Direction | Why |
 |----------|-----------|-----|
 | `thinking_format_has_close`, `thinking_format_correct` | **down** | flagged 0 per malformed response — this is the signal you want |
-| `thinking_length_*` (aggregate) | **deflated** | malformed responses contribute 0 to the mean |
-| `response_length_*` | **unaffected / relatively high** | still counts the full text, reasoning included |
+| `thinking_length_*` (aggregate) | **unbiased** | averaged over the well-formed responses only; malformed ones are excluded from the denominator, not counted as 0 |
+| `response_length_*` | **unaffected / relatively high** | still counts the full text of every response, reasoning included |
 | **task score** | **likely deflated** | the un-stripped reasoning stays in the scored text and pollutes answer extraction |
-
-For a **non-thinking** run all `thinking_*` metrics sit at 0 by construction
-(expected, not a problem); `response_length_*` is normal. `thinking_format_has_open`
-can instead be **inflated** under few-shot / multi-turn (see Caveats).
 
 ## Caveats
 
@@ -128,6 +146,10 @@ can instead be **inflated** under few-shot / multi-turn (see Caveats).
   though the answer is correct. Prefer a robust extractor (`flexible-extract`, or
   a CoT/zero-shot task variant). `thinking_format_*` + the length split help
   distinguish "reasoned fine, extractor too strict" from a real thinking failure.
-- **`thinking_format_has_open` / `correct` over-count** under **few-shot** (demo
-  think tags in the prompt) and **multi-turn** (a prior turn's unclosed open leaks
-  into the next turn's rendered history).
+- **`has_open` is current-turn only** (see Multi-turn above), so few-shot demo tags
+  and a prior turn's unclosed open can't inflate it. On prefill templates it is
+  ~always 1, so `correct` there tracks whether the turn *closed*.
+- **Response caching.** The metrics are measured *during generation*, so a response
+  served from the `--cache_requests` cache (which skips generation) carries no
+  `length_info` and is excluded from these aggregates. Re-run without a cache hit
+  (or without `--cache_requests`) to populate them for every doc.

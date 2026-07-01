@@ -724,9 +724,7 @@ def evaluate(
                         "filtered_resps": [
                             req.filtered_resps[filter_key] for req in requests
                         ],
-                        # Per-response generation length measured before any
-                        # thinking-strip (populated by generation models that support
-                        # it, e.g. vLLM; empty list otherwise).
+                        # Per-response generation info (see Instance.length_info).
                         "length_info": [req.length_info for req in requests],
                         "filter": filter_key,
                         "metrics": list(metrics.keys()),
@@ -746,12 +744,8 @@ def evaluate(
                 for metric, value in metrics.items():
                     task_output.sample_metrics[(metric, filter_key)].append(value)
 
-    # Promote per-response generation-info (thinking-format flags always; response/
-    # thinking length when log_length_metrics is set) from each Instance's
-    # length_info into sample_metrics, so they flow through the SAME gather -> mean
-    # -> consolidate -> W&B path as ordinary metrics and surface as per-task numbers
-    # in results.json / make_table / W&B — no external aggregation needed. Runs per
-    # rank before the gather below; independent of log_samples.
+    # Promote per-response generation-info into sample_metrics (per rank, before the
+    # gather below; independent of log_samples). See promote_generation_info_metrics.
     for task_output in eval_tasks:
         promote_generation_info_metrics(task_output, include_length=log_length_metrics)
 

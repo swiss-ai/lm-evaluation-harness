@@ -88,20 +88,20 @@ def test_length_metrics_promoted_only_with_include_length():
     off = _task_output(docs)
     promote_generation_info_metrics(off, include_length=False)
     assert ("response_length_chars", "none") not in off.sample_metrics
-    # opt-in: length promoted as a per-task mean. thinking_length shares response
-    # length's basis: the unit occurs on at least one response, so the doc without
-    # it counts as 0 (not skipped) -> averaged over the same docs as response length.
+    # opt-in: response_length over ALL responses; thinking_length only over the
+    # responses that carry it (the well-formed ones; the malformed doc is absent, NOT
+    # zero-filled).
     on = _task_output(docs)
     promote_generation_info_metrics(on, include_length=True)
     assert on.sample_metrics[("response_length_chars", "none")] == [40.0, 20.0]
-    assert on.sample_metrics[("thinking_length_chars", "none")] == [10.0, 0.0]
-    # thinking-format flags still promoted alongside
+    assert on.sample_metrics[("thinking_length_chars", "none")] == [10.0]
+    # thinking-format flags still promoted alongside, over all responses
     assert on.sample_metrics[("thinking_format_correct", "none")] == [1.0, 0.0]
 
 
-def test_multi_unit_pairing_independent():
-    # Both unit pairs (chars and tokens) present on one response must be promoted
-    # independently and paired correctly per unit (guards the suffix-keying).
+def test_multi_unit_promoted_independently():
+    # Each unit (chars, tokens) for both response and thinking length is promoted as
+    # its own independent key.
     to = _task_output(
         [
             _inst(
@@ -124,7 +124,7 @@ def test_multi_unit_pairing_independent():
 
 
 def test_bool_excluded_on_length_path():
-    # bool guard must also apply to length values (the pairing reads rval/tval).
+    # bool guard (int subclass) must also apply to length values.
     to = _task_output(
         [_inst([{"response_length_chars": True, "thinking_length_chars": False}])]
     )
@@ -177,6 +177,24 @@ def test_multi_turn_instances_grouped_per_doc():
     assert sorted(to.sample_metrics[("thinking_format_correct", "none")]) == [0.5, 1.0]
 
 
+def test_multi_turn_length_only_well_formed_turns_count():
+    # multi_turn_generate: each turn is a SEPARATE Instance sharing doc_id. Turn 1 is
+    # well-formed (carries thinking_length); turn 2 is not (response only). The per-doc
+    # response length averages BOTH turns; thinking length counts ONLY the well-formed
+    # turn (denominator = correct turns, no zero-fill from the malformed one).
+    to = _task_output(
+        [
+            _inst(
+                [{"response_length_chars": 100, "thinking_length_chars": 80}], doc_id=0
+            ),  # turn 1, well-formed
+            _inst([{"response_length_chars": 40}], doc_id=0),  # turn 2, not well-formed
+        ]
+    )
+    promote_generation_info_metrics(to, include_length=True)
+    assert to.sample_metrics[("response_length_chars", "none")] == [70.0]  # mean(100,40)
+    assert to.sample_metrics[("thinking_length_chars", "none")] == [80.0]  # turn 1 only
+
+
 def test_no_length_info_yields_no_metrics():
     to = _task_output([_inst([]), _inst(None)])
     promote_generation_info_metrics(to)
@@ -197,49 +215,41 @@ def test_bool_values_excluded():
     assert ("thinking_format_correct", "none") not in to.sample_metrics
 
 
-def test_thinking_length_shares_response_basis():
-    # Mixed task: some responses close their thinking block, some don't. thinking
-    # length must be averaged over the SAME responses as response length (missing
-    # = 0), so it can never exceed response length. A skip-missing bug would give
-    # mean(thinking) = 90 > mean(response) = 55.
+def test_thinking_length_denominator_excludes_incorrect():
+    # Unbiased average: thinking_length is present only on well-formed responses, so
+    # its mean's denominator is the count of CORRECT responses — never inflated by the
+    # malformed one. response_length stays over all responses.
     docs = [
-        _inst([{"response_length_chars": 100, "thinking_length_chars": 90}]),
-        _inst([{"response_length_chars": 10}]),  # no closed block -> thinking 0
+        _inst([{"response_length_chars": 100, "thinking_length_chars": 80}]),  # correct
+        _inst([{"response_length_chars": 120, "thinking_length_chars": 90}]),  # correct
+        _inst([{"response_length_chars": 10}]),  # malformed -> no thinking_length
     ]
     to = _task_output(docs)
     promote_generation_info_metrics(to, include_length=True)
-    assert to.sample_metrics[("response_length_chars", "none")] == [100.0, 10.0]
-    assert to.sample_metrics[("thinking_length_chars", "none")] == [90.0, 0.0]
-    assert mean(to.sample_metrics[("thinking_length_chars", "none")]) <= mean(
-        to.sample_metrics[("response_length_chars", "none")]
-    )
+    assert to.sample_metrics[("response_length_chars", "none")] == [100.0, 120.0, 10.0]
+    # thinking over the 2 correct only -> mean(80,90)=85, NOT divided by 3
+    assert to.sample_metrics[("thinking_length_chars", "none")] == [80.0, 90.0]
+    assert mean(to.sample_metrics[("thinking_length_chars", "none")]) == 85.0
 
 
-def test_zero_fill_within_doc_partial_close():
-    # repeats>1: within ONE doc, some responses close their thinking block and some
-    # don't. The non-closing responses count as 0, so the per-doc thinking mean is
-    # over all responses (mean(90, 0) = 45), same basis as response_length.
-    to = _task_output(
-        [
-            _inst(
-                [
-                    {"response_length_chars": 100, "thinking_length_chars": 90},
-                    {"response_length_chars": 100},
-                ],
-                repeats=2,
-            )
-        ]
-    )
+def test_aggregate_thinking_may_exceed_aggregate_response():
+    # Intended consequence of "response over all, thinking over correct-only": the
+    # aggregate thinking mean can exceed the aggregate response mean (different bases),
+    # even though per-sample thinking <= response always holds.
+    docs = [
+        _inst([{"response_length_chars": 100, "thinking_length_chars": 90}]),  # correct
+        _inst([{"response_length_chars": 10}]),  # malformed -> no thinking_length
+    ]
+    to = _task_output(docs)
     promote_generation_info_metrics(to, include_length=True)
-    assert to.sample_metrics[("response_length_chars", "none")] == [100.0]
-    assert to.sample_metrics[("thinking_length_chars", "none")] == [45.0]
+    assert mean(to.sample_metrics[("response_length_chars", "none")]) == 55.0
+    assert mean(to.sample_metrics[("thinking_length_chars", "none")]) == 90.0
 
 
-def test_no_thinking_anywhere_zero_thinking_length():
-    # thinking_length_<unit> is paired per-unit with response_length_<unit>: when no
-    # response closed a block it is emitted as 0 for every response that has the
-    # response_length unit (same basis/count, and consistent across ranks so a
-    # multi-GPU shard with no thinking can't desync the key set).
+def test_no_correct_response_omits_thinking_length():
+    # When no response is well-formed, thinking_length has no values and the key is
+    # simply absent (the gather unions keys, so this is multi-rank safe). response
+    # length is still aggregated over all responses.
     docs = [
         _inst([{"response_length_chars": 30}]),
         _inst([{"response_length_chars": 40}]),
@@ -247,31 +257,13 @@ def test_no_thinking_anywhere_zero_thinking_length():
     to = _task_output(docs)
     promote_generation_info_metrics(to, include_length=True)
     assert to.sample_metrics[("response_length_chars", "none")] == [30.0, 40.0]
-    assert to.sample_metrics[("thinking_length_chars", "none")] == [0.0, 0.0]
+    assert ("thinking_length_chars", "none") not in to.sample_metrics
 
 
-def test_length_less_response_not_counted():
-    # A response dict carrying no response_length_* (e.g. an empty {} from a
-    # suppressed error, or a format-only dict) must contribute to NEITHER response
-    # nor thinking length, so the two stay on an identical count/basis.
-    docs = [
-        _inst([{"response_length_chars": 100, "thinking_length_chars": 90}]),
-        _inst([{"thinking_format_correct": 0}]),  # format-only, no response_length
-        _inst([{}]),  # empty (suppressed-error) dict
-    ]
-    to = _task_output(docs)
-    promote_generation_info_metrics(to, include_length=True)
-    rc = to.sample_metrics[("response_length_chars", "none")]
-    tc = to.sample_metrics[("thinking_length_chars", "none")]
-    assert rc == [100.0]  # only the doc that had response_length
-    assert tc == [90.0]  # same single basis, NOT [90.0, 0.0, 0.0]
-    assert len(rc) == len(tc)
-
-
-def test_orphan_thinking_unit_without_response_dropped():
-    # thinking_length_<unit> with no matching response_length_<unit> (e.g. vLLM
-    # token_ids=None -> no response_length_tokens, but tokenizer set -> a
-    # thinking_length_tokens) is dropped, so it can't exceed / outnumber response.
+def test_orphan_thinking_unit_promoted_independently():
+    # Each length key is now independent: a thinking_length_<unit> with no matching
+    # response_length_<unit> (e.g. vLLM token_ids=None -> no response_length_tokens but
+    # a tokenizer-derived thinking_length_tokens) is promoted on its own.
     to = _task_output(
         [
             _inst(
@@ -279,7 +271,7 @@ def test_orphan_thinking_unit_without_response_dropped():
                     {
                         "response_length_chars": 100,
                         "thinking_length_chars": 90,
-                        "thinking_length_tokens": 50,  # orphan: no response_length_tokens
+                        "thinking_length_tokens": 50,  # no response_length_tokens
                     }
                 ]
             )
@@ -287,7 +279,7 @@ def test_orphan_thinking_unit_without_response_dropped():
     )
     promote_generation_info_metrics(to, include_length=True)
     assert to.sample_metrics[("thinking_length_chars", "none")] == [90.0]
-    assert ("thinking_length_tokens", "none") not in to.sample_metrics
+    assert to.sample_metrics[("thinking_length_tokens", "none")] == [50.0]
     assert ("response_length_tokens", "none") not in to.sample_metrics
 
 
