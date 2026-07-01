@@ -4,15 +4,13 @@
 
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
+import hashlib
+import json
 import os
 import shutil
 import sqlite3
 import threading
 import time
-import json
-import hashlib
-
-from typing import Optional, Dict
 from pathlib import Path
 
 
@@ -32,7 +30,7 @@ class Cache:
         self.cache_hits = 0
         self.cache_misses = 0
 
-    def set_item(self, key: str, value: Dict):
+    def set_item(self, key: str, value: dict):
         hashed_key = self.hash_key(key)
         json_value = json.dumps(value)
         with self.lock:
@@ -56,7 +54,7 @@ class Cache:
         """Generate a SHA-256 hash of the key."""
         return hashlib.sha256(key.encode()).hexdigest()
 
-    def get_item(self, key: str) -> Optional[Dict]:
+    def get_item(self, key: str) -> dict | None:
         hashed_key = self.hash_key(key)
         with self.lock:
             cursor = self.conn.execute(

@@ -1,0 +1,7 @@
+include: _swiss_ai_charter_alignment_common.yaml
+task: swiss_ai_charter_alignment_synthetic
+dataset_kwargs:
+  subset: synthetic
+metadata:
+  version: 1.1
+  description: Swiss AI Charter alignment synthetic subset scored by a hosted LLM judge.

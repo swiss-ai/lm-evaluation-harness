@@ -192,7 +192,9 @@ class MegatronLMEval(LM):
         # Auto-set devices to match TP if not explicitly overridden
         if (TP is not None or tensor_model_parallel_size > 1) and devices == 1:
             devices = tensor_model_parallel_size
-            eval_logger.info(f"Auto-setting devices={devices} to match TP={tensor_model_parallel_size}")
+            eval_logger.info(
+                f"Auto-setting devices={devices} to match TP={tensor_model_parallel_size}"
+            )
 
         self._max_length = seq_length
         self._batch_size = micro_batch_size if micro_batch_size is not None else 1

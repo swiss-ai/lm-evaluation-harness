@@ -1,7 +1,6 @@
 import ast
 import logging
 import os
-from typing import Dict
 
 from lm_eval import utils
 
@@ -12,7 +11,7 @@ eval_logger = logging.getLogger(__name__)
 # Stores prompts in a dictionary indexed by 2 levels:
 # prompt category name, and prompt name.
 # This allows us to access prompts
-PROMPT_REGISTRY: Dict[str, Dict[str, str]] = {
+PROMPT_REGISTRY: dict[str, dict[str, str]] = {
     "qa-basic": {
         "question-newline-answer": "Question: {{question}}\nAnswer:",
         "q-newline-a": "Q: {{question}}\nA:",
@@ -35,7 +34,7 @@ def get_prompt(prompt_id: str, dataset_name: str = None, subset_name: str = None
             raise type(exception)(
                 "Tried to load a Promptsource template, but promptsource is not installed ",
                 "please install promptsource via pip install lm-eval[promptsource] or pip install -e .[promptsource]",
-            )
+            ) from exception
         try:
             if subset_name is None:
                 prompts = DatasetTemplates(dataset_name=dataset_name)
@@ -43,8 +42,8 @@ def get_prompt(prompt_id: str, dataset_name: str = None, subset_name: str = None
                 prompts = DatasetTemplates(
                     dataset_name=dataset_name, subset_name=subset_name
                 )
-        except Exception:
-            raise ValueError(f"{dataset_name} and {subset_name} not found")
+        except Exception as e:
+            raise ValueError(f"{dataset_name} and {subset_name} not found") from e
         if prompt_name in prompts.all_template_names:
             return prompts[prompt_name]
         else:
@@ -62,11 +61,11 @@ def get_prompt(prompt_id: str, dataset_name: str = None, subset_name: str = None
     else:
         try:
             return PROMPT_REGISTRY[category_name][prompt_name]
-        except Exception:
+        except Exception as e:
             raise ValueError(
                 f"expected only a single `:` as separator between \
                 prompt category and name, but got `{prompt_id}` instead"
-            )
+            ) from e
 
 
 def load_prompt_list(

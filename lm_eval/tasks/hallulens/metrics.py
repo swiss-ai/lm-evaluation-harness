@@ -1,15 +1,16 @@
-from lm_eval.tasks.hallulens.facthalu import FactHalu
-from lm_eval.tasks.hallulens.utils import jsonify_ans, generate, try_remote_generate
-from lm_eval.tasks.hallulens.nonsensename import NonsenseNameEval, NonsenseMixedEval
-import json
+import concurrent.futures
 import os
 import sys
-import numpy as np
-import hashlib
-from huggingface_hub import HfApi, hf_hub_download
-from transformers import AutoTokenizer
-import concurrent.futures
 import threading
+
+import numpy as np
+from huggingface_hub import hf_hub_download
+from transformers import AutoTokenizer
+
+from lm_eval.tasks.hallulens.facthalu import FactHalu
+from lm_eval.tasks.hallulens.nonsensename import NonsenseMixedEval, NonsenseNameEval
+from lm_eval.tasks.hallulens.utils import generate, jsonify_ans, try_remote_generate
+
 
 _METRICS_CACHE_KEY = "__hallulens_metrics_cache__"
 if _METRICS_CACHE_KEY not in sys.modules:
@@ -18,7 +19,9 @@ if _METRICS_CACHE_KEY not in sys.modules:
 
     _tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-27B")
     if _test is None:
-        raise RuntimeError("Remote generation failed, cannot connect to the model API. Please check your connection and API key.")
+        raise RuntimeError(
+            "Remote generation failed, cannot connect to the model API. Please check your connection and API key."
+        )
     else:
         print("Remote generation successful, using remote model.")
         _model = None
@@ -80,14 +83,14 @@ Question: {prompt}
 Response: {generation}
 Correct Answer: {gold_answer}
 
-Remember you have to judge the correctness of the response based on the provided correct answer. 
+Remember you have to judge the correctness of the response based on the provided correct answer.
 Please answer with "CORRECT", "INCORRECT", or "UNVERIFIABLE" only, without any additional explanation or text.
 YOUR JUDGEMENT:
 """
 
 ABSTAIN_PROMPT_UPDATED = """
 You're given single-turn conversations between User and Chatbot.
-Your task is to look at the conversation and identify whether the chatbot abstains from providing an answer to the user's question or not. 
+Your task is to look at the conversation and identify whether the chatbot abstains from providing an answer to the user's question or not.
 
 Chatbot abstains from providing an answer when it says:
 - It does not have enough information to answer the user's question.
@@ -148,7 +151,7 @@ Result:{{"is_abstaining":false}}
 
 Example 10:
 User: What ranking did Jude Rogers give to "Hollywood" in her list of Madonna's singles in honor of her 60th birthday?
-Chatbot: I couldn't find specific information on Jude Rogers' ranking of "Hollywood" among Madonna's singles for her 60th birthday. 
+Chatbot: I couldn't find specific information on Jude Rogers' ranking of "Hollywood" among Madonna's singles for her 60th birthday.
 Result:{{"is_abstaining":true}}
 
 Remember, if the chatbot abstains from providing an answer, it should not attempt to correct the user's question or provide an answer. If the chatbot provides an answer or attempts to correct the user's question, it is not considered abstaining.
@@ -185,12 +188,14 @@ if _LONGWIKI_EVALUATOR_KEY not in sys.modules:
 
 _longwiki_evaluator = sys.modules[_LONGWIKI_EVALUATOR_KEY]
 
+
 def replace_none_with_nan(scores):
     """Replace None values in the scores dictionary with NaN."""
     for key, value in scores.items():
         if value is None:
             scores[key] = np.nan
     return scores
+
 
 def _evaluate_single(item):
     """Run the full evaluation for a single doc — with caching.
@@ -255,9 +260,9 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
       Phase 3: Verify + score in parallel (retrieval = cache hits, verification = API calls)
     """
     print(f"[LONGWIKI] Starting batch: {len(longwiki_indices)} docs", flush=True)
-    
+
     # Phase 1
-    print(f"[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
+    print("[LONGWIKI] Phase 1: extracting claims in parallel...", flush=True)
     # Phase 1: parallel extraction (abstention check + claim extraction are API calls)
     extraction_data = [None] * len(longwiki_indices)
 
@@ -271,24 +276,28 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
         return pos, gen, claims, partial_result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(_extract, pos) for pos in range(len(longwiki_indices))]
+        futures = [
+            executor.submit(_extract, pos) for pos in range(len(longwiki_indices))
+        ]
         for future in concurrent.futures.as_completed(futures):
             pos, gen, claims, partial_result = future.result()
             extraction_data[pos] = (gen, claims, partial_result)
 
-
-
     # Phase 2: one big prewarm across ALL documents (single batched GPU call)
     all_claims_tuples = []
-    for gen, claims, _ in extraction_data:
+    for _gen, claims, _ in extraction_data:
         for claim in claims:
             all_claims_tuples.append((claim.topic, claim.claim, claim.question))
 
-    print(f"Longwiki batch: {len(longwiki_indices)} docs, {len(all_claims_tuples)} total claims", flush=True)
+    print(
+        f"Longwiki batch: {len(longwiki_indices)} docs, {len(all_claims_tuples)} total claims",
+        flush=True,
+    )
 
     _longwiki_evaluator.bulk_prewarm(all_claims_tuples)
 
-    print(f"[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
+    print("[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
+
     # Phase 3: parallel verification + scoring (retrieval = cache hits, verification = API)
     def _verify(pos):
         gen, claims, partial_result = extraction_data[pos]
@@ -298,7 +307,9 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
         return pos, result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(_verify, pos) for pos in range(len(longwiki_indices))]
+        futures = [
+            executor.submit(_verify, pos) for pos in range(len(longwiki_indices))
+        ]
         for future in concurrent.futures.as_completed(futures):
             pos, result = future.result()
             idx = longwiki_indices[pos]
@@ -307,7 +318,8 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
             cache_key = (items[idx]["doc"]["prompt"], items[idx]["completion"])
             with _eval_cache_lock:
                 _eval_cache[cache_key] = result
-    print(f"[LONGWIKI] Phase 3 done.", flush=True)
+    print("[LONGWIKI] Phase 3 done.", flush=True)
+
 
 def _run_all(items, max_workers=16):
     results = [None] * len(items)
@@ -326,15 +338,18 @@ def _run_all(items, max_workers=16):
         return results
 
     # Separate longwiki from other categories
-    longwiki_indices = [i for i in uncached_indices if items[i]["doc"]["category"] == "longwiki"]
-    other_indices = [i for i in uncached_indices if items[i]["doc"]["category"] != "longwiki"]
+    longwiki_indices = [
+        i for i in uncached_indices if items[i]["doc"]["category"] == "longwiki"
+    ]
+    other_indices = [
+        i for i in uncached_indices if items[i]["doc"]["category"] != "longwiki"
+    ]
 
     # Process non-longwiki items in parallel (unchanged behavior)
     if other_indices:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_idx = {
-                executor.submit(_evaluate_single, items[i]): i
-                for i in other_indices
+                executor.submit(_evaluate_single, items[i]): i for i in other_indices
             }
             for future in concurrent.futures.as_completed(future_to_idx):
                 idx = future_to_idx[future]
@@ -346,9 +361,11 @@ def _run_all(items, max_workers=16):
 
     return results
 
+
 # ============================================================================
 # Per-document score function (defers to aggregation)
 # ============================================================================
+
 
 def get_score(doc, predictions, **kwargs):
     """Called per-document: defer evaluation to aggregation."""
@@ -377,35 +394,51 @@ def get_score(doc, predictions, **kwargs):
 
 # --- precise_wiki ---
 
+
 def hallu_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["hallu_rate"] for r in results if not np.isnan(r.get("hallu_rate", np.nan))]
+    scores = [
+        r["hallu_rate"] for r in results if not np.isnan(r.get("hallu_rate", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
 def refusal_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["refusal_rate"] for r in results if not np.isnan(r.get("refusal_rate", np.nan))]
+    scores = [
+        r["refusal_rate"]
+        for r in results
+        if not np.isnan(r.get("refusal_rate", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
 def correct_rate_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["correct_rate"] for r in results if not np.isnan(r.get("correct_rate", np.nan))]
+    scores = [
+        r["correct_rate"]
+        for r in results
+        if not np.isnan(r.get("correct_rate", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
 # --- longwiki ---
 
+
 def abstained_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["abstained"] for r in results if not np.isnan(r.get("abstained", np.nan))]
+    scores = [
+        r["abstained"] for r in results if not np.isnan(r.get("abstained", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
 def precision_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["precision"] for r in results if not np.isnan(r.get("precision", np.nan))]
+    scores = [
+        r["precision"] for r in results if not np.isnan(r.get("precision", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
@@ -423,15 +456,19 @@ def f1_agg(items, max_workers=16):
 
 # --- nonsense entities ---
 
+
 def abstention_agg(items, max_workers=16):
     results = _run_all(items, max_workers)
-    scores = [r["abstention"] for r in results if not np.isnan(r.get("abstention", np.nan))]
+    scores = [
+        r["abstention"] for r in results if not np.isnan(r.get("abstention", np.nan))
+    ]
     return sum(scores) / len(scores) if scores else np.nan
 
 
 # ============================================================================
 # Shortform evaluation helpers
 # ============================================================================
+
 
 def eval_abstention(original_prompt, generated_answer, model, tokenizer):
     abstain_prompt = ABSTAIN_PROMPT_UPDATED.format(
@@ -476,13 +513,15 @@ def process_res(abstantion_res, halu_eval_raw):
     # remove . and strip whitespace, and convert to lowercase for more robust matching
     halu_eval_raw = halu_eval_raw.strip().lower().replace(".", "")
     # instead just check if it starts with "correct", "incorrect", or "unverifiable" to allow for some flexibility in the model's response
-    if not (halu_eval_raw.startswith("correct") or halu_eval_raw.startswith("incorrect") or halu_eval_raw.startswith("unverifiable")):
-        print("Unexpected hallucination evaluation response: {}. Expected 'Correct', 'Incorrect', or 'Unverifiable'.".format(halu_eval_raw))
-    hallucinated_judge = (
-        False
-        if halu_eval_raw.startswith("correct")
-        else True
-    )
+    if not (
+        halu_eval_raw.startswith("correct")
+        or halu_eval_raw.startswith("incorrect")
+        or halu_eval_raw.startswith("unverifiable")
+    ):
+        print(
+            f"Unexpected hallucination evaluation response: {halu_eval_raw}. Expected 'Correct', 'Incorrect', or 'Unverifiable'."
+        )
+    hallucinated_judge = not halu_eval_raw.startswith("correct")
     return abstantion_res, hallucinated_judge
 
 
@@ -497,9 +536,7 @@ def run_eval_precise_wiki(original_prompt, generated_answer, gold_answer):
     abstantion_res, halu_test_res = process_res(abstantion_val, halu_test_raw_gen)
     if abstantion_res is None or halu_test_res is None:
         return {"hallu_rate": np.nan, "refusal_rate": np.nan, "correct_rate": np.nan}
-    not_abstained = (
-        0 if abstantion_res else 1
-    )
+    not_abstained = 0 if abstantion_res else 1
     if not_abstained == 0:
         hallu_rate_not_abstain = 0
         refusal_rate = 1

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import logging
@@ -41,8 +42,18 @@ from lm_eval.utils import (
 )
 
 
+resolve_vllm_chat_template = None
 if parse_version(version("vllm")) >= parse_version("0.8.3"):
-    from vllm.entrypoints.chat_utils import resolve_hf_chat_template
+    with contextlib.suppress(ImportError):
+        from vllm.entrypoints.chat_utils import (
+            resolve_hf_chat_template as resolve_vllm_chat_template,
+        )
+    # Fallback for older vllm versions
+    if resolve_vllm_chat_template is None:
+        with contextlib.suppress(ImportError):
+            from vllm.renderers.hf import (
+                resolve_chat_template as resolve_vllm_chat_template,
+            )
 
 try:
     # Moved since vllm-project/vllm#29793
@@ -154,6 +165,7 @@ class VLLM(TemplateLM):
         # VLLM: enable thinking tags in the prompt.
         enable_thinking: bool = True,
         chat_template_args: dict | None = None,
+        chat_template_path: str | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
         check_system_prompt_authority: bool = False,
@@ -244,6 +256,7 @@ class VLLM(TemplateLM):
             chat_template_source=getattr(self.tokenizer, "chat_template", None),
             chat_template_args=chat_template_args,
             strip=strip_system_boilerplate,
+            chat_template_path=chat_template_path,
         )
 
         self.chat_template_args = chat_template_args
@@ -251,7 +264,10 @@ class VLLM(TemplateLM):
             "enable_thinking", enable_thinking
         )
 
-        if parse_version(version("vllm")) >= parse_version("0.8.3"):
+        if (
+            parse_version(version("vllm")) >= parse_version("0.8.3")
+            and resolve_vllm_chat_template is not None
+        ):
             kwargs_resolve_hf_chat_template = {
                 "tokenizer": self.tokenizer,
                 "chat_template": None,
@@ -273,7 +289,7 @@ class VLLM(TemplateLM):
             else:
                 kwargs_resolve_hf_chat_template["trust_remote_code"] = trust_remote_code
 
-            self.hf_chat_template = resolve_hf_chat_template(
+            self.hf_chat_template = resolve_vllm_chat_template(
                 **kwargs_resolve_hf_chat_template  # type: ignore
             )
         else:
@@ -358,7 +374,10 @@ class VLLM(TemplateLM):
         return self._max_gen_toks
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
@@ -372,6 +391,7 @@ class VLLM(TemplateLM):
                 chat_template=self.hf_chat_template,
                 enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
+                **kwargs,
             )
         except jinja2.exceptions.TemplateError:
             eval_logger.warning(
@@ -385,6 +405,7 @@ class VLLM(TemplateLM):
                 chat_template=self.hf_chat_template,
                 enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
+                **kwargs,
             )
 
         return cast("str", chat_templated)

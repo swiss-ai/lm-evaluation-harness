@@ -15,6 +15,7 @@ from pathlib import Path
 
 import yaml
 
+
 DIFFICULTIES = ["low", "medium", "high", "top"]
 LANGUAGES = {
     "ar": "Arabic",

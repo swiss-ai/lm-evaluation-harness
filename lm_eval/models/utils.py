@@ -8,6 +8,7 @@ import logging
 import re
 import time
 from functools import wraps
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -639,23 +640,53 @@ def maybe_strip_system_boilerplate(
     chat_template_source: str | None,
     chat_template_args: dict | None,
     strip: bool,
+    chat_template_path: str | None = None,
 ) -> dict:
-    """Apply system boilerplate stripping if requested.
+    """Prepare chat-template kwargs and optionally strip system boilerplate.
 
-    If *strip* is true and `chat_template_args` does not already contain a
-    ``chat_template`` key, the tokenizer's template source is run through
-    :func:`strip_system_boilerplate_from_template` and the cleaned version
-    is injected into the returned dict.
+    If ``chat_template_path`` is provided, or ``chat_template_args`` contains a
+    ``chat_template_path`` key, the file is read and injected as
+    ``chat_template``. If *strip* is true and `chat_template_args` does not
+    already contain a ``chat_template`` key, the tokenizer's template source is
+    run through :func:`strip_system_boilerplate_from_template` and the cleaned
+    version is injected into the returned dict.
 
     Args:
         chat_template_source: The raw Jinja template string from the tokenizer.
         chat_template_args: Existing chat-template keyword arguments (may be None).
         strip: Whether stripping was requested.
+        chat_template_path: Optional path to a raw Jinja chat-template file.
 
     Returns:
         The (possibly updated) ``chat_template_args`` dict — never ``None``.
     """
-    chat_template_args = chat_template_args or {}
+    chat_template_args = dict(chat_template_args or {})
+    nested_path = chat_template_args.pop("chat_template_path", None)
+    if chat_template_path == "":
+        chat_template_path = None
+    if nested_path == "":
+        nested_path = None
+    if chat_template_path is not None and nested_path is not None:
+        raise ValueError(
+            "Specify chat_template_path either as a top-level model arg or inside "
+            "chat_template_args, not both."
+        )
+
+    resolved_path = (
+        chat_template_path if chat_template_path is not None else nested_path
+    )
+    if resolved_path is not None:
+        if "chat_template" in chat_template_args:
+            raise ValueError(
+                "Specify either chat_template_args.chat_template or "
+                "chat_template_path, not both."
+            )
+        path = Path(str(resolved_path)).expanduser()
+        try:
+            chat_template_args["chat_template"] = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"Could not read chat template from {path!s}") from exc
+
     if not strip:
         return chat_template_args
 

@@ -74,18 +74,18 @@ the upstream flags `--system_instructions` and
 
 ### Limits and known caveats
 
-- **Multi-turn parallelism.** Supported on HF + `accelerate launch
-  --num_processes N` (the driver shards docs, gathers each turn, and pads
-  ranks with fewer live docs); on vLLM via `data_parallel_size` /
-  `tensor_parallel_size` in `--model_args`; and on any OpenAI-compatible
-  chat backend via `num_concurrent`. Native Anthropic / Google backends
-  don't implement `apply_chat_template` and the driver hard-errors —
-  route through `local-chat-completions` against a wrapper instead. The
-  full matrix and a "which path do I pick?" guide live in
+- **Multi-turn parallelism.** The rollout driver is single-node
+  (`world_size == 1`). Within each turn it issues one batched
+  `generate_until` call, so backends with internal parallelism still
+  parallelize: vLLM via `data_parallel_size` / `tensor_parallel_size` in
+  `--model_args`, and any OpenAI-compatible chat backend via
+  `num_concurrent`. Cross-rank HF `accelerate launch` data-parallel is
+  **not** supported. Native Anthropic / Google backends don't implement
+  `apply_chat_template` and the driver hard-errors — route through
+  `local-chat-completions` against a wrapper instead. The full matrix
+  lives in
   [docs/multi_turn_rollout.md#backend-compatibility](../../../docs/multi_turn_rollout.md#backend-compatibility)
   — that is the canonical source; this bullet is a pointer.
-- **`repeats > 1` is not supported on multi-turn tasks** — `_build_initial_multi_turn_states`
-  hard-errors so a `repeats: 3` YAML doesn't silently single-sample.
 - **HF-vs-vLLM kernel drift**: expect ~0.5–1 pp at T=0 bf16, intrinsic
   to swapping inference backends. Not a config bug.
 - **Numerical paper parity is unverified.** Implementation is

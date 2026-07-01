@@ -18,11 +18,32 @@ metric_list:
     aggregation: mean
     higher_is_better: false
 generation_kwargs:
-  do_sample: false
-  temperature: 0
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.95
   max_gen_toks: 32768
   until:
     - "\n\n\n\n"
-repeats: 1
+repeats: 8
+filter_list:
+  # single-sample accuracy (first of the 8 samples), reported alongside the vote
+  - name: "score-first"
+    filter:
+      - function: "take_first"
+  # mean@8 (avg@k): score each of the 8 samples individually and average accuracy
+  - name: "mean@8"
+    filter:
+      - function: "take_first_k"
+        k: 8
+  # self-consistency: majority vote over all 8 sampled answers
+  - name: "maj@8"
+    filter:
+      - function: !function utils.MajorityVoteFilter
+      - function: "take_first"
+  # pass@8: solved if any of the 8 samples is correct
+  - name: "pass@8"
+    filter:
+      - function: !function utils.PassAtKFilter
+      - function: "take_first"
 metadata:
   version: 0.0

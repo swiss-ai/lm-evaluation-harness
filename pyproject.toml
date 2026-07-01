@@ -73,6 +73,10 @@ sparsify = ["sparsify"]
 # Task specific dependencies
 acpbench = ["lark>=1.1.9", "tarski[clingo]==0.8.2", "pddl==0.4.2", "kstar-planner==1.4.2"]
 audiolm_qwen = ["librosa", "soundfile"]
+bfcl = ["tree_sitter==0.21.3", "tree-sitter-java==0.21.0", "tree-sitter-javascript==0.21.4", "mpmath"]
+mt_bench = ["openai"]
+olympiadbench = ["sympy>=1.12", "antlr4-python3-runtime==4.11"]
+swiss_ai_charter_alignment = ["openai"]
 alpaca_eval = ["alpaca-eval>=0.6.2"]
 arena_hard = ["openai", "tiktoken"]
 dev = ["pytest", "pytest-cov", "pytest-xdist", "pre-commit", "requests", "aiohttp", "tenacity", "tqdm", "tiktoken", "sentencepiece", "ruff", "pillow"]
@@ -99,10 +103,13 @@ zeno = ["pandas", "zeno-client"]
 tasks = [
     "lm_eval[alpaca_eval]",
     "lm_eval[arena_hard]",
+    "lm_eval[bfcl]",
     "lm_eval[discrim_eval]",
     "lm_eval[ifeval]",
     "lm_eval[sysp_eval]",
     "lm_eval[japanese_leaderboard]",
+    "lm_eval[mt_bench]",
+    "lm_eval[olympiadbench]",
     "lm_eval[longbench]",
     "lm_eval[libra]",
     "lm_eval[math]",
@@ -165,15 +172,13 @@ fixable = [
     "UP",     # pyupgrade fixes
 ]
 ignore = [
-    # docstrings
+    # docstrings — only require existence; formatting nits are too noisy
     "D10",    # missing-docstring
-        # docstrings
-    "D212", # start first line
-    "D415", # terminal punctuation
-    "D205", # missing blank line
-    "D417", # docs: undocumented param
-    "D200", # unnecessary line
-    "D202", # blank-line-after-function
+    "D2",     # whitespace / indentation in docstrings
+    "D3",     # quote style / backslashes
+    "D4",     # section formatting (Args/Returns/Raises etc.)
+
+    "B905", # zip-strict
 
     "E111",   # indentation-with-invalid-multiple
     "E114",   # indentation-with-invalid-multiple-comment
@@ -184,7 +189,9 @@ ignore = [
     "E731",   # lambda-assignment
     "E741",   # ambiguous-variable-name
     "SIM118", # dict-in-keys
+    "SIM108", # ternary if
     "S101",   # assert-used
+    "S311",   # cryptographic random generator
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
@@ -193,6 +200,13 @@ ignore = [
     "F402",   # import-shadowed-by-loop-var
     "F403",   # undefined-local-with-import-star
     "F405",   # undefined-local-with-import-star-usage
+]
+"lm_eval/tasks/bfcl_v3/multi_turn_func_source/*.py" = [
+    "B006",   # mutable-argument-default
+    "D410",   # missing-blank-line-after-section
+    "D411",   # missing-blank-line-before-section
+    "S105",   # possible-hardcoded-password
+    "S311",   # suspicious-non-cryptographic-random-usage
 ]
 # Vendored from github.com/normster/llm_rules (Apache-2.0, SHA f627e56).
 # Kept verbatim; do not lint upstream style.

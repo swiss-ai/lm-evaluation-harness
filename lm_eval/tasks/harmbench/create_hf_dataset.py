@@ -14,7 +14,8 @@ from datasets import Dataset, DatasetDict
 from dotenv import load_dotenv
 from huggingface_hub import HfApi, login
 
-ROOT_DIR = os.path.dirname((os.path.abspath(__file__)))
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # --- Log into Hugging Face ---
@@ -37,7 +38,7 @@ def load_csv_url_as_df(url):
 
 
 def load_local_json_as_df(json_path):
-    with open(os.path.join(ROOT_DIR, json_path), "r") as f:
+    with open(os.path.join(ROOT_DIR, json_path)) as f:
         data = json.load(f)
 
     # Expand the data so each behavior in the array becomes a separate row

@@ -1,5 +1,7 @@
-import evaluate as hf_evaluate
 import re
+
+import evaluate as hf_evaluate
+
 
 try:
     compute_ = hf_evaluate.load("code_eval")
@@ -15,6 +17,11 @@ def pass_at_k(references: list[str], predictions: list[list[str]], k: list[int] 
     assert k is not None
     if isinstance(k, int):
         k = [k]
+    # Only compute pass@k for k that don't exceed the number of available samples
+    # (code_eval errors otherwise). Lets a single-sample "first" filter coexist
+    # with a multi-sample filter under one k=[1, N] metric entry.
+    n = min(len(p) for p in predictions)
+    k = [kk for kk in k if kk <= n] or [1]
     res = compute_.compute(
         references=references,
         predictions=predictions,

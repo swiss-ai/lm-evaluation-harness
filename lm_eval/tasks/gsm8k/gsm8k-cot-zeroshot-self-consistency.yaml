@@ -1,0 +1,58 @@
+tag:
+  - math_word_problems
+  - chain_of_thought
+  - self_consistency
+task: gsm8k_cot_zeroshot_self_consistency
+dataset_path: openai/gsm8k
+dataset_name: main
+output_type: generate_until
+training_split: train
+fewshot_split: train
+test_split: test
+# Zero-shot CoT prompt (matches gsm8k-cot-zeroshot)
+doc_to_text: "Q: {{question}}\nA: Let's think step by step."
+doc_to_target: "{{answer}}"
+# Custom scoring: extract the numeric answer from each of the k samples and score
+# each individually (needed for mean@k; the built-in exact_match only scores one).
+process_results: !function sc_utils.process_results
+num_fewshot: 0
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
+# Self-consistency sampling: temperature 0.7, top-p 0.95 (matches the AIME configs).
+generation_kwargs:
+  do_sample: true
+  temperature: 0.7
+  top_p: 0.95
+  max_gen_toks: 2048
+  until:
+    - "Q:"
+    - "</s>"
+    - "<|im_end|>"
+repeats: 32
+filter_list:
+  # single-sample accuracy (first of the 32 samples)
+  - name: "score-first"
+    filter:
+      - function: "take_first"
+  # mean@32 (avg@k): score each of the 32 samples individually and average accuracy
+  - name: "mean@32"
+    filter:
+      - function: "take_first_k"
+        k: 32
+  # self-consistency: majority vote over all 32 sampled answers
+  - name: "maj@32"
+    filter:
+      - function: !function sc_utils.MajorityVoteFilter
+      - function: "take_first"
+  # pass@32: solved if any of the 32 samples is correct
+  - name: "pass@32"
+    filter:
+      - function: !function sc_utils.PassAtKFilter
+      - function: "take_first"
+metadata:
+  version: 1.0
