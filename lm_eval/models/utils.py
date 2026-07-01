@@ -662,6 +662,10 @@ def maybe_strip_system_boilerplate(
     """
     chat_template_args = dict(chat_template_args or {})
     nested_path = chat_template_args.pop("chat_template_path", None)
+    if chat_template_path == "":
+        chat_template_path = None
+    if nested_path == "":
+        nested_path = None
     if chat_template_path is not None and nested_path is not None:
         raise ValueError(
             "Specify chat_template_path either as a top-level model arg or inside "

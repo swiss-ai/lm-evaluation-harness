@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import gc
 import logging
@@ -41,8 +42,18 @@ from lm_eval.utils import (
 )
 
 
+resolve_vllm_chat_template = None
 if parse_version(version("vllm")) >= parse_version("0.8.3"):
-    from vllm.entrypoints.chat_utils import resolve_hf_chat_template
+    with contextlib.suppress(ImportError):
+        from vllm.entrypoints.chat_utils import (
+            resolve_hf_chat_template as resolve_vllm_chat_template,
+        )
+    # Fallback for older vllm versions
+    if resolve_vllm_chat_template is None:
+        with contextlib.suppress(ImportError):
+            from vllm.renderers.hf import (
+                resolve_chat_template as resolve_vllm_chat_template,
+            )
 
 try:
     # Moved since vllm-project/vllm#29793
@@ -253,7 +264,10 @@ class VLLM(TemplateLM):
             "enable_thinking", enable_thinking
         )
 
-        if parse_version(version("vllm")) >= parse_version("0.8.3"):
+        if (
+            parse_version(version("vllm")) >= parse_version("0.8.3")
+            and resolve_vllm_chat_template is not None
+        ):
             kwargs_resolve_hf_chat_template = {
                 "tokenizer": self.tokenizer,
                 "chat_template": None,
@@ -275,7 +289,7 @@ class VLLM(TemplateLM):
             else:
                 kwargs_resolve_hf_chat_template["trust_remote_code"] = trust_remote_code
 
-            self.hf_chat_template = resolve_hf_chat_template(
+            self.hf_chat_template = resolve_vllm_chat_template(
                 **kwargs_resolve_hf_chat_template  # type: ignore
             )
         else:

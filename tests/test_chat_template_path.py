@@ -57,3 +57,24 @@ def test_chat_template_path_rejects_duplicate_path_sources(tmp_path):
             strip=False,
             chat_template_path=str(template),
         )
+
+
+def test_empty_chat_template_path_is_ignored():
+    args = maybe_strip_system_boilerplate(
+        chat_template_source=None,
+        chat_template_args=None,
+        strip=False,
+        chat_template_path="",
+    )
+
+    assert args == {}
+
+
+def test_nested_empty_chat_template_path_is_ignored():
+    args = maybe_strip_system_boilerplate(
+        chat_template_source=None,
+        chat_template_args={"chat_template_path": "", "enable_thinking": False},
+        strip=False,
+    )
+
+    assert args == {"enable_thinking": False}
