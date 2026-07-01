@@ -114,6 +114,7 @@ class HFLM(TemplateLM):
         allow_system_boilerplate: bool = False,
         check_system_prompt_authority: bool = False,
         chat_template_args: dict[str, Any] | None = None,
+        chat_template_path: str | os.PathLike | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -267,6 +268,9 @@ class HFLM(TemplateLM):
             chat_template_source=getattr(self.tokenizer, "chat_template", None),
             chat_template_args=chat_template_args,
             strip=strip_system_boilerplate,
+            chat_template_path=str(chat_template_path)
+            if chat_template_path is not None
+            else None,
         )
 
         self.chat_template_args = chat_template_args

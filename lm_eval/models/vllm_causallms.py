@@ -154,6 +154,7 @@ class VLLM(TemplateLM):
         # VLLM: enable thinking tags in the prompt.
         enable_thinking: bool = True,
         chat_template_args: dict | None = None,
+        chat_template_path: str | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
         check_system_prompt_authority: bool = False,
@@ -244,6 +245,7 @@ class VLLM(TemplateLM):
             chat_template_source=getattr(self.tokenizer, "chat_template", None),
             chat_template_args=chat_template_args,
             strip=strip_system_boilerplate,
+            chat_template_path=chat_template_path,
         )
 
         self.chat_template_args = chat_template_args

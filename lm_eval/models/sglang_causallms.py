@@ -11,6 +11,7 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     handle_stop_sequences,
+    maybe_strip_system_boilerplate,
     postprocess_generated_text,
 )
 from lm_eval.utils import (
@@ -55,6 +56,8 @@ class SGLangLM(TemplateLM):
         dp_size: int = 1,
         tp_size: int = 1,
         prefix_token_id: int | None = None,
+        chat_template_args: dict | None = None,
+        chat_template_path: str | None = None,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         **kwargs,
@@ -107,6 +110,12 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
+        self.chat_template_args = maybe_strip_system_boilerplate(
+            chat_template_source=getattr(self.tokenizer, "chat_template", None),
+            chat_template_args=chat_template_args,
+            strip=False,
+            chat_template_path=chat_template_path,
+        )
         self._max_gen_toks = max_gen_toks
         self.add_bos_token = add_bos_token
         if "gemma" in pretrained.lower():
@@ -414,6 +423,7 @@ class SGLangLM(TemplateLM):
             tokenize=False,
             add_generation_prompt=add_generation_prompt,
             continue_final_message=not add_generation_prompt,
+            **self.chat_template_args,
             **kwargs,
         )
 
