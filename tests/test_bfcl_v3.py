@@ -145,10 +145,29 @@ def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
     assert seen["kwargs"]["tools"][0]["name"] == "calculate_triangle_area"
     assert seen["kwargs"]["tools"][0]["parameters"]["type"] == "object"
     assert seen["messages"][0]["role"] == "system"
-    assert "<|tools_suffix|>" in seen["messages"][0]["content"]["text"]
+    assert seen["messages"][0]["content"]["text"] == ""
     assert "<available_function_name>" not in seen["messages"][0]["content"]["text"]
     assert "<parameter_name>" not in seen["messages"][0]["content"]["text"]
     assert seen["messages"][1]["content"]["parts"][0]["type"] == "text"
+
+
+def test_bfcl_v3_apertus_fewshot_context_uses_custom_system_instruction():
+    task = _make_apertus_task()
+    doc = task.test_docs()[0]
+    seen = {}
+
+    task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        system_instruction="Use tools carefully.",
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(
+            {"messages": messages, "kwargs": kwargs}
+        )
+        or "templated",
+    )
+
+    assert seen["messages"][0]["content"]["text"] == "Use tools carefully."
 
 
 def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
@@ -228,6 +247,7 @@ def test_bfcl_v3_apertus_multi_turn_uses_tool_chat_template():
     assert prompt == "templated-multiturn"
     assert seen["kwargs"]["tools"]
     assert seen["messages"][0]["role"] == "system"
+    assert seen["messages"][0]["content"]["text"] == ""
     assert any(
         part["type"] == "text"
         for message in seen["messages"]

@@ -61,10 +61,7 @@ DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC = (
     "I have updated some more functions you can choose from. What about now?"
 )
 
-APERTUS_SYSTEM_PROMPT = """You are an expert tool-calling assistant. Use the available tools to satisfy the user's request.
-If no tool can be used, or the request lacks required parameters, do not emit a tool call.
-When calling tools, put the tool-call JSON array between <|tools_prefix|> and <|tools_suffix|>.
-"""
+APERTUS_SYSTEM_PROMPT = ""
 
 
 class _ListDocs(list):
@@ -259,18 +256,16 @@ def _apertus_tools(functions: list[dict], category: str) -> list[dict]:
 
 
 def _apertus_messages(
-    functions: list[dict], messages: list[dict], category: str, multi_turn: bool
+    functions: list[dict],
+    messages: list[dict],
+    category: str,
+    multi_turn: bool,
+    system_instruction: str | None = None,
 ) -> list[dict]:
-    multi_turn_instruction = (
-        "\nContinue calling tools until the current user turn is complete. "
-        "When no further tool call is needed, finish without emitting another tool block."
-        if multi_turn
-        else ""
-    )
     return [
         {
             "role": "system",
-            "content": {"text": APERTUS_SYSTEM_PROMPT + multi_turn_instruction},
+            "content": {"text": system_instruction or APERTUS_SYSTEM_PROMPT},
         },
         *[_apertus_message(message) for message in messages],
     ]
@@ -637,12 +632,15 @@ class BFCLV3Task(ConfigurableTask):
                     "bfcl_v3_apertus tasks require --apply_chat_template so "
                     "the model tokenizer can render the Apertus tool schema."
                 )
+            if _is_multi_turn(self.bfcl_category):
+                return system_instruction or APERTUS_SYSTEM_PROMPT
             return chat_template(
                 _apertus_messages(
                     doc.get("function", []),
                     doc["question"][0],
                     self.bfcl_category,
                     multi_turn=_is_multi_turn(self.bfcl_category),
+                    system_instruction=system_instruction,
                 ),
                 tools=_apertus_tools(
                     doc.get("function", []),
@@ -710,12 +708,16 @@ class BFCLV3Task(ConfigurableTask):
         gen_kwargs: dict,
         apply_chat_template: bool = False,
         chat_template=None,
+        system_instruction: str | None = None,
     ) -> dict:
         return {
             "doc": doc,
             "gen_kwargs": gen_kwargs,
             "apply_chat_template": apply_chat_template,
             "chat_template": chat_template,
+            "system_instruction": system_instruction
+            if system_instruction is not None
+            else ctx,
             "functions": deepcopy(doc["function"]),
             "history": [],
             "turn_idx": 0,
@@ -827,6 +829,7 @@ class BFCLV3Task(ConfigurableTask):
                     state["history"],
                     self.bfcl_category,
                     multi_turn=True,
+                    system_instruction=state.get("system_instruction"),
                 ),
                 tools=_apertus_tools(state["functions"], self.bfcl_category),
             )
