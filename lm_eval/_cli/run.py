@@ -183,6 +183,13 @@ class Run(SubCommand):
             help="Save all model outputs and documents for post-hoc analysis",
         )
         data_group.add_argument(
+            "--log_length_metrics",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="Aggregate per-response response/thinking length into per-task "
+            "metrics in results and W&B (thinking-format flags are always logged).",
+        )
+        data_group.add_argument(
             "--samples",
             "-E",
             default=None,
@@ -410,6 +417,7 @@ class Run(SubCommand):
             torch_random_seed=cfg.seed[2] if cfg.seed else None,
             fewshot_random_seed=cfg.seed[3] if cfg.seed else None,
             confirm_run_unsafe_code=cfg.confirm_run_unsafe_code,
+            log_length_metrics=cfg.log_length_metrics,
             metadata=cfg.metadata,
         )
 

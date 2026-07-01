@@ -99,6 +99,7 @@ lm-eval run --config my_config.yaml --tasks mmlu
 | `--output_path` | `-o` | Output directory or JSON file for results. Required with `--log_samples`. |
 | `--log_samples` | `-s` | Save all model inputs/outputs for post-hoc analysis. |
 | `--samples` | `-E` | JSON mapping task names to sample indices, e.g., `'{"task1": [0,1,2]}'`. Incompatible with `--limit`. |
+| `--log_length_metrics` | | Aggregate per-response response/thinking length into per-task metrics in the results and W&B. See [Generation length & thinking-format metrics](#generation-length--thinking-format-metrics). |
 
 ### Caching and Performance
 
@@ -162,6 +163,32 @@ The `--hf_hub_log_args` argument accepts these keys:
 | `leaderboard_url` | URL to associated leaderboard. |
 | `point_of_contact` | Contact email for results dataset. |
 | `gated` | `True`/`False` - gate the details dataset. |
+
+---
+
+### Generation length & thinking-format metrics
+
+Options that control the per-response length / thinking-format metrics and the
+reasoning-trace strip for thinking models. See **[Thinking / reasoning
+evals](./thinking_evals.md)** for what these metrics mean, what is logged where,
+malformed/non-thinking handling, and multi-turn behavior.
+
+Added by this feature:
+
+| Option | Kind | Description |
+|--------|------|-------------|
+| `--log_length_metrics` | CLI | Aggregate `response_length_*` / `thinking_length_*` into per-task metrics (results.json, table, W&B). Off by default; `thinking_format_*` is aggregated regardless. |
+| `think_start_token` | `--model_args` | Force the reasoning **open** token (str); else auto-detected from the chat template. |
+
+Pre-existing options that also affect these metrics:
+
+| Option | Kind | Description |
+|--------|------|-------------|
+| `--log_samples` | CLI | Write the per-response `length_info` (all length + thinking-format fields) into the sample jsonl. |
+| `--wandb_args` | CLI (value) | Native W&B upload of the aggregated metrics, e.g. `--wandb_args project=p name=run1`. |
+| `--apply_chat_template` | CLI | Required for the chat/thinking template to render (the reasoning tokens live in it). |
+| `enable_thinking` | `--model_args` | `true`/`false` — model reasoning mode (`vllm`/`hf`). On `hf` the fail-loud close-token guard defaults on. |
+| `think_end_token` | `--model_args` | Force the reasoning **close** token (str; also int token id on `hf`); drives the strip; else auto-detected. |
 
 ---
 

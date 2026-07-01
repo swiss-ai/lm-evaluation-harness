@@ -5,6 +5,7 @@
 ---
 
 ## Latest News 📣
+- [2026/06] **Generation length & thinking-format metrics**: `generate_until` backends now record per-response response/thinking length and reasoning-block well-formedness (`thinking_format_has_open/has_close/correct`). Thinking-format aggregates to per-task metrics natively; add `--log_length_metrics` to also aggregate length. See [Thinking / Reasoning Evals](./docs/thinking_evals.md).
 - [2025/12] **CLI refactored** with subcommands (`run`, `ls`, `validate`) and YAML config file support via `--config`. See the [CLI Reference](./docs/interface.md) and [Configuration Guide](./docs/config_files.md).
 - [2025/12] **Lighter install**: Base package no longer includes `transformers`/`torch`. Install model backends separately: `pip install lm_eval[hf]`, `lm_eval[vllm]`, etc.
 - [2025/07] Added `think_end_token` arg to `hf` (token/str), `vllm` and `sglang` (str) for stripping CoT reasoning traces from models that support it.

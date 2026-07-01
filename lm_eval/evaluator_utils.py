@@ -14,6 +14,7 @@ from lm_eval.api.metrics import (
 from lm_eval.api.task import Task
 from lm_eval.utils import positional_deprecated
 
+
 eval_logger = logging.getLogger(__name__)
 
 
@@ -110,7 +111,12 @@ class TaskOutput:
                 agg_fn = mean
             metric_key = f"{metric},{filter_key}"
             self.agg_metrics[metric_key] = agg_fn(items)
-            self.sample_len = len(items)  # TODO: same sample size for each metric?
+            # Report the largest per-metric sample count as the task's sample size.
+            # Most metrics share the doc count, but promoted per-response info
+            # metrics (e.g. thinking_length only on docs that reasoned) can be
+            # sparser; a plain last-wins assignment would undercount `samples` and
+            # mis-weight group pooling.
+            self.sample_len = max(self.sample_len or 0, len(items))
             if isinstance(bootstrap_iters, int):
                 stderr_fn = stderr_for_metric(
                     metric=agg_fn,
@@ -137,6 +143,78 @@ class TaskOutput:
             f"task_alias={self.task_alias}, "
             f"group_alias={self.group_alias})"
         )
+
+
+# Prefixes of the per-response Instance.length_info keys promoted by `_is_promoted`.
+THINKING_FORMAT_PREFIX = "thinking_format_"
+RESPONSE_LENGTH_PREFIX = "response_length_"
+THINKING_LENGTH_PREFIX = "thinking_length_"
+
+
+def promote_generation_info_metrics(
+    task_output: "TaskOutput", include_length: bool = False
+) -> None:
+    """Promote per-response generation-info into per-task metrics in ``sample_metrics``.
+
+    Backends store per-response dicts in each ``Instance.length_info``: the
+    ``thinking_format_*`` 0/1 flags (when thinking is tracked), and (with
+    ``include_length``) the ``response_length_*`` measurements plus, **only for
+    well-formed responses** (``thinking_format_correct == 1``, gated upstream at the
+    backend), the ``thinking_length_*`` measurements.
+
+    Each promoted key is aggregated independently: one value per doc — the mean over
+    that doc's responses **carrying the key**. So ``response_length_*`` averages over
+    all responses, ``thinking_format_*`` (rates) over all responses, and
+    ``thinking_length_*`` over the well-formed responses only — its denominator never
+    includes malformed/incorrect responses (a doc with no well-formed response emits no
+    ``thinking_length_*`` value). Consequence: the aggregate ``thinking_length`` is the
+    mean among well-formed responses and is NOT bounded by the aggregate
+    ``response_length`` (per-sample ``thinking <= response`` still holds).
+
+    Instances are grouped by ``doc_id`` (``multi_turn_generate`` uses one Instance per
+    turn); DP padding clones beyond ``repeats`` are ignored. Routed under the ``none``
+    filter through the existing gather -> mean -> consolidate -> W&B path; the gather
+    unions keys across ranks, so a rank lacking a key (e.g. no well-formed response) is
+    safe. Appends on each call (not idempotent); run once per rank before the gather.
+    """
+    task = task_output.task
+    if task is None:
+        return
+
+    def _numeric(v) -> bool:
+        # bool is an int subclass; flags/lengths are plain ints, so exclude bool.
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    def _is_promoted(key: str) -> bool:
+        if key.startswith(THINKING_FORMAT_PREFIX):
+            return True
+        return include_length and key.startswith(
+            (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
+        )
+
+    def _doc_infos(inst) -> list:
+        """Per-response dicts for one instance, capped at the intended sample
+        count (DP padding can append extra clones beyond ``repeats``).
+        """
+        infos = getattr(inst, "length_info", None) or []
+        n = getattr(inst, "repeats", None)
+        if isinstance(n, int) and n > 0:
+            infos = infos[:n]
+        return [info for info in infos if isinstance(info, dict)]
+
+    by_doc: dict = collections.defaultdict(list)
+    for inst in getattr(task, "instances", []):
+        by_doc[inst.doc_id].append(inst)
+
+    for insts in by_doc.values():
+        per_key: dict = collections.defaultdict(list)
+        for inst in insts:
+            for info in _doc_infos(inst):
+                for key, value in info.items():
+                    if _is_promoted(key) and _numeric(value):
+                        per_key[key].append(float(value))
+        for key, values in per_key.items():
+            task_output.sample_metrics[(key, "none")].append(mean(values))
 
 
 def get_task_list(task_dict: dict) -> list[TaskOutput]:

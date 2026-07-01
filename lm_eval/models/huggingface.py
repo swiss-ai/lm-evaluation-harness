@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from datetime import timedelta
@@ -31,14 +32,20 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
+    attach_length_info,
+    build_length_info,
     check_system_boilerplate,
+    compute_generation_length_info,
+    compute_thinking_format_info,
     configure_pad_token,
+    detect_open_prefilled,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
     maybe_strip_system_boilerplate,
     normalize_gen_kwargs,
     postprocess_generated_text,
+    resolve_think_tokens,
 )
 from lm_eval.models.utils_hf import (
     clear_torch_cache,
@@ -109,6 +116,9 @@ class HFLM(TemplateLM):
         # end token for thinking, either the string or int token id.
         # splits to get response after this token (if provided).
         think_end_token: str | int | None = None,
+        # start token for thinking (string) - used for the thinking-format metric.
+        # Auto-detected from the chat template when not set.
+        think_start_token: str | None = None,
         enable_thinking: bool | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
@@ -272,6 +282,43 @@ class HFLM(TemplateLM):
         self.chat_template_args = chat_template_args
         if enable_thinking is not None:
             self.chat_template_args["enable_thinking"] = enable_thinking
+
+        # think_end_token may be an int (token id) for the strip; think_end_token_str
+        # is the string close used by the format metric — decoded from the int when
+        # needed so the strip and metric share one boundary (and a valid int close
+        # never trips the fail-loud guard).
+        _chat_template = getattr(self.tokenizer, "chat_template", None)
+        _forced_close_str = None
+        if isinstance(self.think_end_token, str):
+            _forced_close_str = self.think_end_token
+        elif isinstance(self.think_end_token, int):
+            with contextlib.suppress(Exception):
+                _forced_close_str = (
+                    self.tok_decode([self.think_end_token], skip_special_tokens=False)
+                    or None
+                )
+        # Default enable_thinking True (as in vLLM/SGLang); the fail-loud guard still
+        # only fires for reasoning-declaring templates.
+        self.think_start_token, self.think_end_token_str = resolve_think_tokens(
+            _chat_template,
+            self.chat_template_args.get("enable_thinking", True),
+            think_start_token,
+            _forced_close_str,
+        )
+        if self.think_end_token is None:
+            self.think_end_token = self.think_end_token_str
+
+        # Whether the template prefills the reasoning open into the generation prompt
+        # (vs the model emitting it); feeds the per-turn has_open check.
+        self.think_open_prefilled = detect_open_prefilled(
+            self.apply_chat_template, self.think_start_token
+        )
+        # Track thinking metrics only when thinking is on and a close token is known.
+        # Gate on the *string* close (think_end_token may be an int token id here).
+        self.track_thinking_metrics = bool(
+            self.chat_template_args.get("enable_thinking", True)
+            and self.think_end_token_str
+        )
 
         # System-prompt authority probe — OFF by default. Run it only when the
         # caller opts in via `check_system_prompt_authority` (and hasn't waived it with
@@ -1408,6 +1455,9 @@ class HFLM(TemplateLM):
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
         res = []
+        # Parallel to `res`: per-response length measured on the RAW generation
+        # (before the thinking span is stripped), carried back to the Instances.
+        length_res = []
 
         def _collate(req: tuple[str, dict]):
             """Defines the key for the sorted method"""
@@ -1517,15 +1567,71 @@ class HFLM(TemplateLM):
                 if self.backend == "causal":
                     cont_toks = cont_toks[context_enc.shape[1] :]
 
-                # Handle integer think_end_token: find last occurrence and strip tokens after it
+                # Thinking boundary indices (int close = token id); reused for the
+                # length info and the strip below.
+                think_token_indices = (
+                    [i for i, t in enumerate(cont_toks) if t == self.think_end_token]
+                    if isinstance(self.think_end_token, int)
+                    else None
+                )
+
+                # Length of the RAW generation, before the strip below.
+                raw_gen_text = self.tok_decode(cont_toks, skip_special_tokens=False)
                 if isinstance(self.think_end_token, int):
-                    think_token_indices = [
-                        i
-                        for i, token in enumerate(cont_toks)
-                        if token == self.think_end_token
-                    ]
-                    if think_token_indices:
-                        cont_toks = cont_toks[think_token_indices[-1] + 1 :]
+                    # Int-token path: builds the same length+format dict as
+                    # build_length_info but with a token-id thinking span instead of a
+                    # string one — keep the two in sync on any length/format change.
+                    # Format uses the string close, but has_close / correct MUST reflect
+                    # the int-token boundary the strip actually uses (below), so the
+                    # metric never claims well-formed while the strip is skipped
+                    # (string/int tokenizations can disagree).
+                    fmt = (
+                        compute_thinking_format_info(
+                            raw_gen_text,
+                            think_start_token=self.think_start_token,
+                            think_end_token=self.think_end_token_str,
+                            open_prefilled=self.think_open_prefilled,
+                        )
+                        if self.track_thinking_metrics
+                        else {}
+                    )
+                    if fmt:
+                        int_has_close = bool(think_token_indices)
+                        fmt["thinking_format_has_close"] = int(int_has_close)
+                        if "thinking_format_correct" in fmt:
+                            fmt["thinking_format_correct"] = int(
+                                fmt["thinking_format_correct"] and int_has_close
+                            )
+                    len_info = compute_generation_length_info(
+                        raw_gen_text, token_ids=cont_toks
+                    )
+                    # Measure the thinking span only for well-formed responses; the
+                    # corrected `correct` already implies think_token_indices is set.
+                    if fmt.get("thinking_format_correct") == 1:
+                        n_think = think_token_indices[-1] + 1
+                        think_text = self.tok_decode(
+                            cont_toks[:n_think], skip_special_tokens=False
+                        )
+                        len_info["thinking_length_tokens"] = n_think
+                        len_info["thinking_length_words"] = len(think_text.split())
+                        len_info["thinking_length_chars"] = len(think_text)
+                    len_info.update(fmt)
+                else:
+                    # String-close path shares the common builder (format-first).
+                    len_info = build_length_info(
+                        raw_gen_text,
+                        token_ids=cont_toks,
+                        think_start_token=self.think_start_token,
+                        think_end_token=self.think_end_token,
+                        tokenizer=self.tokenizer,
+                        open_prefilled=self.think_open_prefilled,
+                        track_thinking_metrics=self.track_thinking_metrics,
+                    )
+                length_res.append(len_info)
+
+                # Strip thinking for scoring (int mode): keep tokens after the last close.
+                if think_token_indices:
+                    cont_toks = cont_toks[think_token_indices[-1] + 1 :]
 
                 s = self.tok_decode(cont_toks)
 
@@ -1547,6 +1653,8 @@ class HFLM(TemplateLM):
                 pbar.update(1)
         # reorder this group of results back to original unsorted form
         res = re_ords.get_original(res)
+        # Carry length info back to the Instances, in the same restored order as `res`.
+        attach_length_info(requests, re_ords.get_original(length_res))
 
         pbar.close()
 

@@ -24,8 +24,11 @@ from lm_eval.api.registry import register_model
 from lm_eval.models.utils import (
     Collator,
     _add_special_kwargs,
+    attach_length_info,
+    build_length_info,
     check_system_boilerplate,
     configure_pad_token,
+    detect_open_prefilled,
     get_template_special_tokens,
     handle_stop_sequences,
     has_bos_prefix,
@@ -33,6 +36,7 @@ from lm_eval.models.utils import (
     maybe_truncate,
     normalize_gen_kwargs,
     postprocess_generated_text,
+    resolve_think_tokens,
     undistribute,
 )
 from lm_eval.utils import (
@@ -159,6 +163,9 @@ class VLLM(TemplateLM):
         check_system_prompt_authority: bool = False,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
+        # Start marker for thinking tags - used for the thinking-format metric. Auto-
+        # detected from the chat template when not set.
+        think_start_token: str | None = None,
         max_lora_rank: int = 16,
         truncation_side: Literal["left", "right", "middle"] = "left",
         **kwargs,
@@ -176,6 +183,7 @@ class VLLM(TemplateLM):
         )
         kwargs.pop("device", None)
         self.think_end_token = think_end_token
+        self.think_start_token = think_start_token
         self.V1 = os.environ.get("VLLM_USE_V1", "1") != "0"
         self._max_length = max_model_len if max_model_len is not None else max_length
         self.tensor_parallel_size = int(tensor_parallel_size)
@@ -250,6 +258,14 @@ class VLLM(TemplateLM):
         self.enable_thinking = self.chat_template_args.pop(
             "enable_thinking", enable_thinking
         )
+        # Auto-detect the open/close tokens from the chat template when not forced.
+        # Fails loud if thinking is on but they can't be resolved.
+        self.think_start_token, self.think_end_token = resolve_think_tokens(
+            getattr(self.tokenizer, "chat_template", None),
+            self.enable_thinking,
+            self.think_start_token,
+            self.think_end_token,
+        )
 
         if parse_version(version("vllm")) >= parse_version("0.8.3"):
             kwargs_resolve_hf_chat_template = {
@@ -285,6 +301,15 @@ class VLLM(TemplateLM):
         # in chat_template_args would cause a duplicate-kwarg TypeError.
         if "chat_template" in self.chat_template_args:
             self.hf_chat_template = self.chat_template_args.pop("chat_template")
+
+        # Whether the template prefills the reasoning open into the generation prompt
+        # (vs the model emitting its own) — feeds the per-turn has_open check. Probed
+        # after hf_chat_template is set (apply_chat_template depends on it).
+        self.think_open_prefilled = detect_open_prefilled(
+            self.apply_chat_template, self.think_start_token
+        )
+        # Track thinking metrics only when thinking is on and a close token is known.
+        self.track_thinking_metrics = bool(self.enable_thinking and self.think_end_token)
 
         # System-prompt authority probe — OFF by default; opt in via
         # `check_system_prompt_authority` (and not waived by `allow_system_boilerplate`).
@@ -667,6 +692,9 @@ class VLLM(TemplateLM):
     ) -> list[str]:
         assert self.tokenizer
         res = []
+        # Parallel to `res`: per-response length info on the RAW generation (before
+        # the thinking span is stripped), carried back to the Instances at the end.
+        length_res = []
 
         # batch tokenize contexts
         context, all_gen_kwargs = zip(*(req.args for req in requests), strict=True)
@@ -743,6 +771,19 @@ class VLLM(TemplateLM):
             # cache generations
             for output, _context in zip(cont, context, strict=True):
                 generated_text: str = output.outputs[0].text
+                # Per-response length + current-turn thinking-format (format-first, so
+                # the thinking span is measured only for well-formed responses).
+                length_res.append(
+                    build_length_info(
+                        generated_text,
+                        token_ids=getattr(output.outputs[0], "token_ids", None),
+                        think_start_token=self.think_start_token,
+                        think_end_token=self.think_end_token,
+                        tokenizer=self.tokenizer,
+                        open_prefilled=self.think_open_prefilled,
+                        track_thinking_metrics=self.track_thinking_metrics,
+                    )
+                )
                 # use secondary stop seqs to cut off should-have-been-stopped content post-hoc
                 generated_text = postprocess_generated_text(
                     generated_text, until, self.think_end_token
@@ -755,7 +796,10 @@ class VLLM(TemplateLM):
 
         pbar.close()
         # reorder all group of results back to original unsorted form
-        return re_ords.get_original(res)
+        res = re_ords.get_original(res)
+        # Carry length info back to the Instances, in the same restored order as `res`.
+        attach_length_info(requests, re_ords.get_original(length_res))
+        return res
 
     def _loglikelihood_tokens(
         self,
