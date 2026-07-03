@@ -109,6 +109,9 @@ class POSFilter(Filter):
 class WhitespaceFilter(Filter):
     """Filters out leading and trailing whitespace from responses."""
 
+    def __init__(self) -> None:
+        pass
+
     def apply(self, resps: list[list[str]], docs: list[dict]) -> list[list[str]]:
         def filter_set(inst):
             filtered_resp = []
