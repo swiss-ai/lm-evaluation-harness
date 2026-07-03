@@ -405,6 +405,8 @@ def test_bfcl_v3_apertus_construct_requests_uses_larger_generation_budget():
     request = task.construct_requests(doc, ctx="prompt")
 
     assert request.arguments[1]["max_gen_toks"] == 2048
+    assert "\n\n" not in request.arguments[1]["until"]
+    assert request.arguments[1]["until"][0] == "<|assistant_end|>"
 
 
 def test_bfcl_v3_apertus_irrelevance_scores_absence_of_tool_block():

@@ -686,12 +686,10 @@ class BFCLV3Task(ConfigurableTask):
         arguments = deepcopy(self.config.generation_kwargs)
         arguments.setdefault("until", ["\n\n"])
         arguments.setdefault("max_gen_toks", 512)
-        if (
-            self.bfcl_tool_format == "apertus"
-            and APERTUS_ASSISTANT_END not in arguments["until"]
-        ):
-            arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
         if self.bfcl_tool_format == "apertus":
+            arguments["until"] = [stop for stop in arguments["until"] if stop != "\n\n"]
+            if APERTUS_ASSISTANT_END not in arguments["until"]:
+                arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
             arguments["max_gen_toks"] = max(arguments["max_gen_toks"], 2048)
         return Instance(
             request_type=self.OUTPUT_TYPE,
