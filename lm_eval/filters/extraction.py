@@ -163,7 +163,9 @@ class MultiChoiceRegexFilter(RegexFilter):
         # so we process each of these (same input/target response sets)
         # independently (and keep them a list.)
 
-        def find_match(regex, resp, convert_dict={}):
+        def find_match(regex, resp, convert_dict=None):
+            if convert_dict is None:
+                convert_dict = {}
             if not isinstance(resp, str):
                 resp = ""
             match = regex.findall(resp)
@@ -261,10 +263,10 @@ class OrderedRegexFilter(Filter):
 
     def __init__(
         self,
-        regex_patterns: list[str] = [r"#### (\-?[0-9\.\,]+)"],
+        regex_patterns: list[str] | None = None,
         group_select: int = 0,
         fallback: str = "[invalid]",
-        strip_extracts: list[str] = None,
+        strip_extracts: list[str] | None = None,
     ) -> None:
         """
         Args:
@@ -273,6 +275,8 @@ class OrderedRegexFilter(Filter):
             fallback: Fallback value if no match is found.
             strip_extracts: Regexes to remove from the extracted result.
         """
+        if regex_patterns is None:
+            regex_patterns = [r"#### (\-?[0-9\.\,]+)"]
         self.regex_patterns = regex_patterns
         self.regexes = [re.compile(pattern) for pattern in regex_patterns]
         self.group_select = group_select
