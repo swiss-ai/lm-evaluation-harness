@@ -3,6 +3,8 @@ from itertools import islice
 
 import datasets
 import pytest
+from datasets.exceptions import DatasetNotFoundError
+from huggingface_hub.errors import GatedRepoError, LocalTokenNotFoundError
 
 import lm_eval.tasks as tasks
 from lm_eval.api.task import ConfigurableTask
@@ -35,8 +37,16 @@ def task_class(task_names=None, task_manager=None) -> ConfigurableTask:
     """
     if task_manager is None:
         task_manager = tasks.TaskManager()
-    res = tasks.get_task_dict(task_names, task_manager)
-    res = [x.task for x in get_task_list(res)]
+    res = []
+    for task_name in task_names:
+        try:
+            task_dict = tasks.get_task_dict([task_name], task_manager)
+        except (DatasetNotFoundError, GatedRepoError, LocalTokenNotFoundError) as e:
+            # Gated datasets (e.g. milu) cannot be built without HF credentials,
+            # which fork PRs don't get; skip so the scan still covers the rest.
+            print(f"Skipping {task_name}: dataset inaccessible ({type(e).__name__})")
+            continue
+        res.extend(x.task for x in get_task_list(task_dict))
 
     return res
 
