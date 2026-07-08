@@ -6,10 +6,10 @@ task: mbpp_instruct_self_consistency
 num_fewshot: 0
 repeats: 8
 generation_kwargs:
-  max_gen_toks: 2048
+  max_gen_toks: 16384
   until: []
   do_sample: true
-  temperature: 0.7
+  temperature: 0.6
   top_p: 0.95
 metric_list:
   - metric: !function utils.pass_at_k_metric
