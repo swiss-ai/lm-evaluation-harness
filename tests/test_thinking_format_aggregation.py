@@ -7,8 +7,16 @@ standard mean -> consolidate -> W&B path.
 import collections
 from types import SimpleNamespace
 
+import pytest
+
+from lm_eval.api.group import ConfigurableGroup
 from lm_eval.api.metrics import mean
-from lm_eval.evaluator_utils import TaskOutput, promote_generation_info_metrics
+from lm_eval.api.task import Task
+from lm_eval.evaluator_utils import (
+    TaskOutput,
+    consolidate_group_results,
+    promote_generation_info_metrics,
+)
 
 
 _doc_counter = iter(range(10_000))
@@ -191,7 +199,9 @@ def test_multi_turn_length_only_well_formed_turns_count():
         ]
     )
     promote_generation_info_metrics(to, include_length=True)
-    assert to.sample_metrics[("response_length_chars", "none")] == [70.0]  # mean(100,40)
+    assert to.sample_metrics[("response_length_chars", "none")] == [
+        70.0
+    ]  # mean(100,40)
     assert to.sample_metrics[("thinking_length_chars", "none")] == [80.0]  # turn 1 only
 
 
@@ -293,3 +303,89 @@ def test_sample_len_is_max_over_sparse_metrics():
     to.sample_metrics[("thinking_length_chars", "none")] = [10.0]  # sparse: 1 doc
     to.calculate_aggregate_metric(bootstrap_iters=0)
     assert to.sample_len == 3  # max(3, 1); a last-wins bug would give 1
+
+
+class _StubTask(Task):
+    """Minimal concrete Task: `consolidate_group_results` only reads `.task_name`."""
+
+    def __init__(self, name):
+        self.task_name = name
+
+    def has_training_docs(self): ...
+    def has_validation_docs(self): ...
+    def has_test_docs(self): ...
+    def doc_to_text(self, doc): ...
+    def doc_to_target(self, doc): ...
+    def construct_requests(self, doc, ctx, **kw): ...
+    def process_results(self, doc, results): ...
+    def aggregation(self): ...
+    def higher_is_better(self): ...
+
+
+def test_group_samples_independent_of_metric_iteration_order(monkeypatch):
+    """A group's `samples` is the sum over its subtasks, whatever metric is last.
+
+    `metric_list` is built from a *set*, so its order varies per process. The group's
+    `sizes` are filtered to the subtasks carrying that one metric, so assigning
+    `samples` inside the per-metric loop undercounted whenever a SPARSE metric (e.g. a
+    promoted `thinking_format_*`, present on only some subtasks) landed last. `samples`
+    is published in results.json and reused as the pooling weight by any parent group.
+    """
+    import lm_eval.evaluator_utils as eu
+
+    def build():
+        results = collections.defaultdict(dict)
+        results["taskA"] = {  # dense only
+            "alias": "taskA",
+            "exact_match,none": 0.5,
+            "exact_match_stderr,none": 0.1,
+            "samples": 100,
+        }
+        results["taskB"] = {  # dense + sparse promoted metric
+            "alias": "taskB",
+            "exact_match,none": 0.3,
+            "exact_match_stderr,none": 0.1,
+            "thinking_format_correct,none": 0.9,
+            "thinking_format_correct_stderr,none": 0.01,
+            "samples": 50,
+        }
+        group = ConfigurableGroup(
+            config={
+                "group": "mygroup",
+                "task": ["taskA", "taskB"],
+                "aggregate_metric_list": [
+                    {
+                        "metric": "exact_match",
+                        "aggregation": "mean",
+                        "weight_by_size": True,
+                        "filter_list": ["none"],
+                    }
+                ],
+            }
+        )
+        return results, {
+            group: {"taskA": _StubTask("taskA"), "taskB": _StubTask("taskB")}
+        }
+
+    builtin_list = list
+    for order in (
+        ["thinking_format_correct,none", "exact_match,none"],  # dense last
+        ["exact_match,none", "thinking_format_correct,none"],  # SPARSE last (the bug)
+    ):
+        monkeypatch.setattr(
+            eu,
+            "list",
+            lambda x, _o=order: _o if isinstance(x, set) else builtin_list(x),
+            raising=False,
+        )
+        results, task_dict = build()
+        res, *_ = consolidate_group_results(
+            results, collections.defaultdict(dict), task_dict
+        )
+        assert res["mygroup"]["samples"] == 150, (
+            f"order={order}: got {res['mygroup']['samples']}, expected 100+50"
+        )
+        # the group's own weighted metric was always right; only `samples` was wrong
+        assert res["mygroup"]["exact_match,none"] == pytest.approx(
+            (0.5 * 100 + 0.3 * 50) / 150
+        )

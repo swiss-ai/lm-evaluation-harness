@@ -16,6 +16,7 @@ from lm_eval.models.utils import (
     handle_stop_sequences,
     postprocess_generated_text,
     resolve_think_tokens,
+    resolve_track_thinking_metrics,
 )
 from lm_eval.utils import (
     get_rolling_token_windows,
@@ -67,8 +68,16 @@ class SGLangLM(TemplateLM):
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         # Start marker for thinking tags - used for the thinking-format metric. Auto-
-        # detected from the chat template when not set.
+        # detected from the chat template only with `autodetect_think_tokens`.
         think_start_token: str | None = None,
+        # opt in to auto-detecting the reasoning tokens from the chat template. Off (the
+        # default) => the template is never scanned, so without an explicit
+        # think_end_token there is no strip and no thinking metrics. Must be a named
+        # parameter: `**kwargs` is forwarded verbatim to `sgl.Engine`.
+        autodetect_think_tokens: bool = False,
+        # force the thinking-format/length metrics on/off; None = derive (on whenever a
+        # reasoning close token is known).
+        track_thinking_metrics: bool | None = None,
         **kwargs,
     ):
         super().__init__()
@@ -120,25 +129,29 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
-        # Auto-detect open/close tokens from the chat template when not forced. SGLang
-        # has no enable_thinking toggle, so a reasoning-declaring template is treated
-        # as thinking-intended (fail loud if its tokens can't be resolved).
+        # Auto-detect open/close tokens from the chat template when opted in and not
+        # forced. When on, fails loud if the template declares reasoning tokens but the
+        # close can't be resolved; pass `think_end_token=` or drop the opt-in to escape.
+        # The strip then runs iff a close is known.
         _chat_template = getattr(self.tokenizer, "chat_template", None)
         self.think_start_token, self.think_end_token = resolve_think_tokens(
             _chat_template,
-            enable_thinking=True,
+            autodetect=autodetect_think_tokens,
             think_start_token=self.think_start_token,
             think_end_token=self.think_end_token,
         )
         # Whether the template prefills the reasoning open into the generation prompt
-        # (vs the model emitting it); feeds the per-turn has_open check. SGLang's
-        # apply_chat_template is enable_thinking-agnostic, so this reflects its own
-        # rendering. Track thinking metrics whenever a close token is known (SGLang has
-        # no enable_thinking toggle — it is always on).
+        # (vs the model emitting it); feeds the per-turn has_open check. Returns False
+        # when no open token is known.
         self.think_open_prefilled = detect_open_prefilled(
             self.apply_chat_template, self.think_start_token
         )
-        self.track_thinking_metrics = bool(self.think_end_token)
+        # Derived from a known close, unless forced by the caller. A missing open is fine
+        # and degrades the format metric to close-only.
+        self.track_thinking_metrics = resolve_track_thinking_metrics(
+            track_thinking_metrics,
+            think_end_token=self.think_end_token,
+        )
         self._max_gen_toks = max_gen_toks
         self.add_bos_token = add_bos_token
         if "gemma" in pretrained.lower():

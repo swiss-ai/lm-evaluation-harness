@@ -173,12 +173,36 @@ reasoning-trace strip for thinking models. See **[Thinking / reasoning
 evals](./thinking_evals.md)** for what these metrics mean, what is logged where,
 malformed/non-thinking handling, and multi-turn behavior.
 
+**Overview — four independent switches:**
+
+- **The model thinks** when its **chat template** says so. `enable_thinking` is purely a
+  template argument: `vllm` forwards it (default `true`), `hf` forwards it only when you
+  set it explicitly, and `sglang` never does — otherwise the template's own default
+  applies. It does **not** gate the strip, token detection, or metric tracking.
+- **The reasoning tokens are auto-detected** from the chat template only when you opt in
+  with `autodetect_think_tokens=true` (default `false`, so nothing is scanned).
+- **The strip runs** whenever a reasoning **close** token is known — set explicitly via
+  `think_end_token`, or auto-detected. Everything up to and including the close is
+  dropped before the answer is scored. By default no close is known, so **nothing is
+  stripped**.
+- **Thinking length & correctness** (`thinking_length_*`, `thinking_format_*`) are
+  tracked iff a close token is known — or whatever `track_thinking_metrics` forces.
+  `thinking_format_*` reaches results/W&B on its own; `thinking_length_*` needs
+  `--log_length_metrics`.
+- **Response length** (`response_length_*`) is recorded for **every** `generate_until`
+  response, thinking or not, and reaches results/W&B with `--log_length_metrics`.
+
+Per-response values are always written to `length_info` in the sample jsonl under
+`--log_samples`, independently of the aggregation flags.
+
 Added by this feature:
 
 | Option | Kind | Description |
 |--------|------|-------------|
 | `--log_length_metrics` | CLI | Aggregate `response_length_*` / `thinking_length_*` into per-task metrics (results.json, table, W&B). Off by default; `thinking_format_*` is aggregated regardless. |
-| `think_start_token` | `--model_args` | Force the reasoning **open** token (str); else auto-detected from the chat template. |
+| `think_start_token` | `--model_args` | Force the reasoning **open** token (str); otherwise auto-detected from the chat template only when `autodetect_think_tokens=true`. Used for `thinking_format_has_open`; without it the format metric degrades to close-only. |
+| `autodetect_think_tokens` | `--model_args` | `true`/`false` (**default `false`**) — opt in to auto-detecting the reasoning open/close from the chat template. Left off, the template is never scanned: with no explicit `think_end_token` there is then **no strip and no thinking metrics**, and the fail-loud guard cannot fire. |
+| `track_thinking_metrics` | `--model_args` | `true`/`false` — force the `thinking_format_*` / `thinking_length_*` metrics on or off. Default (unset) derives them: on iff a close token is known. Requires a close token even when forced on (a missing **open** is fine — the metric degrades to close-only). `response_length_*` is unaffected. |
 
 Pre-existing options that also affect these metrics:
 
@@ -187,8 +211,24 @@ Pre-existing options that also affect these metrics:
 | `--log_samples` | CLI | Write the per-response `length_info` (all length + thinking-format fields) into the sample jsonl. |
 | `--wandb_args` | CLI (value) | Native W&B upload of the aggregated metrics, e.g. `--wandb_args project=p name=run1`. |
 | `--apply_chat_template` | CLI | Required for the chat/thinking template to render (the reasoning tokens live in it). |
-| `enable_thinking` | `--model_args` | `true`/`false` — model reasoning mode (`vllm`/`hf`). On `hf` the fail-loud close-token guard defaults on. |
-| `think_end_token` | `--model_args` | Force the reasoning **close** token (str; also int token id on `hf`); drives the strip; else auto-detected. |
+| `enable_thinking` | `--model_args` | `true`/`false` — a **chat-template argument only** (`hf`/`vllm`; `sglang` has none). Forwarded by `vllm` (default `true`) and by `hf` only when set explicitly; otherwise the template's default decides. It does **not** gate the strip, token detection, or metric tracking. (It changes the rendered prompt, so on a prefill template it does affect the `has_open` value.) |
+| `think_end_token` | `--model_args` | Force the reasoning **close** token (str; also int token id on `hf`); drives the strip. Honoured with or without `autodetect_think_tokens`. |
+
+Useful combinations:
+
+```bash
+# Nothing (the default): no detection, no strip, no thinking metrics
+--model_args pretrained=M
+
+# Opt in: detect the tokens, strip the trace, record the thinking metrics
+--model_args pretrained=M,autodetect_think_tokens=true
+
+# Name the close yourself (no template scan; `has_open` is not tracked)
+--model_args pretrained=M,think_end_token='</think>'
+
+# Strip, but drop the thinking metrics (and their per-response cost)
+--model_args pretrained=M,autodetect_think_tokens=true,track_thinking_metrics=false
+```
 
 ---
 

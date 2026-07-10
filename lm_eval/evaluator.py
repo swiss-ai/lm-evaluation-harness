@@ -529,6 +529,9 @@ def evaluate(
         verbosity (str): Verbosity level for logging. (no-op, deprecated)
         confirm_run_unsafe_code (bool): Whether to confirm running tasks marked
             as unsafe.
+        log_length_metrics (bool): If True, also aggregate per-response response/thinking
+            length (from each Instance's length_info) into per-task metrics, alongside
+            the always-on thinking-format flags. Off by default.
 
     Returns:
         dict | None: Dictionary of results, or None if not on rank 0.

@@ -37,6 +37,7 @@ from lm_eval.models.utils import (
     normalize_gen_kwargs,
     postprocess_generated_text,
     resolve_think_tokens,
+    resolve_track_thinking_metrics,
     undistribute,
 )
 from lm_eval.utils import (
@@ -155,7 +156,8 @@ class VLLM(TemplateLM):
         gpu_memory_utilization: float = 0.9,
         data_parallel_size: int = 1,
         lora_local_path: str | None = None,
-        # VLLM: enable thinking tags in the prompt.
+        # VLLM: enable thinking tags in the prompt. Chat-template argument only; it does
+        # not affect the strip, token auto-detection or the thinking metrics.
         enable_thinking: bool = True,
         chat_template_args: dict | None = None,
         strip_system_boilerplate: bool = False,
@@ -164,8 +166,16 @@ class VLLM(TemplateLM):
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         # Start marker for thinking tags - used for the thinking-format metric. Auto-
-        # detected from the chat template when not set.
+        # detected from the chat template only with `autodetect_think_tokens`.
         think_start_token: str | None = None,
+        # opt in to auto-detecting the reasoning tokens from the chat template. Off (the
+        # default) => the template is never scanned, so without an explicit
+        # think_end_token there is no strip and no thinking metrics. Must be a named
+        # parameter: `**kwargs` is merged into `model_args` and forwarded to `LLM(...)`.
+        autodetect_think_tokens: bool = False,
+        # force the thinking-format/length metrics on/off; None = derive from whether a
+        # reasoning close token is known.
+        track_thinking_metrics: bool | None = None,
         max_lora_rank: int = 16,
         truncation_side: Literal["left", "right", "middle"] = "left",
         **kwargs,
@@ -258,11 +268,13 @@ class VLLM(TemplateLM):
         self.enable_thinking = self.chat_template_args.pop(
             "enable_thinking", enable_thinking
         )
-        # Auto-detect the open/close tokens from the chat template when not forced.
-        # Fails loud if thinking is on but they can't be resolved.
+        # Auto-detect the open/close tokens from the chat template when not forced (and
+        # only when `autodetect_think_tokens`). Fails loud if the template declares
+        # reasoning tokens but the close can't be resolved. The strip then runs iff a
+        # close is known. `self.enable_thinking` is used solely for template rendering.
         self.think_start_token, self.think_end_token = resolve_think_tokens(
             getattr(self.tokenizer, "chat_template", None),
-            self.enable_thinking,
+            autodetect_think_tokens,
             self.think_start_token,
             self.think_end_token,
         )
@@ -308,8 +320,11 @@ class VLLM(TemplateLM):
         self.think_open_prefilled = detect_open_prefilled(
             self.apply_chat_template, self.think_start_token
         )
-        # Track thinking metrics only when thinking is on and a close token is known.
-        self.track_thinking_metrics = bool(self.enable_thinking and self.think_end_token)
+        # Derived from a known close, unless forced by the caller. A missing open is fine
+        # and degrades the format metric to close-only.
+        self.track_thinking_metrics = resolve_track_thinking_metrics(
+            track_thinking_metrics, self.think_end_token
+        )
 
         # System-prompt authority probe — OFF by default; opt in via
         # `check_system_prompt_authority` (and not waived by `allow_system_boilerplate`).

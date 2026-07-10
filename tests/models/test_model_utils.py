@@ -11,9 +11,12 @@ from lm_eval.models.utils import (
     get_template_special_tokens,
     maybe_truncate,
     normalize_gen_kwargs,
+    postprocess_generated_text,
     resolve_think_tokens,
+    resolve_track_thinking_metrics,
     strip_system_boilerplate_from_template,
     template_declares_reasoning,
+    truncate_before_stops,
     truncate_tokens,
 )
 
@@ -812,8 +815,52 @@ class TestBuildLengthInfo:
         assert not any(k.startswith("thinking_") for k in info)
         assert info["response_length_chars"] == len("<think>reason</think>ans")
 
+    def test_absent_open_degrades_to_close_only(self):
+        # The close alone is enough to track: `correct` reduces to `has_close`, the
+        # thinking span is still measured, and `has_open` is simply not emitted.
+        info = build_length_info(
+            "reason</think>ans",
+            think_start_token=None,
+            think_end_token=CLOSE_T,
+            track_thinking_metrics=True,
+        )
+        assert "thinking_format_has_open" not in info
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 1
+        assert info["thinking_length_chars"] == len("reason</think>")
+
+    def test_absent_close_emits_no_correct_and_no_span(self):
+        # Defensive: `track_thinking_metrics` never turns on without a close (the backend
+        # gates on it), but if it did, nothing may be mis-attributed — no `correct`, no
+        # thinking span, and `response_length_*` still recorded.
+        info = build_length_info(
+            "<think>reason with no close",
+            think_start_token=OPEN_T,
+            think_end_token=None,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert "thinking_format_has_close" not in info
+        assert "thinking_format_correct" not in info
+        assert not any(k.startswith("thinking_length_") for k in info)
+        assert info["response_length_chars"] == len("<think>reason with no close")
+
+    def test_both_tokens_absent_emits_only_response_length(self):
+        info = build_length_info(
+            "just an answer",
+            think_start_token=None,
+            think_end_token=None,
+            track_thinking_metrics=True,
+        )
+        assert not any(k.startswith("thinking_") for k in info)
+        assert info["response_length_chars"] == len("just an answer")
+
 
 class TestResolveThinkTokens:
+    """The 2nd arg is `autodetect`, NOT `enable_thinking`: template scanning is gated on
+    the dedicated flag, so the reasoning mode never decides whether the strip is armed.
+    """
+
     def test_auto_detect(self):
         assert resolve_think_tokens(SIMPLE_TPL, True, None, None) == (
             "<think>",
@@ -827,7 +874,9 @@ class TestResolveThinkTokens:
     def test_no_raise_for_plain_template(self):
         assert resolve_think_tokens(PLAIN_TPL, True, None, None) == (None, None)
 
-    def test_no_raise_when_thinking_disabled(self):
+    def test_autodetect_off_suppresses_fail_loud(self):
+        # the new escape hatch: autodetect=False never scans the template, so an
+        # unparseable close cannot raise (works on every backend, incl. sglang).
         tpl = "{% set inner_token = x %}{% set outer_token = y %}"  # unparseable values
         assert resolve_think_tokens(tpl, False, None, None) == (None, None)
 
@@ -836,11 +885,27 @@ class TestResolveThinkTokens:
         with pytest.raises(ValueError, match="close"):
             resolve_think_tokens(tpl, True, None, None)
 
+    def test_fail_loud_message_names_the_escape_hatches(self):
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"
+        with pytest.raises(ValueError) as exc:
+            resolve_think_tokens(tpl, True, None, None)
+        msg = str(exc.value)
+        assert "think_end_token=" in msg
+        assert "autodetect_think_tokens=false" in msg
+        # the old, now-nonexistent escape must not be advertised
+        assert "enable_thinking" not in msg
+
     def test_missing_open_only_warns_not_raises(self):
         # close is parseable, open is not: the strip/length work, so don't abort —
         # only the (non-fatal) format open metric is dropped.
         tpl = "{% set inner_token = x %}{% set outer_token = '</think>' %}"
         assert resolve_think_tokens(tpl, True, None, None) == (None, "</think>")
+
+    def test_open_without_close_returns_open_and_no_close(self):
+        # An open alone cannot arm the strip or any thinking metric (all key off the
+        # close). Resolution still surfaces the open; the caller must not crash.
+        assert resolve_think_tokens(PLAIN_TPL, True, OPEN_T, None) == (OPEN_T, None)
+        assert resolve_think_tokens(PLAIN_TPL, False, OPEN_T, None) == (OPEN_T, None)
 
     def test_forcing_suppresses_fail_loud(self):
         tpl = "{% set inner_token = x %}{% set outer_token = y %}"
@@ -850,3 +915,106 @@ class TestResolveThinkTokens:
         # an explicit close (e.g. HF int decoded to a string) avoids the close raise
         tpl = "{% set inner_token = x %}{% set outer_token = y %}"
         assert resolve_think_tokens(tpl, True, None, "</think>") == (None, "</think>")
+
+    def test_autodetect_off_skips_detection_even_when_parseable(self):
+        # autodetect=False must NOT read a perfectly parseable reasoning template:
+        # no close -> no strip and no thinking metrics.
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, None) == (None, None)
+
+    def test_autodetect_off_still_honors_explicit_tokens(self):
+        # explicit > flag: a forced close is a deliberate strip request.
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, "</x>") == (None, "</x>")
+        assert resolve_think_tokens(SIMPLE_TPL, False, "<s>", "</s>") == ("<s>", "</s>")
+
+    def test_thinking_mode_does_not_gate_detection(self):
+        # The decoupling lock: there is no `enable_thinking` lever left in this helper.
+        # Whatever the reasoning mode, autodetect=True detects and autodetect=False does not.
+        assert resolve_think_tokens(SIMPLE_TPL, True, None, None) == (OPEN_T, CLOSE_T)
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, None) == (None, None)
+
+
+class TestResolveTrackThinkingMetrics:
+    """Tracking derives from the CLOSE token alone. None = derive; True/False = force.
+    A missing open is fine (close-only style); a missing close disables everything.
+    """
+
+    def test_derived_from_close_token(self):
+        assert resolve_track_thinking_metrics(None, CLOSE_T) is True
+
+    def test_derived_requires_close_token(self):
+        assert resolve_track_thinking_metrics(None, None) is False
+
+    def test_derived_ignores_absence_of_thinking_flag(self):
+        # Decoupling lock: `enable_thinking` is not a lever here, so a close token alone
+        # is sufficient to track regardless of the model's reasoning mode.
+        import inspect
+
+        assert (
+            "enable_thinking"
+            not in inspect.signature(resolve_track_thinking_metrics).parameters
+        )
+
+    def test_force_off(self):
+        assert resolve_track_thinking_metrics(False, CLOSE_T) is False
+
+    def test_force_on(self):
+        assert resolve_track_thinking_metrics(True, CLOSE_T) is True
+
+    def test_force_on_without_close_token_warns_and_stays_off(self):
+        # has_close / the thinking span are undefined without a close -> cannot track
+        assert resolve_track_thinking_metrics(True, None) is False
+
+    def test_open_only_still_cannot_track(self):
+        # An open token is irrelevant here: only the close is passed, and without it
+        # tracking stays off even when forced.
+        assert resolve_track_thinking_metrics(None, None) is False
+        assert resolve_track_thinking_metrics(True, None) is False
+
+    def test_returns_plain_bool(self):
+        # promoted flags must stay ints/bools, never a truthy string
+        assert resolve_track_thinking_metrics(1, CLOSE_T) is True
+        assert resolve_track_thinking_metrics(0, CLOSE_T) is False
+
+    def test_int_token_id_zero_is_a_known_close(self):
+        # `0` is a valid token id; a plain truthiness test would silently disable
+        # tracking for it. "Known" means not None and not the empty string.
+        assert resolve_track_thinking_metrics(None, 0) is True
+        assert resolve_track_thinking_metrics(False, 0) is False
+        assert resolve_track_thinking_metrics(None, 42) is True
+        # ...while an empty close is still "unknown"
+        assert resolve_track_thinking_metrics(None, "") is False
+        assert resolve_track_thinking_metrics(True, "") is False
+
+
+class TestTruncateBeforeStops:
+    def test_truncates_at_earliest_stop(self):
+        assert truncate_before_stops("answer\n\nmore", ["\n\n"]) == "answer"
+
+    def test_earliest_of_multiple_stops_wins(self):
+        # order-independent: cut at whichever stop occurs first in the text
+        assert truncate_before_stops("aXbYc", ["Y", "X"]) == "a"
+        assert truncate_before_stops("aXbYc", ["X", "Y"]) == "a"
+
+    def test_no_stop_present_is_identity(self):
+        assert truncate_before_stops("clean answer", ["\n\n"]) == "clean answer"
+
+    def test_empty_and_none_stops_are_identity(self):
+        assert truncate_before_stops("text", []) == "text"
+        assert truncate_before_stops("text", None) == "text"
+        assert truncate_before_stops("text", "") == "text"
+
+    def test_string_stop_accepted(self):
+        assert truncate_before_stops("a<stop>b", "<stop>") == "a"
+
+    def test_empty_term_ignored(self):
+        # a '' stop term (e.g. seq2seq eos decoding to '') must not truncate to ''
+        assert truncate_before_stops("hello", ["", "\n"]) == "hello"
+
+    def test_matches_postprocess_stop_phase(self):
+        # truncate_before_stops must reproduce exactly the stop-truncation half of
+        # postprocess_generated_text (no thinking strip) — the boundary HF length
+        # measurement relies on to match the scored text.
+        text = "reasoning</think>the answer\n\noverflow"
+        assert truncate_before_stops(text, ["\n\n"]) == postprocess_generated_text(
+            text, ["\n\n"], None
+        )

@@ -157,25 +157,26 @@ def promote_generation_info_metrics(
     """Promote per-response generation-info into per-task metrics in ``sample_metrics``.
 
     Backends store per-response dicts in each ``Instance.length_info``: the
-    ``thinking_format_*`` 0/1 flags (when thinking is tracked), and (with
-    ``include_length``) the ``response_length_*`` measurements plus, **only for
-    well-formed responses** (``thinking_format_correct == 1``, gated upstream at the
-    backend), the ``thinking_length_*`` measurements.
+    ``thinking_format_*`` 0/1 flags (when thinking is tracked) and, with
+    ``include_length``, the ``response_length_*`` measurements plus ``thinking_length_*``
+    — the latter only for well-formed responses (``thinking_format_correct == 1``, gated
+    at the backend).
 
-    Each promoted key is aggregated independently: one value per doc — the mean over
-    that doc's responses **carrying the key**. So ``response_length_*`` averages over
-    all responses, ``thinking_format_*`` (rates) over all responses, and
-    ``thinking_length_*`` over the well-formed responses only — its denominator never
-    includes malformed/incorrect responses (a doc with no well-formed response emits no
-    ``thinking_length_*`` value). Consequence: the aggregate ``thinking_length`` is the
-    mean among well-formed responses and is NOT bounded by the aggregate
-    ``response_length`` (per-sample ``thinking <= response`` still holds).
+    Each key aggregates independently to one value per doc: the mean over that doc's
+    responses **carrying the key**. So ``response_length_*`` and the ``thinking_format_*``
+    rates average over all responses, while ``thinking_length_*`` averages over the
+    well-formed ones only — malformed responses leave its denominator rather than
+    zero-filling it (a doc with none emits no value). Consequence: the aggregate
+    ``thinking_length`` is NOT bounded by the aggregate ``response_length``. Per-sample,
+    ``thinking <= response`` holds exactly for ``_chars``/``_words``; for ``_tokens`` it
+    can drift by a token or two wherever the span is re-encoded rather than counted
+    (everything but the ``hf`` int-token path).
 
-    Instances are grouped by ``doc_id`` (``multi_turn_generate`` uses one Instance per
-    turn); DP padding clones beyond ``repeats`` are ignored. Routed under the ``none``
-    filter through the existing gather -> mean -> consolidate -> W&B path; the gather
-    unions keys across ranks, so a rank lacking a key (e.g. no well-formed response) is
-    safe. Appends on each call (not idempotent); run once per rank before the gather.
+    Instances are grouped by ``doc_id`` (``multi_turn_generate`` emits one per turn); DP
+    padding clones beyond ``repeats`` are ignored. Emitted under the ``none`` filter into
+    the existing gather -> mean -> consolidate -> W&B path, whose gather unions keys
+    across ranks, so a rank missing a key is safe. Appends on each call (not idempotent):
+    run once per rank, before the gather.
     """
     task = task_output.task
     if task is None:
@@ -593,10 +594,20 @@ def consolidate_group_results(
                                 stderrs, sizes
                             )
 
-                results[group_or_task]["samples"] = sum(sizes)
-                group_metadata = group_config.get("metadata", None)
-                if group_metadata is not None:
-                    versions[group_or_task] = group_metadata.get("version", None)
+            # The group's sample count is a property of the GROUP, not of whichever metric
+            # `metric_list` happened to iterate last. `sizes` above is filtered to the
+            # subtasks carrying that one metric, so assigning from it inside the loop made
+            # `samples` depend on set-iteration order and undercount whenever the last
+            # metric was sparse (present on only some subtasks) — e.g. a promoted
+            # `thinking_format_*` key. `samples` is reported in results.json and reused as
+            # the pooling weight by any PARENT group, so the error propagated upward.
+            results[group_or_task]["samples"] = sum(
+                results[task].get("samples", 0) for task in task_list
+            )
+
+            group_metadata = group_config.get("metadata", None)
+            if group_metadata is not None:
+                versions[group_or_task] = group_metadata.get("version", None)
 
             # Clean up duplicate score rows for subtasks that also report other metrics.
             for task in task_list:

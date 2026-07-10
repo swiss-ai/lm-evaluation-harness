@@ -46,6 +46,8 @@ from lm_eval.models.utils import (
     normalize_gen_kwargs,
     postprocess_generated_text,
     resolve_think_tokens,
+    resolve_track_thinking_metrics,
+    truncate_before_stops,
 )
 from lm_eval.models.utils_hf import (
     clear_torch_cache,
@@ -117,9 +119,17 @@ class HFLM(TemplateLM):
         # splits to get response after this token (if provided).
         think_end_token: str | int | None = None,
         # start token for thinking (string) - used for the thinking-format metric.
-        # Auto-detected from the chat template when not set.
+        # Auto-detected from the chat template only with `autodetect_think_tokens`.
         think_start_token: str | None = None,
+        # chat-template argument only; does not affect the strip, detection or metrics.
         enable_thinking: bool | None = None,
+        # opt in to auto-detecting the reasoning tokens from the chat template. Off (the
+        # default) => the template is never scanned, so without an explicit
+        # think_end_token there is no strip and no thinking metrics.
+        autodetect_think_tokens: bool = False,
+        # force the thinking-format/length metrics on/off; None = derive from whether a
+        # reasoning close token is known.
+        track_thinking_metrics: bool | None = None,
         strip_system_boilerplate: bool = False,
         allow_system_boilerplate: bool = False,
         check_system_prompt_authority: bool = False,
@@ -297,27 +307,37 @@ class HFLM(TemplateLM):
                     self.tok_decode([self.think_end_token], skip_special_tokens=False)
                     or None
                 )
-        # Default enable_thinking True (as in vLLM/SGLang); the fail-loud guard still
-        # only fires for reasoning-declaring templates.
+        # Auto-detection is opt-in via `autodetect_think_tokens` (default off); the
+        # fail-loud guard only fires when it is on AND the template declares reasoning
+        # tokens. `enable_thinking` is a chat-template argument and takes no part here.
         self.think_start_token, self.think_end_token_str = resolve_think_tokens(
             _chat_template,
-            self.chat_template_args.get("enable_thinking", True),
+            autodetect_think_tokens,
             think_start_token,
             _forced_close_str,
         )
+        # The strip runs iff a close is known (explicit or auto-detected).
         if self.think_end_token is None:
             self.think_end_token = self.think_end_token_str
+        # The scored text comes from `tok_decode(...)`, which drops special tokens. A
+        # close that it erases could never be found there, so a string strip would
+        # silently never fire. Route such a close through the token-id strip instead.
+        if isinstance(self.think_end_token, str):
+            self.think_end_token = self._strippable_close(self.think_end_token)
 
         # Whether the template prefills the reasoning open into the generation prompt
-        # (vs the model emitting it); feeds the per-turn has_open check.
+        # (vs the model emitting it); feeds the per-turn has_open check. Safe when no open
+        # token is known — detect_open_prefilled returns False.
         self.think_open_prefilled = detect_open_prefilled(
             self.apply_chat_template, self.think_start_token
         )
-        # Track thinking metrics only when thinking is on and a close token is known.
-        # Gate on the *string* close (think_end_token may be an int token id here).
-        self.track_thinking_metrics = bool(
-            self.chat_template_args.get("enable_thinking", True)
-            and self.think_end_token_str
+        # Derived from a known close (int token id or string), unless forced by the
+        # caller. Gating on the *string* form would silently drop every thinking metric
+        # whenever an int close failed to decode, while the strip still fired off the id.
+        # A missing open is fine and degrades the format metric to close-only.
+        self.track_thinking_metrics = resolve_track_thinking_metrics(
+            track_thinking_metrics,
+            self.think_end_token,
         )
 
         # System-prompt authority probe — OFF by default. Run it only when the
@@ -521,6 +541,39 @@ class HFLM(TemplateLM):
             return self.accelerator.unwrap_model(self._model)
         else:
             return self._model
+
+    def _strippable_close(self, close: str) -> str | int:
+        """Return ``close``, or its token id when the scoring decode would erase it.
+
+        The scored text is produced by ``tok_decode(...)``, which defaults to
+        ``skip_special_tokens=True``. A close registered as a *special* token (e.g.
+        DeepSeek-R1's ``</think>``) is dropped there, so ``postprocess_generated_text``
+        could never split on it: the reasoning would silently survive into the scored
+        text, glued to the answer. Falling back to the token id routes the strip through
+        the id-based path, which operates on ids and is unaffected. Never raises.
+
+        Uses ``self.tokenizer`` directly rather than ``tok_encode``/``tok_decode``: this
+        runs early in ``__init__``, before ``self.add_bos_token`` exists.
+        """
+        with contextlib.suppress(Exception):
+            ids = self.tokenizer.encode(close, add_special_tokens=False)
+            if self.tokenizer.decode(ids, skip_special_tokens=True) != "":
+                return close  # survives the scoring decode; the string strip works
+            if len(ids) == 1:
+                eval_logger.info(
+                    "Reasoning close %r is a special token and is dropped by the scoring "
+                    "decode; stripping on its token id (%d) instead.",
+                    close,
+                    ids[0],
+                )
+                return ids[0]
+            eval_logger.warning(
+                "The reasoning close %r is erased by skip_special_tokens and does not map "
+                "to a single token id, so the reasoning strip cannot fire. Pass "
+                "think_end_token=<token id> explicitly.",
+                close,
+            )
+        return close
 
     @property
     def eot_token_id(self) -> int:
@@ -1451,12 +1504,73 @@ class HFLM(TemplateLM):
 
         return re_ord.get_original(res)
 
+    def _bounded_response(
+        self, cont_toks: list[int], until: list[str]
+    ) -> tuple[list[int], str]:
+        """Bound one generated row to the response that sequence actually produced.
+
+        HF's stop criteria halt the *whole batch* only once every sequence is done
+        (``MultiTokenEOSCriteria``), so a row that finished early carries overflow:
+        trailing pad/eos fill, plus real tokens generated past its own stop. Returns the
+        exact original token prefix for this response (never a decode->encode re-encode)
+        and the corresponding text bound.
+
+        Steps: trim the trailing pad/eos tail (never the reasoning close itself), decode,
+        cut at this sequence's own first stop, then map that char bound back onto the
+        token ids by bisect (decoded-prefix length is monotonic in the prefix). Never
+        raises: on any failure it falls back to the unbounded row, i.e. the old behaviour.
+        """
+        bounded: tuple[list[int], str] | None = None
+        with contextlib.suppress(Exception):
+            trimmed = list(cont_toks)
+            stop_ids = {
+                i
+                for i in (
+                    getattr(self.tokenizer, "pad_token_id", None),
+                    self.eot_token_id,
+                )
+                if isinstance(i, int)
+            }
+            # A close that coincides with eos/pad must survive the tail trim, else the
+            # strip and `has_close` would both miss a block the model really did close.
+            if isinstance(self.think_end_token, int):
+                stop_ids.discard(self.think_end_token)
+            while trimmed and trimmed[-1] in stop_ids:
+                trimmed.pop()
+
+            raw_gen_text = self.tok_decode(trimmed, skip_special_tokens=False)
+            gen_text = truncate_before_stops(raw_gen_text, until)
+            if gen_text == raw_gen_text:
+                bounded = (trimmed, gen_text)
+            else:
+                lo, hi = 0, len(trimmed)
+                while lo < hi:
+                    mid = (lo + hi + 1) // 2
+                    fits = len(
+                        self.tok_decode(trimmed[:mid], skip_special_tokens=False)
+                    ) <= len(gen_text)
+                    if fits:
+                        lo = mid
+                    else:
+                        hi = mid - 1
+                bounded = (trimmed[:lo], gen_text)
+        if bounded is not None:
+            return bounded
+
+        # Fallback: the unbounded row (the pre-bounding behaviour).
+        full = ""
+        with contextlib.suppress(Exception):
+            full = self.tok_decode(list(cont_toks), skip_special_tokens=False)
+        return list(cont_toks), full
+
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
         res = []
-        # Parallel to `res`: per-response length measured on the RAW generation
-        # (before the thinking span is stripped), carried back to the Instances.
+        # Parallel to `res`: per-response length/thinking-format, measured on a bounded
+        # view of each generation (trailing pad/eos trimmed, truncated at the first
+        # stop) so batched over-generation past a sequence's own stop is excluded, and
+        # before the thinking span is stripped. Carried back to the Instances.
         length_res = []
 
         def _collate(req: tuple[str, dict]):
@@ -1567,71 +1681,111 @@ class HFLM(TemplateLM):
                 if self.backend == "causal":
                     cont_toks = cont_toks[context_enc.shape[1] :]
 
-                # Thinking boundary indices (int close = token id); reused for the
-                # length info and the strip below.
-                think_token_indices = (
-                    [i for i, t in enumerate(cont_toks) if t == self.think_end_token]
+                # Bound this sequence to its OWN response before anything reads it.
+                # Batched generation runs until EVERY sequence in the batch stops
+                # (MultiTokenEOSCriteria halts the whole batch), so a sequence that
+                # finished early carries "overflow": trailing pad/eos fill, plus real
+                # tokens generated past its own stop. `meas_toks` is an exact prefix of
+                # `cont_toks`; `gen_text` is its text bound. Never raises.
+                meas_toks, gen_text = self._bounded_response(cont_toks, until)
+
+                # Positions of the int close WITHIN this sequence's own response. The
+                # scoring strip and the metric both read this list, so they can never
+                # disagree about whether the block closed — and a close that exists only
+                # in a batch sibling's overflow can no longer be stripped on.
+                closes = (
+                    [i for i, t in enumerate(meas_toks) if t == self.think_end_token]
                     if isinstance(self.think_end_token, int)
                     else None
                 )
 
-                # Length of the RAW generation, before the strip below.
-                raw_gen_text = self.tok_decode(cont_toks, skip_special_tokens=False)
-                if isinstance(self.think_end_token, int):
-                    # Int-token path: builds the same length+format dict as
-                    # build_length_info but with a token-id thinking span instead of a
-                    # string one — keep the two in sync on any length/format change.
-                    # Format uses the string close, but has_close / correct MUST reflect
-                    # the int-token boundary the strip actually uses (below), so the
-                    # metric never claims well-formed while the strip is skipped
-                    # (string/int tokenizations can disagree).
-                    fmt = (
-                        compute_thinking_format_info(
-                            raw_gen_text,
-                            think_start_token=self.think_start_token,
-                            think_end_token=self.think_end_token_str,
-                            open_prefilled=self.think_open_prefilled,
-                        )
-                        if self.track_thinking_metrics
-                        else {}
-                    )
-                    if fmt:
-                        int_has_close = bool(think_token_indices)
-                        fmt["thinking_format_has_close"] = int(int_has_close)
-                        if "thinking_format_correct" in fmt:
-                            fmt["thinking_format_correct"] = int(
-                                fmt["thinking_format_correct"] and int_has_close
+                # --- Per-response length/format measurement ---
+                # Measured on the bounded view so the flags reflect THIS sequence's
+                # response and are not polluted by longer batch siblings (matching
+                # vllm/sglang, which stop each sequence independently). Never raises —
+                # measurement must not break generation.
+                len_info: dict = {}
+                with contextlib.suppress(Exception):
+                    if isinstance(self.think_end_token, int):
+                        # Int-token path: same length+format dict as build_length_info but
+                        # with a token-id thinking span — keep the two in sync on any
+                        # length/format change. has_close and the span come from `closes`
+                        # (exact ids, overflow-free), so they are batch-invariant and they
+                        # are the very indices the scoring strip uses. Order/re-open is
+                        # judged on `gen_text`, using the close as it renders IN CONTEXT:
+                        # `think_end_token_str` is decoded from the id in isolation and can
+                        # differ (leading space, merge), which would make the string search
+                        # miss and flag a well-formed response as malformed.
+                        close_str = self.think_end_token_str
+                        if closes:
+                            end = len(
+                                self.tok_decode(
+                                    meas_toks[: closes[-1] + 1],
+                                    skip_special_tokens=False,
+                                )
                             )
-                    len_info = compute_generation_length_info(
-                        raw_gen_text, token_ids=cont_toks
-                    )
-                    # Measure the thinking span only for well-formed responses; the
-                    # corrected `correct` already implies think_token_indices is set.
-                    if fmt.get("thinking_format_correct") == 1:
-                        n_think = think_token_indices[-1] + 1
-                        think_text = self.tok_decode(
-                            cont_toks[:n_think], skip_special_tokens=False
+                            start = len(
+                                self.tok_decode(
+                                    meas_toks[: closes[-1]], skip_special_tokens=False
+                                )
+                            )
+                            close_str = gen_text[start:end] or close_str
+                        fmt = (
+                            compute_thinking_format_info(
+                                gen_text,
+                                think_start_token=self.think_start_token,
+                                think_end_token=close_str,
+                                open_prefilled=self.think_open_prefilled,
+                            )
+                            if self.track_thinking_metrics
+                            else {}
                         )
-                        len_info["thinking_length_tokens"] = n_think
-                        len_info["thinking_length_words"] = len(think_text.split())
-                        len_info["thinking_length_chars"] = len(think_text)
-                    len_info.update(fmt)
-                else:
-                    # String-close path shares the common builder (format-first).
-                    len_info = build_length_info(
-                        raw_gen_text,
-                        token_ids=cont_toks,
-                        think_start_token=self.think_start_token,
-                        think_end_token=self.think_end_token,
-                        tokenizer=self.tokenizer,
-                        open_prefilled=self.think_open_prefilled,
-                        track_thinking_metrics=self.track_thinking_metrics,
-                    )
+                        if self.track_thinking_metrics:
+                            # The int boundary is authoritative for has_close; `correct`
+                            # keeps the order/re-open verdict, and degrades to close-only
+                            # when no usable close string was available.
+                            int_has_close = bool(closes)
+                            fmt["thinking_format_has_close"] = int(int_has_close)
+                            prior = fmt.get("thinking_format_correct")
+                            if prior is None:
+                                prior = fmt.get("thinking_format_has_open", 1)
+                            fmt["thinking_format_correct"] = int(
+                                bool(prior) and int_has_close
+                            )
+                        len_info = compute_generation_length_info(
+                            gen_text, token_ids=meas_toks
+                        )
+                        # Thinking span = up to and including the last close; `correct`
+                        # already implies `closes` is non-empty.
+                        if fmt.get("thinking_format_correct") == 1:
+                            n_think = closes[-1] + 1
+                            think_text = self.tok_decode(
+                                meas_toks[:n_think], skip_special_tokens=False
+                            )
+                            len_info["thinking_length_tokens"] = n_think
+                            len_info["thinking_length_words"] = len(think_text.split())
+                            len_info["thinking_length_chars"] = len(think_text)
+                        len_info.update(fmt)
+                    else:
+                        # String-close path shares the common builder (format-first).
+                        len_info = build_length_info(
+                            gen_text,
+                            token_ids=meas_toks,
+                            think_start_token=self.think_start_token,
+                            think_end_token=self.think_end_token,
+                            tokenizer=self.tokenizer,
+                            open_prefilled=self.think_open_prefilled,
+                            track_thinking_metrics=self.track_thinking_metrics,
+                        )
                 length_res.append(len_info)
 
-                # Strip thinking for scoring (int mode): keep tokens after the last close.
-                if think_token_indices:
-                    cont_toks = cont_toks[think_token_indices[-1] + 1 :]
+                # Strip thinking for scoring (int mode): keep tokens after the last
+                # IN-BOUNDS close. `closes` indexes `meas_toks`, itself a prefix of
+                # `cont_toks`, so the indices are valid here and a close that only
+                # appears in batch overflow can never drive the strip. Everything after
+                # the close is kept; `postprocess_generated_text` truncates at the stop.
+                if closes:
+                    cont_toks = cont_toks[closes[-1] + 1 :]
 
                 s = self.tok_decode(cont_toks)
 
