@@ -9,3 +9,4 @@ Welcome to the docs for the LM Evaluation Harness!
   * For an extended description of how to extend the library to new model classes served over an API, see the [API Guide](./API_guide.md).
 * For a crash course on adding new tasks to the library, see our [New Task Guide](./new_task_guide.md).
 * To learn more about pushing the limits of task configuration that the Eval Harness supports, see the [Task Configuration Guide](./task_guide.md).
+* To learn how reasoning ("thinking") models are handled — the reasoning-trace strip and the per-response length / thinking-format metrics — see the [Thinking / Reasoning Evals](./thinking_evals.md) guide.

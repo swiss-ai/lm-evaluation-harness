@@ -22,6 +22,11 @@ class Instance:
     )
     resps: list = field(default_factory=list)
     filtered_resps: dict = field(default_factory=dict)
+    # Per-response generation info measured before any thinking-strip, on the backend's
+    # view of the response (hf bounds it to exclude batched over-generation); one dict per
+    # response (mirroring `resps`), empty otherwise. Holds length + thinking-format keys,
+    # aggregated by `evaluator_utils.promote_generation_info_metrics`.
+    length_info: list = field(default_factory=list)
 
     # initialized after init
     task_name: str | None = None

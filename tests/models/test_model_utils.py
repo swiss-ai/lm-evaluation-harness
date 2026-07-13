@@ -1,11 +1,22 @@
 import pytest
 
 from lm_eval.models.utils import (
+    build_length_info,
     check_system_boilerplate,
+    compute_generation_length_info,
+    compute_thinking_format_info,
+    detect_open_prefilled,
+    detect_think_end_token,
+    detect_think_start_token,
     get_template_special_tokens,
     maybe_truncate,
     normalize_gen_kwargs,
+    postprocess_generated_text,
+    resolve_think_tokens,
+    resolve_track_thinking_metrics,
     strip_system_boilerplate_from_template,
+    template_declares_reasoning,
+    truncate_before_stops,
     truncate_tokens,
 )
 
@@ -500,3 +511,510 @@ class TestStripSystemBoilerplate:
 
     def test_none_input_returns_none(self):
         assert strip_system_boilerplate_from_template(None) is None
+
+
+SIMPLE_TPL = "{% set inner_token = '<think>' %}{% set outer_token = '</think>' %}"
+SPECIAL_TPL = (
+    "{% set inner_token = '<|inner_prefix|>' %}"
+    "{% set outer_token = '<|inner_suffix|>' %}"
+)
+PLAIN_TPL = "hello {{ messages }}"
+
+# Bound to names (not passed as string literals) so the *_token kwargs don't trip
+# ruff's flake8-bandit S106 hardcoded-password false positive.
+OPEN_T = "<think>"
+CLOSE_T = "</think>"
+
+
+class TestDetectThinkTokens:
+    def test_detect_start_and_end(self):
+        assert detect_think_start_token(SIMPLE_TPL) == "<think>"
+        assert detect_think_end_token(SIMPLE_TPL) == "</think>"
+
+    def test_detect_special_token_forms(self):
+        assert detect_think_start_token(SPECIAL_TPL) == "<|inner_prefix|>"
+        assert detect_think_end_token(SPECIAL_TPL) == "<|inner_suffix|>"
+
+    def test_last_assignment_wins(self):
+        tpl = "{% set inner_token = '<a>' %}{% set inner_token = '<b>' %}"
+        assert detect_think_start_token(tpl) == "<b>"
+
+    def test_none_when_absent_or_empty(self):
+        assert detect_think_start_token(PLAIN_TPL) is None
+        assert detect_think_end_token(PLAIN_TPL) is None
+        assert detect_think_start_token(None) is None
+
+    def test_template_declares_reasoning(self):
+        assert template_declares_reasoning(SIMPLE_TPL) is True
+        assert template_declares_reasoning("{% set outer_token = '</t>' %}") is True
+        assert template_declares_reasoning(PLAIN_TPL) is False
+        assert template_declares_reasoning(None) is False
+
+    def test_word_boundary_avoids_false_positive(self):
+        # identifiers merely ending in inner_token/outer_token must not match
+        assert template_declares_reasoning("{% set winner_token = x %}") is False
+        assert template_declares_reasoning("{% set router_token = y %}") is False
+        assert detect_think_start_token("{% set winner_token = '<w>' %}") is None
+        assert detect_think_end_token("{% set router_token = '<r>' %}") is None
+
+
+class TestComputeThinkingFormatInfo:
+    def test_prefill_normal(self):
+        # prefill template: the open is injected by the generation prompt (open_prefilled),
+        # the model emits only the close.
+        info = compute_thinking_format_info(
+            "reasoning</think>answer",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=True,
+        )
+        assert info == {
+            "thinking_format_has_open": 1,
+            "thinking_format_has_close": 1,
+            "thinking_format_correct": 1,
+        }
+
+    def test_non_prefill_open_generated_by_model(self):
+        info = compute_thinking_format_info(
+            "<think>reasoning</think>answer",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 1
+
+    def test_prefill_missing_close(self):
+        info = compute_thinking_format_info(
+            "reasoning with no close",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_has_close"] == 0
+        assert info["thinking_format_correct"] == 0
+
+    def test_non_prefill_open_no_close(self):
+        info = compute_thinking_format_info(
+            "<think>still reasoning",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_has_close"] == 0
+        assert info["thinking_format_correct"] == 0
+
+    def test_non_prefill_bare_close_not_correct(self):
+        # Multi-turn correctness: a non-prefill turn that emits ONLY a close (open not
+        # this turn) must read has_open=0, correct=0 — the history is never consulted,
+        # so a prior turn's leaked open cannot inflate the signal.
+        info = compute_thinking_format_info(
+            "here is the answer</think>done",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_has_open"] == 0
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 0
+
+    def test_reversed_order_not_correct(self):
+        # close before open in the generation -> malformed
+        info = compute_thinking_format_info(
+            "</think>stuff<think>",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_correct"] == 0
+
+    def test_reopen_after_close_with_prefilled_open_not_correct(self):
+        # prefilled open, model closes then re-opens -> malformed.
+        info = compute_thinking_format_info(
+            "reasoning</think>answer<think>oops",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 0
+
+    def test_multiple_closes_reopen_detected_from_first_close(self):
+        # close, reopen, close again -> the reopen between the two closes must still
+        # be caught (probe from the FIRST close, not the last).
+        info = compute_thinking_format_info(
+            "<think>a</think>b<think>c</think>d",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 0
+
+    def test_multiple_closes_without_reopen_is_correct(self):
+        # one open, a stray extra close, no second open -> still well-formed.
+        info = compute_thinking_format_info(
+            "<think>a</think>b</think>c",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+        )
+        assert info["thinking_format_correct"] == 1
+
+    def test_close_only_model_correct_equals_has_close(self):
+        # No open token known (close-only model): correct reduces to has_close, and
+        # has_open is not emitted.
+        closed = compute_thinking_format_info(
+            "reasoning</think>answer", think_end_token=CLOSE_T
+        )
+        assert closed == {
+            "thinking_format_has_close": 1,
+            "thinking_format_correct": 1,
+        }
+        not_closed = compute_thinking_format_info(
+            "reasoning, never closed", think_end_token=CLOSE_T
+        )
+        assert not_closed == {
+            "thinking_format_has_close": 0,
+            "thinking_format_correct": 0,
+        }
+
+    def test_no_tokens_known_returns_empty(self):
+        assert compute_thinking_format_info("hi") == {}
+
+    def test_never_raises_on_bad_input(self):
+        # non-str generation should be swallowed, returning {}
+        assert compute_thinking_format_info(None) == {}
+
+
+class TestComputeGenerationLengthInfo:
+    def test_response_length_basic(self):
+        info = compute_generation_length_info("one two three", token_ids=[1, 2, 3])
+        assert info["response_length_words"] == 3
+        assert info["response_length_chars"] == len("one two three")
+        assert info["response_length_tokens"] == 3
+        assert "thinking_length_chars" not in info
+
+    def test_no_close_omits_thinking_span(self):
+        info = compute_generation_length_info("no close here", think_end_token=CLOSE_T)
+        assert "thinking_length_chars" not in info
+
+    def test_thinking_span_uses_last_close(self):
+        # the strip keeps text after the LAST close, so the thinking span must too.
+        raw = "<think>a</think>b</think>c"
+        info = compute_generation_length_info(raw, think_end_token=CLOSE_T)
+        expected = "<think>a</think>b</think>"  # up to and including the last close
+        assert info["thinking_length_chars"] == len(expected)
+        assert info["response_length_chars"] == len(raw)
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_thinking_span_measured_without_open_token(self):
+        # multi-turn: a turn may CLOSE a block whose open was prefilled/earlier. The
+        # helper sees only THIS turn's text and measures start..last-close regardless
+        # of whether an open token is present (length is close-driven, open-agnostic).
+        gen = "continued reasoning</think>final answer"
+        info = compute_generation_length_info(gen, think_end_token=CLOSE_T)
+        expected_think = "continued reasoning</think>"
+        assert info["thinking_length_chars"] == len(expected_think)
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_open_without_close_omits_thinking_span(self):
+        # A turn with no close has no boundary, so no thinking_length is recorded
+        # (and it is simply absent from the aggregate, not zero-filled).
+        gen = "<think>still reasoning, no close"
+        info = compute_generation_length_info(gen, think_end_token=CLOSE_T)
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len(gen)
+
+    def test_measure_thinking_false_suppresses_span(self):
+        # The backend passes measure_thinking only for well-formed responses; when
+        # False, the thinking span is not recorded even though a close is present.
+        info = compute_generation_length_info(
+            "r</think>a", think_end_token=CLOSE_T, measure_thinking=False
+        )
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len("r</think>a")
+
+
+class TestDetectOpenPrefilled:
+    def test_prefill_template_detected(self):
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|><think>"  # noqa: E731
+        assert detect_open_prefilled(render, OPEN_T) is True
+
+    def test_non_prefill_template_not_detected(self):
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|>"  # noqa: E731
+        assert detect_open_prefilled(render, OPEN_T) is False
+
+    def test_no_open_token_is_false(self):
+        render = lambda h, add_generation_prompt=True: "<think>"  # noqa: E731
+        assert detect_open_prefilled(render, None) is False
+
+    def test_render_failure_is_false(self):
+        def render(h, add_generation_prompt=True):
+            raise RuntimeError("boom")
+
+        assert detect_open_prefilled(render, OPEN_T) is False
+
+
+class TestBuildLengthInfo:
+    """Shared string-close builder (vllm/sglang/hf): format-first, so the thinking
+    span is recorded only for well-formed responses.
+    """
+
+    def test_well_formed_records_thinking(self):
+        info = build_length_info(
+            "<think>reason</think>ans",
+            token_ids=[1, 2, 3],
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_correct"] == 1
+        assert info["response_length_tokens"] == 3
+        assert "thinking_length_chars" in info
+        assert info["thinking_length_chars"] <= info["response_length_chars"]
+
+    def test_malformed_omits_thinking_but_keeps_response(self):
+        # open but no close -> correct=0 -> no thinking_length, response still measured.
+        info = build_length_info(
+            "<think>reason with no close",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_correct"] == 0
+        assert "thinking_length_chars" not in info
+        assert info["response_length_chars"] == len("<think>reason with no close")
+
+    def test_prefilled_open_records_thinking(self):
+        # non-prefill would read has_open=0 here; open_prefilled=True makes it well-formed.
+        info = build_length_info(
+            "reason</think>ans",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=True,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert info["thinking_format_correct"] == 1
+        assert "thinking_length_chars" in info
+
+    def test_untracked_emits_only_response_length(self):
+        info = build_length_info(
+            "<think>reason</think>ans",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            track_thinking_metrics=False,
+        )
+        assert not any(k.startswith("thinking_") for k in info)
+        assert info["response_length_chars"] == len("<think>reason</think>ans")
+
+    def test_absent_open_degrades_to_close_only(self):
+        # The close alone is enough to track: `correct` reduces to `has_close`, the
+        # thinking span is still measured, and `has_open` is simply not emitted.
+        info = build_length_info(
+            "reason</think>ans",
+            think_start_token=None,
+            think_end_token=CLOSE_T,
+            track_thinking_metrics=True,
+        )
+        assert "thinking_format_has_open" not in info
+        assert info["thinking_format_has_close"] == 1
+        assert info["thinking_format_correct"] == 1
+        assert info["thinking_length_chars"] == len("reason</think>")
+
+    def test_absent_close_emits_no_correct_and_no_span(self):
+        # Defensive: `track_thinking_metrics` never turns on without a close (the backend
+        # gates on it), but if it did, nothing may be mis-attributed — no `correct`, no
+        # thinking span, and `response_length_*` still recorded.
+        info = build_length_info(
+            "<think>reason with no close",
+            think_start_token=OPEN_T,
+            think_end_token=None,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_has_open"] == 1
+        assert "thinking_format_has_close" not in info
+        assert "thinking_format_correct" not in info
+        assert not any(k.startswith("thinking_length_") for k in info)
+        assert info["response_length_chars"] == len("<think>reason with no close")
+
+    def test_both_tokens_absent_emits_only_response_length(self):
+        info = build_length_info(
+            "just an answer",
+            think_start_token=None,
+            think_end_token=None,
+            track_thinking_metrics=True,
+        )
+        assert not any(k.startswith("thinking_") for k in info)
+        assert info["response_length_chars"] == len("just an answer")
+
+
+class TestResolveThinkTokens:
+    """The 2nd arg is `autodetect`, NOT `enable_thinking`: template scanning is gated on
+    the dedicated flag, so the reasoning mode never decides whether the strip is armed.
+    """
+
+    def test_auto_detect(self):
+        assert resolve_think_tokens(SIMPLE_TPL, True, None, None) == (
+            "<think>",
+            "</think>",
+        )
+
+    def test_forced_args_skip_detection(self):
+        # forced values win even on a plain template
+        assert resolve_think_tokens(PLAIN_TPL, True, "<s>", "</s>") == ("<s>", "</s>")
+
+    def test_no_raise_for_plain_template(self):
+        assert resolve_think_tokens(PLAIN_TPL, True, None, None) == (None, None)
+
+    def test_autodetect_off_suppresses_fail_loud(self):
+        # the new escape hatch: autodetect=False never scans the template, so an
+        # unparseable close cannot raise (works on every backend, incl. sglang).
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"  # unparseable values
+        assert resolve_think_tokens(tpl, False, None, None) == (None, None)
+
+    def test_fail_loud_when_close_undetectable(self):
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"  # declares but no quotes
+        with pytest.raises(ValueError, match="close"):
+            resolve_think_tokens(tpl, True, None, None)
+
+    def test_fail_loud_message_names_the_escape_hatches(self):
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"
+        with pytest.raises(ValueError) as exc:
+            resolve_think_tokens(tpl, True, None, None)
+        msg = str(exc.value)
+        assert "think_end_token=" in msg
+        assert "autodetect_think_tokens=false" in msg
+        # the old, now-nonexistent escape must not be advertised
+        assert "enable_thinking" not in msg
+
+    def test_missing_open_only_warns_not_raises(self):
+        # close is parseable, open is not: the strip/length work, so don't abort —
+        # only the (non-fatal) format open metric is dropped.
+        tpl = "{% set inner_token = x %}{% set outer_token = '</think>' %}"
+        assert resolve_think_tokens(tpl, True, None, None) == (None, "</think>")
+
+    def test_open_without_close_returns_open_and_no_close(self):
+        # An open alone cannot arm the strip or any thinking metric (all key off the
+        # close). Resolution still surfaces the open; the caller must not crash.
+        assert resolve_think_tokens(PLAIN_TPL, True, OPEN_T, None) == (OPEN_T, None)
+        assert resolve_think_tokens(PLAIN_TPL, False, OPEN_T, None) == (OPEN_T, None)
+
+    def test_forcing_suppresses_fail_loud(self):
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"
+        assert resolve_think_tokens(tpl, True, "<s>", "</s>") == ("<s>", "</s>")
+
+    def test_forced_close_suppresses_fail_loud(self):
+        # an explicit close (e.g. HF int decoded to a string) avoids the close raise
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"
+        assert resolve_think_tokens(tpl, True, None, "</think>") == (None, "</think>")
+
+    def test_autodetect_off_skips_detection_even_when_parseable(self):
+        # autodetect=False must NOT read a perfectly parseable reasoning template:
+        # no close -> no strip and no thinking metrics.
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, None) == (None, None)
+
+    def test_autodetect_off_still_honors_explicit_tokens(self):
+        # explicit > flag: a forced close is a deliberate strip request.
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, "</x>") == (None, "</x>")
+        assert resolve_think_tokens(SIMPLE_TPL, False, "<s>", "</s>") == ("<s>", "</s>")
+
+    def test_thinking_mode_does_not_gate_detection(self):
+        # The decoupling lock: there is no `enable_thinking` lever left in this helper.
+        # Whatever the reasoning mode, autodetect=True detects and autodetect=False does not.
+        assert resolve_think_tokens(SIMPLE_TPL, True, None, None) == (OPEN_T, CLOSE_T)
+        assert resolve_think_tokens(SIMPLE_TPL, False, None, None) == (None, None)
+
+
+class TestResolveTrackThinkingMetrics:
+    """Tracking derives from the CLOSE token alone. None = derive; True/False = force.
+    A missing open is fine (close-only style); a missing close disables everything.
+    """
+
+    def test_derived_from_close_token(self):
+        assert resolve_track_thinking_metrics(None, CLOSE_T) is True
+
+    def test_derived_requires_close_token(self):
+        assert resolve_track_thinking_metrics(None, None) is False
+
+    def test_derived_ignores_absence_of_thinking_flag(self):
+        # Decoupling lock: `enable_thinking` is not a lever here, so a close token alone
+        # is sufficient to track regardless of the model's reasoning mode.
+        import inspect
+
+        assert (
+            "enable_thinking"
+            not in inspect.signature(resolve_track_thinking_metrics).parameters
+        )
+
+    def test_force_off(self):
+        assert resolve_track_thinking_metrics(False, CLOSE_T) is False
+
+    def test_force_on(self):
+        assert resolve_track_thinking_metrics(True, CLOSE_T) is True
+
+    def test_force_on_without_close_token_warns_and_stays_off(self):
+        # has_close / the thinking span are undefined without a close -> cannot track
+        assert resolve_track_thinking_metrics(True, None) is False
+
+    def test_open_only_still_cannot_track(self):
+        # An open token is irrelevant here: only the close is passed, and without it
+        # tracking stays off even when forced.
+        assert resolve_track_thinking_metrics(None, None) is False
+        assert resolve_track_thinking_metrics(True, None) is False
+
+    def test_returns_plain_bool(self):
+        # promoted flags must stay ints/bools, never a truthy string
+        assert resolve_track_thinking_metrics(1, CLOSE_T) is True
+        assert resolve_track_thinking_metrics(0, CLOSE_T) is False
+
+    def test_int_token_id_zero_is_a_known_close(self):
+        # `0` is a valid token id; a plain truthiness test would silently disable
+        # tracking for it. "Known" means not None and not the empty string.
+        assert resolve_track_thinking_metrics(None, 0) is True
+        assert resolve_track_thinking_metrics(False, 0) is False
+        assert resolve_track_thinking_metrics(None, 42) is True
+        # ...while an empty close is still "unknown"
+        assert resolve_track_thinking_metrics(None, "") is False
+        assert resolve_track_thinking_metrics(True, "") is False
+
+
+class TestTruncateBeforeStops:
+    def test_truncates_at_earliest_stop(self):
+        assert truncate_before_stops("answer\n\nmore", ["\n\n"]) == "answer"
+
+    def test_earliest_of_multiple_stops_wins(self):
+        # order-independent: cut at whichever stop occurs first in the text
+        assert truncate_before_stops("aXbYc", ["Y", "X"]) == "a"
+        assert truncate_before_stops("aXbYc", ["X", "Y"]) == "a"
+
+    def test_no_stop_present_is_identity(self):
+        assert truncate_before_stops("clean answer", ["\n\n"]) == "clean answer"
+
+    def test_empty_and_none_stops_are_identity(self):
+        assert truncate_before_stops("text", []) == "text"
+        assert truncate_before_stops("text", None) == "text"
+        assert truncate_before_stops("text", "") == "text"
+
+    def test_string_stop_accepted(self):
+        assert truncate_before_stops("a<stop>b", "<stop>") == "a"
+
+    def test_empty_term_ignored(self):
+        # a '' stop term (e.g. seq2seq eos decoding to '') must not truncate to ''
+        assert truncate_before_stops("hello", ["", "\n"]) == "hello"
+
+    def test_matches_postprocess_stop_phase(self):
+        # truncate_before_stops must reproduce exactly the stop-truncation half of
+        # postprocess_generated_text (no thinking strip) — the boundary HF length
+        # measurement relies on to match the scored text.
+        text = "reasoning</think>the answer\n\noverflow"
+        assert truncate_before_stops(text, ["\n\n"]) == postprocess_generated_text(
+            text, ["\n\n"], None
+        )

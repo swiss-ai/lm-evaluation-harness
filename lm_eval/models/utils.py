@@ -1127,6 +1127,27 @@ def maybe_truncate(
     return truncate_tokens(tokens, max_ctx_len, side=side), min_gen_toks
 
 
+def truncate_before_stops(generation: str, stop: list[str] | str | None) -> str:
+    """Return ``generation`` truncated before the earliest stop sequence.
+
+    The stop-truncation half of :func:`postprocess_generated_text`, split out so callers
+    can reproduce the scoring boundary without the thinking strip. HF uses it to bound
+    per-response measurement to a sequence's own response, dropping the over-generation
+    that whole-batch stopping leaves past the first stop.
+    """
+    if stop:
+        stop = [stop] if isinstance(stop, str) else stop
+        for term in stop:
+            if len(term) > 0:
+                # ignore '' separator,
+                # for seq2seq case where self.tok_decode(self.eot_token_id) = ''
+                # `partition` stops at the FIRST match; `split` would materialise every
+                # segment, which is costly on looping/degenerate output where a short
+                # stop recurs thousands of times.
+                generation = generation.partition(term)[0]
+    return generation
+
+
 def postprocess_generated_text(
     generation: str, stop: list[str] | str | None, think_end_token: str | None
 ) -> str:
@@ -1135,7 +1156,7 @@ def postprocess_generated_text(
 
     Args:
         generation (str): The generated text to be processed.
-        stop (list[str] | None): Stop sequence(s) to remove. Text is truncated
+        stop (list[str] | str | None): Stop sequence(s) to remove. Text is truncated
             at the first occurrence of any stop sequence.
         think_end_token (str | None): Token marking end of thinking section. If provided,
             returns only the text after this token (discarding thinking content).
@@ -1143,17 +1164,317 @@ def postprocess_generated_text(
     Returns:
         str: The processed generation - text before stop sequences and after thinking sections.
     """
-    if stop:
-        stop = [stop] if isinstance(stop, str) else stop
-        for term in stop:
-            if len(term) > 0:
-                # ignore '' separator,
-                # for seq2seq case where self.tok_decode(self.eot_token_id) = ''
-                generation = generation.split(term)[0]
+    generation = truncate_before_stops(generation, stop)
     if think_end_token:
         generation = generation.split(think_end_token)[-1].lstrip()
 
     return generation
+
+
+def compute_generation_length_info(
+    raw_text: str,
+    token_ids: Sequence | None = None,
+    think_end_token: str | None = None,
+    tokenizer: Any = None,
+    measure_thinking: bool = True,
+) -> dict:
+    """Length of a generation, and of its thinking span, for per-sample logging.
+
+    Measured before ``postprocess_generated_text`` strips the reasoning, so both survive
+    thinking-mode scoring. The response covers the whole generation (reasoning + answer);
+    the thinking span ends at the LAST ``think_end_token`` — the boundary the strip uses.
+
+    Always emits ``response_length_{words,chars}``, plus ``_tokens`` = ``len(token_ids)``
+    when given. Emits ``thinking_length_{words,chars}`` — plus ``_tokens``, a best-effort
+    re-encode, when ``tokenizer`` is given — only if ``measure_thinking`` and the text
+    contains a close. Callers set ``measure_thinking`` only for well-formed responses, so
+    the span is never mis-attributed (e.g. a turn closing a block opened in a prior turn).
+
+    ``raw_text``/``token_ids`` are the caller's view: vllm/sglang pass the engine's
+    per-response text and exact ids; hf passes a view bounded to the response (pad/eos
+    tail and post-stop over-generation removed). Never raises.
+    """
+    info: dict = {}
+    with contextlib.suppress(Exception):
+        info["response_length_words"] = len(raw_text.split())
+        info["response_length_chars"] = len(raw_text)
+        if token_ids is not None:
+            info["response_length_tokens"] = len(token_ids)
+        if measure_thinking and think_end_token and think_end_token in raw_text:
+            # up to and including the LAST close, matching the strip
+            thinking_text = raw_text.rsplit(think_end_token, 1)[0] + think_end_token
+            info["thinking_length_words"] = len(thinking_text.split())
+            info["thinking_length_chars"] = len(thinking_text)
+            if tokenizer is not None:
+                # token count is best-effort
+                with contextlib.suppress(Exception):
+                    info["thinking_length_tokens"] = len(
+                        tokenizer.encode(thinking_text, add_special_tokens=False)
+                    )
+    return info
+
+
+def attach_length_info(requests, length_res) -> None:
+    """Attach each per-response generation-info dict back onto its originating
+    Instance (one entry per response, mirroring how ``resps`` are appended).
+    ``length_res`` must already be in the original request order.
+    """
+    for req, info in zip(requests, length_res, strict=True):
+        req.length_info.append(info)
+
+
+def compute_thinking_format_info(
+    generation: str,
+    think_start_token: str | None = None,
+    think_end_token: str | None = None,
+    open_prefilled: bool = False,
+) -> dict:
+    """Whether a generation's reasoning (think) block is well-formed.
+
+    Returns 0/1 flags for per-sample logging (aggregated to a per-task rate). Every check
+    reads the **current turn only**, never the prompt/history, so a prior turn's leaked
+    open cannot inflate the signal:
+
+    - ``has_open`` — opened this turn: emitted in the generation, or injected by the
+      template's generation prompt (``open_prefilled``, a per-model fact). Only emitted
+      when an open token is known.
+    - ``has_close`` — the model emitted the close token.
+    - ``correct`` — open+close model: open and close present, open precedes the LAST
+      close (the strip's boundary), and no re-open after the FIRST close (catches a stray
+      second open, ``</think>...<think>...``). Close-only model (no open token known): it
+      reduces to ``has_close``.
+
+    All keys are prefixed ``thinking_format_``. ``correct`` is emitted whenever the close
+    is known. Never raises.
+    """
+    info: dict = {}
+    with contextlib.suppress(Exception):
+        # The close must be emitted by the model -> search the generation only. Use the
+        # LAST close as the boundary, matching the strip (which keeps text after it).
+        gen_close = generation.rfind(think_end_token) if think_end_token else -1
+        has_close = gen_close != -1
+        if think_end_token:
+            info["thinking_format_has_close"] = int(has_close)
+        if think_start_token:
+            # "Opened this turn" = the model emitted the open, or the template prefilled
+            # it into the generation prompt. The rendered history is NOT consulted.
+            gen_open = generation.find(think_start_token)
+            has_open = open_prefilled or gen_open != -1
+            info["thinking_format_has_open"] = int(has_open)
+            if think_end_token:
+                # open precedes close: a prefilled open is before the generation;
+                # otherwise the open must occur in the generation before the close.
+                open_before_close = open_prefilled or (0 <= gen_open < gen_close)
+                # Re-opened after closing => malformed. Probe from the FIRST close so an
+                # open sitting between two closes is still caught.
+                first_close = generation.find(think_end_token)
+                reopened = has_close and (
+                    generation.find(
+                        think_start_token, first_close + len(think_end_token)
+                    )
+                    != -1
+                )
+                info["thinking_format_correct"] = int(
+                    has_open and has_close and open_before_close and not reopened
+                )
+        elif think_end_token:
+            # Close-only model: well-formedness reduces to "did it close".
+            info["thinking_format_correct"] = int(has_close)
+    return info
+
+
+def build_length_info(
+    generation: str,
+    *,
+    token_ids: Sequence | None = None,
+    think_start_token: str | None = None,
+    think_end_token: str | None = None,
+    tokenizer: Any = None,
+    open_prefilled: bool = False,
+    track_thinking_metrics: bool = False,
+) -> dict:
+    """Per-response length+format dict for the **string-close** generation paths.
+
+    Format-first: the thinking span is measured only for well-formed responses
+    (``thinking_format_correct == 1``). Shared by ``vllm``/``sglang`` and the ``hf``
+    string-close path; the ``hf`` int-token path builds the same dict inline because its
+    close boundary is a token id, not a string — keep the two in sync.
+    """
+    fmt = (
+        compute_thinking_format_info(
+            generation,
+            think_start_token=think_start_token,
+            think_end_token=think_end_token,
+            open_prefilled=open_prefilled,
+        )
+        if track_thinking_metrics
+        else {}
+    )
+    info = compute_generation_length_info(
+        generation,
+        token_ids=token_ids,
+        think_end_token=think_end_token,
+        tokenizer=tokenizer,
+        measure_thinking=bool(fmt.get("thinking_format_correct", 0)),
+    )
+    info.update(fmt)
+    return info
+
+
+def _detect_template_token(chat_template: str | None, var_name: str) -> str | None:
+    """Extract the value of a Jinja ``<var_name> = '...'`` assignment from a chat
+    template (last assignment wins), or None.
+    """
+    if not chat_template:
+        return None
+    matches = re.findall(rf"""\b{var_name}\s*=\s*['"]([^'"]+)['"]""", chat_template)
+    return matches[-1] if matches else None
+
+
+def template_declares_reasoning(chat_template: str | None) -> bool:
+    """Whether a chat template declares reasoning tokens (``inner_token`` /
+    ``outer_token``), i.e. the model is thinking-capable.
+
+    Matches an assignment's *presence* (even an unquoted/variable value), so it is
+    deliberately broader than ``detect_think_*_token``, which extracts only quoted
+    literals. That gap is load-bearing: it lets :func:`resolve_think_tokens` fail loud on
+    a template that declares reasoning but whose token value isn't a parseable literal.
+    Do not "dedupe" the two — it would silence the guard.
+    """
+    if not chat_template:
+        return False
+    return re.search(r"\b(?:inner|outer)_token\s*=", chat_template) is not None
+
+
+def detect_think_start_token(chat_template: str | None) -> str | None:
+    """Derive the reasoning *open* token from a chat template's ``inner_token``
+    declaration (e.g. ``<think>`` / ``<|inner_prefix|>``), or None. See
+    :func:`detect_think_end_token` for the close counterpart.
+    """
+    return _detect_template_token(chat_template, "inner_token")
+
+
+def detect_think_end_token(chat_template: str | None) -> str | None:
+    """Derive the reasoning *close* token from a chat template's ``outer_token``
+    declaration (e.g. ``</think>`` / ``<|inner_suffix|>``), or None. The close drives
+    the strip; :func:`resolve_think_tokens` owns the default/fail-loud behaviour.
+    """
+    return _detect_template_token(chat_template, "outer_token")
+
+
+def resolve_think_tokens(
+    chat_template: str | None,
+    autodetect: bool | None,
+    think_start_token: str | None,
+    think_end_token: str | None,
+) -> tuple[str | None, str | None]:
+    """Resolve the reasoning (open, close) string tokens.
+
+    Caller-forced values always win. Auto-detection from the chat template is gated on
+    ``autodetect``, which is **opt-in** (``autodetect_think_tokens``, default off): when it
+    is falsy the template is not consulted at all, so an unconfigured run resolves no
+    close and therefore gets no strip and no thinking metrics. ``enable_thinking`` plays
+    no part — it is a chat-template argument only.
+
+    The CLOSE is load-bearing: it drives the strip, the thinking span and ``has_close``.
+    Fail loud when auto-detection is on and the template declares reasoning tokens but the
+    close cannot be parsed as a literal — pass ``think_end_token=`` instead, or drop
+    ``autodetect_think_tokens=true``. With detection off (the default) it never fires.
+
+    A missing OPEN is non-fatal: it only costs ``has_open``, and ``correct`` degrades to
+    ``has_close`` (close-only style), so it warns. An open *without* a close warns too —
+    nothing can be stripped or measured. A template declaring no reasoning tokens is a
+    no-op returning ``(None, None)``.
+    """
+    # Caller-forced values always win; consult the template only when autodetect is on.
+    start = think_start_token
+    end = think_end_token
+    if autodetect:
+        if start is None:
+            start = detect_think_start_token(chat_template)
+        if end is None:
+            end = detect_think_end_token(chat_template)
+        if template_declares_reasoning(chat_template):
+            if end is None:
+                raise ValueError(
+                    "Reasoning-token auto-detection is on "
+                    "(autodetect_think_tokens=true) and the chat template declares "
+                    "reasoning tokens, but the reasoning close (think_end_token) could "
+                    "not be auto-detected from the template. Pass think_end_token= "
+                    "explicitly in --model_args, or turn detection off "
+                    "(autodetect_think_tokens=false, the default)."
+                )
+            if start is None:
+                warning_once(
+                    eval_logger,
+                    "The reasoning open token could not be auto-detected from the chat "
+                    "template; the thinking-format has_open metric will not be tracked "
+                    "(correct falls back to has_close, close-only style). Pass "
+                    "think_start_token= in --model_args to track it.",
+                )
+    if start is not None and end is None:
+        # An open alone is useless: the strip and every thinking metric key off the close.
+        warning_once(
+            eval_logger,
+            "A reasoning open token is known but no close token is; the reasoning strip "
+            "and the thinking-format/length metrics stay off (has_close and the thinking "
+            "span are undefined without a close). Pass think_end_token= in --model_args.",
+        )
+    return start, end
+
+
+def resolve_track_thinking_metrics(
+    override: bool | None,
+    think_end_token: str | int | None,
+) -> bool:
+    """Whether to record the ``thinking_format_*`` / ``thinking_length_*`` metrics.
+
+    Derived from the CLOSE token alone: with ``override=None`` (default) track iff a close
+    is known, whether explicitly passed or auto-detected. ``True``/``False`` force it on or
+    off — e.g. off to drop the metrics (and their per-response cost) from a thinking run.
+
+    The close may be a string or (on ``hf``) an integer token id. "Known" means *not None*
+    and not the empty string — never a plain truthiness test, since ``0`` is a valid token
+    id whose falsiness would otherwise silently disable tracking.
+
+    The close is required either way: it defines ``has_close`` and the thinking span, so
+    forcing ``True`` without one warns and returns False. A missing OPEN is fine — the
+    format metric degrades to close-only (``correct == has_close``). ``response_length_*``
+    is unaffected; it is always recorded. ``enable_thinking`` plays no part here: it is a
+    chat-template argument only.
+    """
+    if think_end_token is None or think_end_token == "":
+        if override:
+            warning_once(
+                eval_logger,
+                "track_thinking_metrics=True but no reasoning close token is known; "
+                "thinking metrics stay off. Pass think_end_token= in --model_args.",
+            )
+        return False
+    if override is not None:
+        return bool(override)
+    return True
+
+
+def detect_open_prefilled(render_fn, think_start_token: str | None) -> bool:
+    """Whether the chat template injects the reasoning *open* into the generation prompt
+    (a "prefill" template) rather than the model emitting its own.
+
+    Probed once at init by rendering a trivial user-only chat through the backend's own
+    ``apply_chat_template`` (so ``chat_template_args``/``enable_thinking`` apply): the
+    demo content has no open token, so any occurrence comes from the template scaffold.
+    Feeds ``compute_thinking_format_info(open_prefilled=...)`` so ``has_open`` means
+    "opened this turn" for prefill and non-prefill models alike. Never raises — returns
+    ``False`` on any failure (no chat template, no open token, render error).
+    """
+    if not think_start_token:
+        return False
+    with contextlib.suppress(Exception):
+        rendered = render_fn(
+            [{"role": "user", "content": "x"}], add_generation_prompt=True
+        )
+        return think_start_token in rendered
+    return False
 
 
 def has_bos_prefix(sequence: str, bos_str: str | Iterable[str] | None = None) -> bool:
