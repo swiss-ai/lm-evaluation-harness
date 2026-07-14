@@ -236,6 +236,13 @@ class WandbLogger:
         metrics = {}
         for metric in metrics_list:
             metric = metric.get("metric")
+            # A metric declared as a `!function` (e.g. humaneval's pass_at_k) is a
+            # callable whose actual per-sample keys differ (pass@1/pass@10), and some
+            # declared metrics aren't logged per sample. Only build columns for string
+            # metric names present on every sample, else `x[metric]` raises KeyError
+            # and aborts the whole samples-table upload.
+            if not isinstance(metric, str) or not all(metric in x for x in data):
+                continue
             if metric in ["word_perplexity", "byte_perplexity", "bits_per_byte"]:
                 metrics[f"{metric}_loglikelihood"] = [x[metric][0] for x in data]
                 if metric in ["byte_perplexity", "bits_per_byte"]:
