@@ -49,11 +49,17 @@ from lm_eval.utils import (
 
 resolve_vllm_chat_template = None
 if parse_version(version("vllm")) >= parse_version("0.8.3"):
-    try:
-        # Moved since vllm-project/vllm#30200
-        from vllm.renderers.hf import resolve_chat_template as resolve_hf_chat_template
-    except ImportError:
-        from vllm.entrypoints.chat_utils import resolve_hf_chat_template
+    # Moved to vllm.renderers.hf since vllm-project/vllm#30200
+    with contextlib.suppress(ImportError):
+        from vllm.renderers.hf import (
+            resolve_chat_template as resolve_vllm_chat_template,
+        )
+    # Fallback for older vllm versions
+    if resolve_vllm_chat_template is None:
+        with contextlib.suppress(ImportError):
+            from vllm.entrypoints.chat_utils import (
+                resolve_hf_chat_template as resolve_vllm_chat_template,
+            )
 
 try:
     # Moved since vllm-project/vllm#29793

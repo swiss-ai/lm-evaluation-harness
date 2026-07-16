@@ -2,7 +2,6 @@ import contextlib
 import copy
 import logging
 from importlib.util import find_spec
-from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -132,7 +131,7 @@ class SGLangLM(TemplateLM):
             chat_template_source=getattr(self.tokenizer, "chat_template", None),
             chat_template_args=chat_template_args,
             strip=False,
-            chat_template_path=chat_template_path
+            chat_template_path=chat_template_path,
         )
         # Auto-detect open/close tokens from the chat template when opted in and not
         # forced. When on, fails loud if the template declares reasoning tokens but the
