@@ -13,16 +13,16 @@ try:
     bertscore = evaluate.load("bertscore")
     bleurt = evaluate.load("bleurt", "bleurt-base-512", module_type="metric")
 
-except (ModuleNotFoundError, ImportError):
+except (ModuleNotFoundError, ImportError) as e:
     raise ModuleNotFoundError(
         "Please install evaluation metrics via pip install evaluate bert-score "
         "rouge_score>=0.1.2 nltk absl-py radgraph"
         "git+https://github.com/google-research/bleurt.git"
-    )
+    ) from e
 except Exception as e:
     raise RuntimeError(
         f"Error loading evaluation metrics: {str(e)}. Please check your installation."
-    )
+    ) from e
 
 
 def doc_eval(pred, refs):
@@ -95,7 +95,7 @@ def doc_to_text(doc) -> str:
     if len(findings) < 5 < len(impressions):
         findings = text[:a]
 
-    return "Given the findings: {}.\nSummarize the findings.".format(findings)
+    return f"Given the findings: {findings}.\nSummarize the findings."
 
 
 def doc_to_target(doc) -> str:

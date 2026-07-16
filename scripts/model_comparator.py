@@ -7,7 +7,6 @@ import pandas as pd
 import torch
 
 import lm_eval.evaluator
-import lm_eval.models.utils
 import lm_eval.models.utils_hf
 from lm_eval import tasks
 

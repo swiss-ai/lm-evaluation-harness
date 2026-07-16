@@ -1,0 +1,8 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_apertus_live_simple
+class: !function task.BFCLV3Task
+metadata:
+  version: 3
+  bfcl_category: live_simple
+  bfcl_language: Python
+  bfcl_tool_format: apertus

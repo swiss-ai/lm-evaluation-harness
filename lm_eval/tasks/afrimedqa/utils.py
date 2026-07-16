@@ -1,6 +1,6 @@
-import datasets
-
 import json
+
+import datasets
 
 
 def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
@@ -8,7 +8,7 @@ def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
 
     def _filter_doc(doc):
         is_expert = doc["tier"] == "expert"
-        has_correct_answer = doc["correct_answer"] and not "," in doc["correct_answer"]
+        has_correct_answer = doc["correct_answer"] and "," not in doc["correct_answer"]
         has_correct_option = doc["answer_options"] and len(
             json.loads(doc["answer_options"])
         ) == len(OPTIONS)

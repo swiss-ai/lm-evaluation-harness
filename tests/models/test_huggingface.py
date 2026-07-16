@@ -316,7 +316,7 @@ class Test_HFLM:
             )
             # deliberately WRONG isolated decode: the old code string-searched this and
             # missed, yielding correct=0 for a perfectly well-formed response.
-            self.LM.think_end_token_str = "###NEVER-APPEARS###"
+            self.LM.think_end_token_str = "###NEVER-APPEARS###"  # noqa: S105
             self.LM.track_thinking_metrics = True
             self.LM.think_open_prefilled = False
 

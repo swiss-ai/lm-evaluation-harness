@@ -17,7 +17,7 @@ import logging
 import os
 from functools import partial
 from itertools import combinations
-from typing import Any, Dict, List
+from typing import Any
 
 import datasets
 import numpy as np
@@ -78,7 +78,7 @@ def find_boxed_entries(answer_str):
         # (b) The answer is split across multiple boxed entries and we need to merge
         result_equal = True
         for idx in range(len(results) - 1):
-            if not (results[idx] == results[idx + 1]):
+            if results[idx] != results[idx + 1]:
                 result_equal = False
                 break
 
@@ -103,16 +103,19 @@ def extract_answer_dataset(solution: str, problem: str, corrected_answers: list)
         else:
             parsed_answer = ", ".join(entries)
 
-    if not (
-        ("Find the equation" in problem)
-        or ("Enter the equation" in problem)
-        or ("What is the equation" in problem)
-        or ("described by the equation" in problem)
-        or ("Find an equation" in problem)
-    ) and ("=" in parsed_answer):
-        if parsed_answer.count("=") == 1:
-            # For greater count, it means we're just predicting values of multiple variables
-            parsed_answer = parsed_answer.split("=")[1]
+    if (
+        not (
+            ("Find the equation" in problem)
+            or ("Enter the equation" in problem)
+            or ("What is the equation" in problem)
+            or ("described by the equation" in problem)
+            or ("Find an equation" in problem)
+        )
+        and ("=" in parsed_answer)
+        and parsed_answer.count("=") == 1
+    ):
+        # For greater count, it means we're just predicting values of multiple variables
+        parsed_answer = parsed_answer.split("=")[1]
     return parsed_answer
 
 
@@ -132,7 +135,7 @@ def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
         os.path.dirname(__file__), "to_be_fixed_questions.json"
     )
 
-    with open(corrected_answer_path, "r") as f:
+    with open(corrected_answer_path) as f:
         corrected_answers = json.load(f)
 
     return dataset.map(
@@ -158,7 +161,7 @@ def non_greedy_robustness_process_docs(doc: datasets.Dataset) -> datasets.Datase
     )
 
 
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
+def process_results(doc: dict, results: list[str]) -> dict[str, int]:
     answer = extract_answer(results[0])
 
     if math_equal(answer, doc["answer"]):
@@ -176,13 +179,13 @@ def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
 
 
 def non_greedy_robustness_process_results(
-    doc: dict, results: List[str]
-) -> Dict[str, int]:
+    doc: dict, results: list[str]
+) -> dict[str, int]:
     answer = extract_answer(results[0])
     return {"non_greedy_accuracy": (doc["question_id"], answer, doc["answer"], None)}
 
 
-def per_prompt_accuracy(results: List[Dict[str, Any]], p_id=0) -> float:
+def per_prompt_accuracy(results: list[dict[str, Any]], p_id=0) -> float:
     accuracies = []
     for result in results:
         prompt_id, retval = result
@@ -208,7 +211,7 @@ per_prompt_accuracy_8 = partial(per_prompt_accuracy, p_id=8)
 per_prompt_accuracy_9 = partial(per_prompt_accuracy, p_id=9)
 
 
-def calculate_consistency_rate(responses: List[List[str]]) -> float:
+def calculate_consistency_rate(responses: list[list[str]]) -> float:
     """
     Calculate the Consistency Rate (CR) for a given set of responses.
 
@@ -231,7 +234,7 @@ def calculate_consistency_rate(responses: List[List[str]]) -> float:
     return total_similarity / total_combinations if total_combinations > 0 else 0.0
 
 
-def math_prompt_consistency_rate(results: List[Dict[str, Any]]) -> float:
+def math_prompt_consistency_rate(results: list[dict[str, Any]]) -> float:
     """
     Calculate the Consistency Rate (CR) for a given set of responses.
 
@@ -254,7 +257,7 @@ def math_prompt_consistency_rate(results: List[Dict[str, Any]]) -> float:
     return calculate_consistency_rate(question_answers_list)
 
 
-def non_greedy_accuracy(results: List[Dict[str, Any]]) -> float:
+def non_greedy_accuracy(results: list[dict[str, Any]]) -> float:
     accuracies = []
     for result in results:
         question_id, final_answer, gt, _ = result

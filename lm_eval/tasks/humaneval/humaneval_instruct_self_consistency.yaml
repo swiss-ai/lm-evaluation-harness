@@ -1,0 +1,40 @@
+include: humaneval_instruct.yaml
+task: humaneval_instruct_self_consistency
+num_fewshot: 0
+repeats: 8
+generation_kwargs:
+  until:
+    - "\nclass"
+    - "\nif"
+    - "\nprint"
+    - "\n```"
+    - "\n```\n\n"
+    - "<|eot_id|>"
+    - "</s>"
+  max_gen_toks: 16384
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+metric_list:
+  - metric: !function utils.pass_at_k
+    aggregation: mean
+    higher_is_better: true
+    k: [1, 8]
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
+filter_list:
+  # all 8 samples -> pass@1 (== mean@8) and pass@8
+  - name: "all"
+    filter:
+      - function: "custom"
+        filter_fn: !function utils.build_predictions_instruct
+  # first sample only -> pass@1 (first-choice)
+  - name: "first"
+    filter:
+      - function: "take_first_k"
+        k: 1
+      - function: "custom"
+        filter_fn: !function utils.build_predictions_instruct
+metadata:
+  version: 1.0

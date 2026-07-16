@@ -120,6 +120,13 @@ def process_results(doc: dict[str, Any], results: list[str]) -> dict[str, int]:
     still pass a single string (legacy single-shot shape); that path is
     treated as ``[that_one_string]``.
     """
+    # Under ``multi_turn_generate``'s rollout plumbing the driver appends ONE
+    # result object — the list of assistant turns from ``multiturn_result`` —
+    # to the doc's single Instance, so this method receives
+    # ``[[turn_0, turn_1, ...]]``. Unwrap to the bare turn list. (Callers that
+    # pass the turn list or a single string directly are handled below.)
+    if len(results) == 1 and isinstance(results[0], list):
+        results = results[0]
     if isinstance(results, str):
         # Legacy single-string input from older test fixtures.
         results = [results]
