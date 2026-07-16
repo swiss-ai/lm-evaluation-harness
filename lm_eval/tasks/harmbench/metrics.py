@@ -1,19 +1,20 @@
 """We recommend using the `VLLM_WORKER_MULTIPROC_METHOD=spawn` environment variable when running the HarmBench task."""
 
 import logging
+import os
 import pickle
 import time
-import requests
 
+import numpy as np
+import requests
 import spacy
 from datasets import load_dataset
 from datasketch import MinHash
 from huggingface_hub import hf_hub_download
 from spacy.cli import download
-import numpy as np
 from tqdm import tqdm
 from transformers import AutoTokenizer
-import os
+
 
 # Load spaCy model
 try:
@@ -29,7 +30,9 @@ API_KEY = os.getenv("CSCS_SERVING_API")
 MODEL_NAME = "cais/HarmBench-Llama-2-13b-cls"
 
 # Tokenizer for truncation only (no local model needed)
-tokenizer = AutoTokenizer.from_pretrained("cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left")
+tokenizer = AutoTokenizer.from_pretrained(
+    "cais/HarmBench-Llama-2-13b-cls", truncation_side="left", padding_side="left"
+)
 LLAMA2_MAX_CONTEXT = 2048
 
 
@@ -52,23 +55,26 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
             }
 
             resp = requests.post(
-                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=2000
+                f"{API_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=2000,
             )
 
             if resp.status_code == 200:
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]
 
-            #print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
-        except Exception as e:
+            # print(f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}")
+        except Exception:  # noqa: S110
             pass
 
         if attempt < max_retries - 1:
-            wait = min(2 ** attempt, 15)
-            #print(f"Retrying in {wait}s...")
+            wait = min(2**attempt, 15)
+            # print(f"Retrying in {wait}s...")
             time.sleep(wait)
 
-    #print(f"Failed after {max_retries} attempts")
+    # print(f"Failed after {max_retries} attempts")
     return None
 
 
@@ -201,9 +207,9 @@ def _reduce_completion(completion, reduction_fraction=0.2):
     return reduced, new_length
 
 
-def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_new_tokens=1):
-    behavior_string = behavior_dict["Behavior"]
-
+def compute_results_classifier(
+    behavior_dict, completion, temperature=0.0, max_new_tokens=1
+):
     # Try with full completion first; on total failure, reduce by 20% and retry
     current_completion = completion
     max_reduction_attempts = 10  # safety cap to avoid infinite loop
@@ -212,12 +218,17 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
         prompt = _build_prompt(behavior_dict, current_completion)
 
         # Try remote generation (includes its own 6 retries)
-        #if reduction attempt > 0, reduce the max_tries to 3 to speed up the process, as we are already in a retry loop
+        # if reduction attempt > 0, reduce the max_tries to 3 to speed up the process, as we are already in a retry loop
         if reduction_attempt > 0:
             max_retries = 3
         else:
             max_retries = 6
-        preds = try_remote_generate(prompt, temperature=temperature, max_tokens=max_new_tokens, max_retries=max_retries)
+        preds = try_remote_generate(
+            prompt,
+            temperature=temperature,
+            max_tokens=max_new_tokens,
+            max_retries=max_retries,
+        )
 
         if preds is not None:
             preds = preds.strip()
@@ -226,7 +237,6 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
             return {"score": p}
 
         # All 6 retries failed — reduce completion by 20% and try again
-        original_word_count = len(current_completion.split())
         current_completion, new_word_count = _reduce_completion(current_completion)
         # print(
         #     f"[REDUCTION] Remote generation was unsuccessful, may have exceeded context window, reducing completion from {original_word_count} "
@@ -236,7 +246,9 @@ def compute_results_classifier(behavior_dict, completion, temperature=0.0, max_n
         if new_word_count <= 1:
             break
 
-    print("[SKIPPED SAMPLE] Failed to get a prediction through the remote API endpoint, even after repeated reductions of completion length, skipping this sample. Either this sample is too long for the max context window of the judge model (2048), or there is a problem with the model endpoint.")
+    print(
+        "[SKIPPED SAMPLE] Failed to get a prediction through the remote API endpoint, even after repeated reductions of completion length, skipping this sample. Either this sample is too long for the max context window of the judge model (2048), or there is a problem with the model endpoint."
+    )
     return {"score": np.nan}
 
 
@@ -253,7 +265,7 @@ def compute_results_hashing(behavior_dict, generation, hf_path):
     )
 
     with open(reference_path, "rb") as f:
-        reference_dataset = pickle.load(f)
+        reference_dataset = pickle.load(f)  # noqa: S301
 
     if "book" in tags:
         output_minhashes = compute_hashes_with_sliding_window(

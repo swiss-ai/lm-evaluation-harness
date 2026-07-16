@@ -1,0 +1,35 @@
+include: minerva_math500.yaml
+task: minerva_math500_self_consistency
+# Zero-shot, sampled self-consistency (score-first / mean@8 / maj@8 / pass@8).
+num_fewshot: 0
+process_results: !function utils.process_results_sc
+generation_kwargs:
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+  max_gen_toks: 16384
+  until:
+    - "Problem:"
+repeats: 8
+filter_list:
+  # single-sample accuracy (first of the 8 samples)
+  - name: "score-first"
+    filter:
+      - function: "take_first"
+  # mean@8 (avg@k): score each of the 8 samples individually and average
+  - name: "mean@8"
+    filter:
+      - function: "take_first_k"
+        k: 8
+  # self-consistency: majority vote over the 8 sampled answers
+  - name: "maj@8"
+    filter:
+      - function: !function utils.MajorityVoteFilter
+      - function: "take_first"
+  # pass@8: solved if any of the 8 samples is correct
+  - name: "pass@8"
+    filter:
+      - function: !function utils.PassAtKFilter
+      - function: "take_first"
+metadata:
+  version: 1.0

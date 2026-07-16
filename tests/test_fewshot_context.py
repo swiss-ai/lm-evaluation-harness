@@ -566,9 +566,9 @@ class TestFewshotContext:
         mock_configurable_task.doc_to_text = Mock(side_effect=lambda d, *args: d["q"])
         mock_configurable_task.doc_to_target = Mock(side_effect=lambda d, *args: d["a"])
         mock_configurable_task.doc_to_choice = Mock(
-            side_effect=lambda d, *args: ["A", "B"]
-            if d == fs_doc
-            else ["Apple", "Banana"]
+            side_effect=lambda d, *args: (
+                ["A", "B"] if d == fs_doc else ["Apple", "Banana"]
+            )
         )
 
         result = ConfigurableTask.fewshot_context(

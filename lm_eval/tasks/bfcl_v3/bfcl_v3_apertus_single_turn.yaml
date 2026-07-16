@@ -1,0 +1,14 @@
+group: bfcl_v3_apertus_single_turn
+task:
+  - bfcl_v3_apertus_simple
+  - bfcl_v3_apertus_parallel
+  - bfcl_v3_apertus_multiple
+  - bfcl_v3_apertus_parallel_multiple
+  - bfcl_v3_apertus_java
+  - bfcl_v3_apertus_javascript
+  - bfcl_v3_apertus_live_simple
+  - bfcl_v3_apertus_live_multiple
+  - bfcl_v3_apertus_live_parallel
+  - bfcl_v3_apertus_live_parallel_multiple
+  - bfcl_v3_apertus_live_irrelevance
+  - bfcl_v3_apertus_live_relevance

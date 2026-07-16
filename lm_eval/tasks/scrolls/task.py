@@ -186,7 +186,7 @@ class _SCROLLSTask(ConfigurableTask):
 
         def _filter(sample):
             text = self._get_prune_text(sample)
-            cached = cache.get(text, None)
+            cached = cache.get(text)
             if cached is None:
                 for tokenizer in tokenizers:
                     if len(tokenizer(text).input_ids) > self.PRUNE_MAX_TOKENS:
@@ -263,9 +263,9 @@ class _SCROLLSMultipleChoiceTask(_SCROLLSTask):
             Instance(
                 request_type="loglikelihood",
                 doc=doc,
-                arguments=(ctx, " {}".format(choice))
+                arguments=(ctx, f" {choice}")
                 if not apply_chat_template
-                else (ctx, "{}".format(choice)),
+                else (ctx, f"{choice}"),
                 idx=i,
                 **kwargs,
             )
@@ -317,8 +317,9 @@ class Qasper(_SCROLLSTask):
     def _process_doc(self, doc):
         doc = _process_doc_prepended_question(doc)
         doc["is_yes_no"] = reduce(
-            lambda prev, cur: prev
-            and squad_metrics.normalize_answer(cur) in ["yes", "no"],
+            lambda prev, cur: (
+                prev and squad_metrics.normalize_answer(cur) in ["yes", "no"]
+            ),
             doc["outputs"],
             True,
         )

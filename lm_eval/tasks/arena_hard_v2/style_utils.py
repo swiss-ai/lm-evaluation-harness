@@ -114,12 +114,15 @@ def extract_style_features(text):
     cleaned = remove_pattern(text, _CODE_BLOCK_PATTERN)
     counters = count_markdown_elements(cleaned)
 
-    return np.array([
-        token_len,
-        sum(counters["header_count"].values()),
-        sum(counters["list_count"].values()),
-        sum(counters["bold_count"].values()),
-    ], dtype=np.float64)
+    return np.array(
+        [
+            token_len,
+            sum(counters["header_count"].values()),
+            sum(counters["list_count"].values()),
+            sum(counters["bold_count"].values()),
+        ],
+        dtype=np.float64,
+    )
 
 
 # ── Feature Normalization ────────────────────────────────────────────
@@ -145,9 +148,7 @@ def compute_relative_features(model_features, baseline_features):
     final = torch.zeros_like(model_features)
 
     # show_result.py lines 150-154: relative token length
-    final[:, 0] = (
-        model_features[:, 0] - baseline_features[:, 0]
-    ) / (
+    final[:, 0] = (model_features[:, 0] - baseline_features[:, 0]) / (
         model_features[:, 0] + baseline_features[:, 0]
     )
 
@@ -156,9 +157,7 @@ def compute_relative_features(model_features, baseline_features):
     baseline_md_density = baseline_features[:, 1:] / (baseline_features[:, :1] + 1)
 
     # show_result.py lines 162-166: relative density difference
-    final[:, 1:] = (
-        model_md_density - baseline_md_density
-    ) / (
+    final[:, 1:] = (model_md_density - baseline_md_density) / (
         model_md_density + baseline_md_density + 1
     )
 
@@ -180,9 +179,7 @@ def zscore_normalize(features):
         torch.Tensor of shape (N, K), z-score normalized.
         Constant columns (std=0) are set to 0.
     """
-    normalized = (
-        features - torch.mean(features, dim=0)
-    ) / torch.std(features, dim=0)
+    normalized = (features - torch.mean(features, dim=0)) / torch.std(features, dim=0)
 
     # Replace NaN with 0 (constant columns have std=0)
     normalized = torch.nan_to_num(normalized, nan=0.0)
@@ -202,9 +199,7 @@ class BTModel(nn.Module):
 
     def __init__(self, num_components):
         super().__init__()
-        self.logits = nn.Parameter(
-            nn.init.constant_(torch.empty(num_components), 0.5)
-        )
+        self.logits = nn.Parameter(nn.init.constant_(torch.empty(num_components), 0.5))
 
     def forward(self):
         return self.logits, None
@@ -215,9 +210,7 @@ def bt_loss(logits, outcomes, **kwargs):
 
     From math_utils.py::bt_loss (lines 66-80).
     """
-    return F.binary_cross_entropy_with_logits(
-        logits, outcomes.float(), reduction="sum"
-    )
+    return F.binary_cross_entropy_with_logits(logits, outcomes.float(), reduction="sum")
 
 
 def fit_pairwise_model(

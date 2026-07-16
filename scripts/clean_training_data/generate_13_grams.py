@@ -92,7 +92,7 @@ class Buckets:
         self.checkpoint_file = os.path.join(directory, "bucket_offsets.ckpt")
 
         if os.path.exists(self.checkpoint_file):
-            self.bucket_offsets = pickle.load(open(self.checkpoint_file, "rb"))
+            self.bucket_offsets = pickle.load(open(self.checkpoint_file, "rb"))  # noqa: SIM115, S301
         else:
             self.bucket_offsets = [0 for i in range(len(self.buckets))]
 
@@ -111,7 +111,7 @@ class Buckets:
             bucket.fh.flush()
 
         bucket_offsets = [bucket.fh.tell() for bucket in self.buckets]
-        pickle.dump(bucket_offsets, open(self.checkpoint_file, "wb"))
+        pickle.dump(bucket_offsets, open(self.checkpoint_file, "wb"))  # noqa: SIM115
 
     def close_buckets(self):
         for bucket in self.buckets:
@@ -119,7 +119,7 @@ class Buckets:
 
 
 def do_ngrams_in_buckets(n_value, working_directory, bucket_count):
-    pile_statistics = json.load(open("pile_statistics.json", "r", encoding="utf-8"))
+    pile_statistics = json.load(open("pile_statistics.json", encoding="utf-8"))  # noqa: SIM115
     pile_document_count = pile_statistics["Document Count"]
     start_offsets = pile_statistics["File Start Offsets"]
 
@@ -137,7 +137,7 @@ def do_ngrams_in_buckets(n_value, working_directory, bucket_count):
     # Checkpoint
     checkpoint_file = os.path.join(working_directory, "pile_offset.ckpt")
     if os.path.exists(checkpoint_file):
-        checkpoint_offset = pickle.load(open(checkpoint_file, "rb"))
+        checkpoint_offset = pickle.load(open(checkpoint_file, "rb"))  # noqa: SIM115, S301
         iterate = True
     else:
         checkpoint_offset = 0
@@ -173,7 +173,7 @@ def do_ngrams_in_buckets(n_value, working_directory, bucket_count):
                 progress.update(batch_size)
                 batch_counter = 0
                 buckets.save_checkpoint()
-                pickle.dump(offset, open(checkpoint_file, "wb"))
+                pickle.dump(offset, open(checkpoint_file, "wb"))  # noqa: SIM115
                 if terminate:
                     buckets.close_buckets()
                     return
@@ -212,4 +212,4 @@ if __name__ == "__main__":
 
     info_dict = {"title": "dataset ngrams", "ngram_size": 13}
     info_dict_path = os.path.join(args.working_directory, "info.json")
-    json.dump(info_dict, open(info_dict_path, "w", encoding="utf-8"))
+    json.dump(info_dict, open(info_dict_path, "w", encoding="utf-8"))  # noqa: SIM115

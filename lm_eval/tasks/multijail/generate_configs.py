@@ -4,8 +4,8 @@ Script to generate multijail config files for multiple languages.
 Creates individual language configs and a group config that includes all languages.
 """
 
-import os
 from pathlib import Path
+
 
 # Language configurations
 LANGUAGES = {

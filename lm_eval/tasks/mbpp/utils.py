@@ -1,9 +1,7 @@
 import re
-from typing import Union
 
 import evaluate as hf_evaluate
 
-import re
 
 try:
     pass_at_k = hf_evaluate.load("code_eval")
@@ -16,9 +14,7 @@ except Exception as e:
     raise e
 
 
-def pass_at_1(
-    references: Union[str, list[str]], predictions: Union[str, list[list[str]]]
-) -> float:
+def pass_at_1(references: str | list[str], predictions: str | list[list[str]]) -> float:
     if isinstance(references, str):
         references = [references]
     if isinstance(predictions[0], str):
@@ -28,6 +24,35 @@ def pass_at_1(
         predictions=predictions,
         k=[1],
     )[0]["pass@1"]
+
+
+def pass_at_k_metric(
+    references: str | list[str],
+    predictions: str | list[list[str]],
+    k: int | list[int] = None,
+) -> dict[str, float]:
+    """pass@k over n sampled solutions per problem (HF code_eval estimator).
+
+    With n samples, ``pass@1`` is the average per-sample pass rate (== mean@n) and
+    ``pass@k`` is the unbiased "any-correct" estimate. ``k`` values exceeding the
+    number of available samples are dropped so a single-sample "first" filter can
+    share the same ``k=[1, N]`` metric entry as the all-samples filter.
+    """
+    if k is None:
+        k = [1]
+    if isinstance(k, int):
+        k = [k]
+    if isinstance(references, str):
+        references = [references]
+    if isinstance(predictions[0], str):
+        predictions = [[p] for p in predictions]
+    n = min(len(p) for p in predictions)
+    k = [kk for kk in k if kk <= n] or [1]
+    return pass_at_k.compute(
+        references=references,
+        predictions=predictions,
+        k=k,
+    )[0]
 
 
 def clean_text(text: str) -> str:

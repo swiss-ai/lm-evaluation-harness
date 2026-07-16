@@ -54,13 +54,13 @@ if __name__ == "__main__":
         que_desc = lang_lib_list[3]
 
         with (
-            open(f"{CURRENT_DIR}/template/_lang_template_yaml", "r") as reader,
+            open(f"{CURRENT_DIR}/template/_lang_template_yaml") as reader,
             open(
                 f"{CURRENT_DIR}/{lang_abbr}/_{lang_abbr}_template_yaml",
                 "w",
             ) as writer,
         ):
-            for line in reader.readlines():
+            for line in reader:
                 if "{repo_id}" in line:
                     line = line.format(repo_id=mmlu_prox_repo_id)
                 if "{lang}" in line:
@@ -110,10 +110,10 @@ if __name__ == "__main__":
 
         for sbj in lang_sbj_dict:
             with open(
-                f"{mmlu_pro_config_dir}/mmlu_pro_{sbj}.yaml", "r", encoding="utf-8"
+                f"{mmlu_pro_config_dir}/mmlu_pro_{sbj}.yaml", encoding="utf-8"
             ) as f:
                 sbj_yaml_last_line = None
-                for line in f.readlines():
+                for line in f:
                     if line.startswith("process_docs:"):
                         sbj_yaml_last_line = line.strip()
 

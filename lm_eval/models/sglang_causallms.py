@@ -1,7 +1,7 @@
+import contextlib
 import copy
 import logging
 from importlib.util import find_spec
-from typing import TYPE_CHECKING
 
 from tqdm import tqdm
 
@@ -14,6 +14,7 @@ from lm_eval.models.utils import (
     build_length_info,
     detect_open_prefilled,
     handle_stop_sequences,
+    maybe_strip_system_boilerplate,
     postprocess_generated_text,
     resolve_think_tokens,
     resolve_track_thinking_metrics,
@@ -26,13 +27,8 @@ from lm_eval.utils import (
 
 eval_logger = logging.getLogger(__name__)
 
-try:
+with contextlib.suppress(ModuleNotFoundError):
     import sglang as sgl
-except ModuleNotFoundError:
-    pass
-
-if TYPE_CHECKING:
-    pass
 
 
 @register_model("sglang")
@@ -65,6 +61,8 @@ class SGLangLM(TemplateLM):
         dp_size: int = 1,
         tp_size: int = 1,
         prefix_token_id: int | None = None,
+        chat_template_args: dict | None = None,
+        chat_template_path: str | None = None,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         # Start marker for thinking tags - used for the thinking-format metric. Auto-
@@ -129,6 +127,12 @@ class SGLangLM(TemplateLM):
 
         # Todo(Jinwei): check tokenizer and other settings.
         self.tokenizer = self.model.tokenizer_manager.tokenizer
+        self.chat_template_args = maybe_strip_system_boilerplate(
+            chat_template_source=getattr(self.tokenizer, "chat_template", None),
+            chat_template_args=chat_template_args,
+            strip=False,
+            chat_template_path=chat_template_path,
+        )
         # Auto-detect open/close tokens from the chat template when opted in and not
         # forced. When on, fails loud if the template declares reasoning tokens but the
         # close can't be resolved; pass `think_end_token=` or drop the opt-in to escape.
@@ -314,7 +318,7 @@ class SGLangLM(TemplateLM):
             )
 
             # cache generations
-            for output, context in zip(cont, context):
+            for output, ctx in zip(cont, context):
                 generated_text = output.get("text", "")
                 # Per-response length + current-turn thinking-format (format-first, so
                 # the thinking span is measured only for well-formed responses).
@@ -338,7 +342,7 @@ class SGLangLM(TemplateLM):
                 )
                 res.append(generated_text)
                 self.cache_hook.add_partial(
-                    "generate_until", (context, gen_kwargs), generated_text
+                    "generate_until", (ctx, gen_kwargs), generated_text
                 )
                 pbar.update(1)
 
@@ -470,7 +474,10 @@ class SGLangLM(TemplateLM):
         pass
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """
         Method to apply a chat template to a list of chat history between user and model.
@@ -480,6 +487,8 @@ class SGLangLM(TemplateLM):
             tokenize=False,
             add_generation_prompt=add_generation_prompt,
             continue_final_message=not add_generation_prompt,
+            **self.chat_template_args,
+            **kwargs,
         )
 
         return chat_templated
@@ -508,7 +517,7 @@ class SGLangLM(TemplateLM):
         for chunk in chunks:
             inputs = []
             ctxlens = []
-            for cache_key, context_enc, continuation_enc in chunk:
+            for _cache_key, context_enc, continuation_enc in chunk:
                 inp = (context_enc + continuation_enc)[-(self.max_length) :]
                 ctxlen = len(context_enc) - max(
                     0, len(context_enc) + len(continuation_enc) - (self.max_length)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import json
 import logging
@@ -7,12 +8,14 @@ import os
 import random
 import time
 from collections import defaultdict
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 import lm_eval.api.model
 import lm_eval.api.registry
+from lm_eval.api.instance import Instance
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
 from lm_eval.evaluator_utils import (
@@ -46,6 +49,124 @@ if TYPE_CHECKING:
     from lm_eval.loggers import EvaluationTracker
 
 eval_logger = logging.getLogger(__name__)
+
+
+def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
+    parameters = inspect.signature(task.init_multiturn_state).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or any(key in parameters for key in multiturn_kwargs):
+        return task.init_multiturn_state(doc, ctx, gen_kwargs, **multiturn_kwargs)
+    return task.init_multiturn_state(doc, ctx, gen_kwargs)
+
+
+def run_multi_turn_rollout(
+    lm: LM,
+    eval_tasks,
+    requests: list,
+    apply_chat_template: bool = False,
+    chat_template=None,
+) -> None:
+    """Run interactive multi-turn generation episodes in batched waves.
+
+    A ``multi_turn_generate`` task still uses the model's regular
+    ``generate_until`` method. The task owns episode state and decides which prompt
+    to issue next after each response. Turn ``t+1``'s prompt contains turn ``t``'s
+    response, so each wave is a synchronization barrier; within a wave all pending
+    episodes across all multi-turn tasks share a single batched ``generate_until``
+    call.
+    """
+    if lm.world_size > 1:
+        raise NotImplementedError(
+            "multi_turn_generate does not currently support distributed "
+            "evaluation. Please run with world_size=1."
+        )
+
+    task_by_name = {
+        task_output.task_name: task_output.task for task_output in eval_tasks
+    }
+    multiturn_kwargs = {
+        "apply_chat_template": apply_chat_template,
+        "chat_template": chat_template,
+    }
+    episodes = []
+    for instance in requests:
+        task = task_by_name[instance.task_name]
+        ctx, gen_kwargs = instance.arguments
+        for _ in range(instance.repeats):
+            episodes.append(
+                {
+                    "task": task,
+                    "instance": instance,
+                    "state": _init_multiturn_state(
+                        task,
+                        instance.doc,
+                        ctx,
+                        deepcopy(gen_kwargs),
+                        multiturn_kwargs,
+                    ),
+                    "step": 0,
+                }
+            )
+
+    max_steps = (
+        max(getattr(episode["task"], "MAX_MULTITURN_STEPS", 64) for episode in episodes)
+        if episodes
+        else 0
+    )
+
+    for _ in range(max_steps):
+        active = []
+        wave_requests = []
+        for episode in episodes:
+            task = episode["task"]
+            if task.multiturn_is_done(episode["state"]):
+                continue
+            next_args = task.multiturn_next_request(episode["state"])
+            if next_args is None:
+                continue
+            request = Instance(
+                request_type="generate_until",
+                doc=episode["instance"].doc,
+                arguments=next_args,
+                idx=episode["step"],
+                metadata=(
+                    episode["instance"].task_name,
+                    episode["instance"].doc_id,
+                    1,
+                ),
+            )
+            active.append((episode, request))
+            wave_requests.append(request)
+
+        if not wave_requests:
+            break
+
+        eval_logger.info(
+            f"Running multi_turn_generate wave with {len(wave_requests)} requests"
+        )
+        responses = lm.generate_until(wave_requests)
+        for response, (episode, request) in zip(responses, active, strict=True):
+            request.resps.append(response)
+            episode["task"].multiturn_consume_response(episode["state"], response)
+            episode["step"] += 1
+    else:
+        unfinished = sum(
+            not episode["task"].multiturn_is_done(episode["state"])
+            for episode in episodes
+        )
+        if unfinished:
+            eval_logger.warning(
+                f"{unfinished} multi_turn_generate episodes reached the "
+                f"maximum step limit ({max_steps})."
+            )
+
+    for episode in episodes:
+        episode["instance"].resps.append(
+            episode["task"].multiturn_result(episode["state"])
+        )
 
 
 def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
@@ -635,19 +756,26 @@ def evaluate(
             # todo: may not account for padding in cases like SquadV2 which has multiple req types
             padding_requests[reqtype] += numpad
 
-    ### Iterative multi-turn rollout (output_type: multi_turn_generate) ###
-    # Runs BEFORE the standard one-shot dispatch so the turn-indexed
-    # `Instance` objects it builds end up on each task's `_instances` list
-    # and flow through the existing filter + process_results + sample-log
-    # path unchanged. Tasks without multi_turn_generate are unaffected.
-    _mt_task_outputs = [
-        to for to in eval_tasks if to.task.OUTPUT_TYPE == "multi_turn_generate"
-    ]
-    if _mt_task_outputs:
-        run_multi_turn_rollout(lm, _mt_task_outputs)
-
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
+    # Iterative multi-turn rollout (output_type: multi_turn_generate): turn
+    # t+1's prompt contains turn t's response, so the task owns episode state
+    # and the driver issues regular `generate_until` calls one wave at a time.
+    # Pulled out of the standard dispatch loop below so the per-turn barrier
+    # is handled explicitly.
+    multiturn_requests = requests.pop("multi_turn_generate", [])
+    if multiturn_requests:
+        eval_logger.info("Running multi_turn_generate requests")
+        run_multi_turn_rollout(
+            lm,
+            eval_tasks,
+            multiturn_requests,
+            apply_chat_template=bool(apply_chat_template),
+            chat_template=getattr(lm, "apply_chat_template", None)
+            if apply_chat_template
+            else None,
+        )
+
     for reqtype, reqs in requests.items():
         eval_logger.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
@@ -878,224 +1006,6 @@ def evaluate(
 
     else:
         return None
-
-
-# Defensive cap on multi-turn rollout depth against a task whose
-# ``next_user_turn`` never returns ``None``. No real benchmark exceeds ~10
-# turns; 64 is comfortable headroom. Expose via task config if ever needed.
-MAX_SAFETY_TURNS = 64
-
-
-def _gather_ints(lm, value: int) -> list[int]:
-    """Collective ``accelerator.gather`` of one per-rank integer, returned as
-    a plain list (length == world_size). All ranks must call together. The
-    caller applies the reduction (``any`` / ``max``).
-    """
-    import torch
-
-    t = torch.tensor(int(value), device=lm.device)
-    return lm.accelerator.gather(t).cpu().detach().numpy().tolist()
-
-
-def _any_rank_has_pending(lm, pending) -> bool:
-    """Collective entry guard. True iff any rank has docs."""
-    return any(_gather_ints(lm, bool(pending)))
-
-
-def _gather_max_live(lm, local_n: int) -> int:
-    """Collective per-turn gather. Returns ``max(live_n across ranks)``,
-    used both for global termination (``== 0``) and pad-to-global-max.
-    """
-    return max(_gather_ints(lm, local_n))
-
-
-def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
-    """Iterative multi-turn rollout driver for ``output_type: multi_turn_generate``.
-
-    Per turn, for each pending doc: ask the task for the next user turn
-    via ``task.next_user_turn`` (None → mark done), render the growing
-    history through ``lm.apply_chat_template``, build one
-    ``Instance(idx=turn_idx)``, and batch all pending instances across
-    all multi-turn tasks into a single ``lm.generate_until`` call. The
-    response is appended to history and ``task._instances``, then
-    ``task.should_stop`` decides early-exit. Loop stops when no docs
-    are pending; the standard post-process loop in ``evaluate()`` then
-    consumes the variable-length per-doc instance lists the same way
-    it handles ``multiple_choice``'s N-instances-per-doc.
-
-    Distributed (``accelerate launch``) is supported when the LM
-    exposes ``lm.accelerator``. Three coordination points keep
-    collectives even-batched: a collective entry guard, a per-turn
-    ``gather`` of live counts (drives termination and pad size), and
-    sentinel-dummy padding for ranks with fewer live docs than the
-    global max. Backends with internal DP (vLLM ``data_parallel_size``,
-    SGLang / openai ``num_concurrent``) expose ``world_size == 1`` and
-    take the non-distributed branch.
-
-    Full architecture, hook contract, backend matrix, and limits:
-    ``docs/multi_turn_rollout.md``.
-    """
-    from copy import deepcopy
-
-    from lm_eval.api.instance import Instance
-    from lm_eval.api.utils import Message
-
-    if not mt_task_outputs:
-        return
-
-    # Docs are already sharded across ranks by
-    # `task.doc_iterator(rank, world_size)` in
-    # `_build_initial_multi_turn_states`; the coordination rules live in
-    # the docstring above.
-    is_distributed = lm.world_size > 1
-    if is_distributed and not hasattr(lm, "accelerator"):
-        raise NotImplementedError(
-            "multi_turn_generate with world_size > 1 requires an "
-            "`accelerator` attribute on the LM (HuggingFace + `accelerate "
-            "launch`). Backends that do their own data parallelism "
-            "internally should expose world_size=1."
-        )
-
-    # Each (task_output, doc_id, state) so the response routes back to
-    # the right task.
-    pending: list[tuple] = []
-    for to in mt_task_outputs:
-        for doc_id, state in to.task._multi_turn_states.items():
-            pending.append((to, doc_id, state))
-
-    # `build_all_requests` already errored if --apply_chat_template was
-    # forgotten; this catches backends that don't implement it at all.
-    if not hasattr(lm, "apply_chat_template"):
-        raise RuntimeError(
-            "multi_turn_generate requires `lm.apply_chat_template`; "
-            "backend does not provide it."
-        )
-
-    # Entry guard — collective so ranks with empty shards don't strand
-    # peers at the next gather. Both early-return sites must clear
-    # `_multi_turn_states` (otherwise the histories built by
-    # `_build_initial_multi_turn_states` leak past short-circuit).
-    if is_distributed:
-        if not _any_rank_has_pending(lm, pending):
-            _clear_multi_turn_states(mt_task_outputs)
-            return
-    elif not pending:
-        _clear_multi_turn_states(mt_task_outputs)
-        return
-
-    # Pad sentinel: 1-token throwaway request used by ranks whose live
-    # batch is below the global max. Response is discarded.
-    dummy_instance = Instance(
-        request_type="generate_until",
-        doc={},
-        arguments=("<pad>", {"max_gen_toks": 1, "until": []}),
-        idx=-1,
-        metadata=("__multi_turn_dp_pad__", -1, 1),
-    )
-
-    turn_idx = 0
-    while True:
-        live: list[tuple] = []
-        this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
-
-        for to, doc_id, state in pending:
-            user_text = to.task.next_user_turn(state.doc, state.history, turn_idx)
-            if user_text is None:
-                state.done = True
-                continue
-
-            state.history.append(Message("user", user_text))
-
-            prompt = lm.apply_chat_template(
-                [m.to_dict() for m in state.history],
-                add_generation_prompt=True,
-            )
-            gen_kwargs = deepcopy(to.task.config.generation_kwargs or {})
-
-            inst = Instance(
-                request_type="generate_until",
-                doc=state.doc,
-                arguments=(prompt, gen_kwargs),
-                idx=turn_idx,
-                metadata=(
-                    to.task.config.task,
-                    doc_id,
-                    to.task.config.repeats or 1,
-                ),
-            )
-            this_turn_batch.append((to, state, inst))
-            live.append((to, doc_id, state))
-
-        # Termination: distributed requires EVERY rank's batch to be
-        # empty before breaking (else the next gather deadlocks).
-        local_n = len(this_turn_batch)
-        if is_distributed:
-            global_max = _gather_max_live(lm, local_n)
-            if global_max == 0:
-                break
-        else:
-            if local_n == 0:
-                break
-            global_max = local_n
-
-        # Safety cap deliberately checked AFTER the per-turn gather so a
-        # future refactor that diverges `turn_idx` across ranks cannot
-        # cause an asymmetric break that deadlocks the next gather.
-        # Today `turn_idx` is identical on every rank — all ranks break
-        # together — but the order matters for that invariant.
-        if turn_idx >= MAX_SAFETY_TURNS:
-            eval_logger.warning(
-                "multi_turn_generate driver hit safety cap of %d turns; "
-                "%d docs still pending — stopping.",
-                MAX_SAFETY_TURNS,
-                len(pending),
-            )
-            break
-
-        cloned = [inst for _, _, inst in this_turn_batch]
-        numpad = global_max - local_n
-        if numpad > 0:
-            cloned.extend([dummy_instance] * numpad)
-
-        responses = lm.generate_until(cloned)
-
-        if is_distributed:
-            lm.accelerator.wait_for_everyone()
-
-        for (to, state, inst), resp in zip(
-            this_turn_batch, responses[:local_n], strict=True
-        ):
-            inst.resps.append(resp)
-            state.history.append(Message("assistant", resp))
-            to.task._instances.append(inst)
-
-            if to.task.should_stop(state.doc, state.history, turn_idx):
-                state.done = True
-
-        pending = [(to, did, st) for to, did, st in live if not st.done]
-        turn_idx += 1
-
-    eval_logger.info(
-        "multi_turn_generate driver completed: %d task(s), %d total turns "
-        "across %d initial docs",
-        len(mt_task_outputs),
-        turn_idx,
-        sum(len(to.task._multi_turn_states) for to in mt_task_outputs),
-    )
-
-    _clear_multi_turn_states(mt_task_outputs)
-
-
-def _clear_multi_turn_states(mt_task_outputs) -> None:
-    """Release per-doc conversation histories. Called at end-of-loop
-    AND each early-return in :func:`run_multi_turn_rollout`; task
-    objects can persist across ``simple_evaluate`` calls (notebook /
-    test flows) and would otherwise retain full N-turn histories
-    indefinitely.
-    """
-    for to in mt_task_outputs:
-        if hasattr(to.task, "_multi_turn_states"):
-            del to.task._multi_turn_states
 
 
 def request_caching_arg_to_dict(cache_requests: str) -> dict:

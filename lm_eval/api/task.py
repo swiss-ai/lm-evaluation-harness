@@ -323,6 +323,43 @@ class Task(abc.ABC):
     def doc_to_prefix(self, doc):
         return ""
 
+    # =========================================================================
+    # Multi-turn rollout — core contract (output_type: multi_turn_generate)
+    # =========================================================================
+    # The evaluator's ``run_multi_turn_rollout`` driver consults these five
+    # hooks. They are the general (state-machine) contract: the task owns
+    # episode state and returns the next fully-rendered prompt, so agentic
+    # tasks (e.g. BFCL's tool-execution loop) that issue several model calls
+    # per user turn are expressible. ``ConfigurableTask`` provides convenience
+    # implementations of all five that delegate to the simpler scripted hooks
+    # (``build_initial_messages`` / ``next_user_turn`` / ``should_stop``), so
+    # scripted benchmarks (e.g. S-RuLES) only override those three.
+
+    def init_multiturn_state(
+        self, doc: dict, ctx: str, gen_kwargs: dict, **kwargs
+    ) -> Any:
+        """Initialize per-document episode state for ``multi_turn_generate`` tasks."""
+        raise NotImplementedError(
+            f"Task {self.config.task} must implement init_multiturn_state() "
+            "to use output_type='multi_turn_generate'."
+        )
+
+    def multiturn_next_request(self, state: Any) -> tuple[str, dict] | None:
+        """Return the next ``(prompt, gen_kwargs)`` for an active episode, or None."""
+        raise NotImplementedError
+
+    def multiturn_consume_response(self, state: Any, response: str) -> None:
+        """Advance an episode after a model response."""
+        raise NotImplementedError
+
+    def multiturn_is_done(self, state: Any) -> bool:
+        """Return whether an episode has no more model requests."""
+        raise NotImplementedError
+
+    def multiturn_result(self, state: Any) -> Any:
+        """Return the object passed to ``process_results`` for this episode."""
+        return state
+
     def build_all_requests(
         self,
         *,
@@ -339,20 +376,6 @@ class Task(abc.ABC):
         tokenizer_name: str = "",
     ) -> None:
         """Build a set of Instances for a task, and store them in task.instances"""
-
-        # Multi-turn: turn t+1's prompt contains turn t's response, so
-        # we build only per-doc initial state here; the actual loop is
-        # `lm_eval.evaluator.run_multi_turn_rollout`.
-        if self.OUTPUT_TYPE == "multi_turn_generate":
-            self._build_initial_multi_turn_states(
-                limit=limit,
-                samples=samples,
-                rank=rank,
-                world_size=world_size,
-                apply_chat_template=apply_chat_template,
-            )
-            self._instances = []
-            return
 
         # used with caching
         og_limit = limit
@@ -1472,11 +1495,16 @@ class ConfigurableTask(Task):
             return None
 
     # =========================================================================
-    # Multi-turn rollout hooks
+    # Multi-turn rollout — scripted convenience hooks
     # =========================================================================
-    # Consulted by `lm_eval.evaluator.run_multi_turn_rollout` for tasks
-    # with ``output_type: multi_turn_generate``. Defaults raise so
-    # forgetting to override is loud.
+    # A simpler contract for *scripted* multi-turn benchmarks: a fixed
+    # sequence of user turns with exactly one model generation per turn
+    # (e.g. S-RuLES). Override these three instead of the five core hooks
+    # declared on ``Task``. The core-hook defaults further down drive a
+    # scripted episode through these methods, so the evaluator's
+    # ``run_multi_turn_rollout`` driver only ever sees the core contract.
+    # Agentic tasks that issue several model calls per user turn (e.g.
+    # BFCL) override the core hooks directly and ignore these three.
 
     def build_initial_messages(self, doc: dict) -> list[Message]:
         """Return the conversation prefix BEFORE any model generation.
@@ -1530,54 +1558,75 @@ class ConfigurableTask(Task):
         """
         return False
 
-    def _build_initial_multi_turn_states(
-        self,
-        *,
-        limit: int | None,
-        samples: list[int] | None,
-        rank: int,
-        world_size: int,
-        apply_chat_template: bool,
-    ) -> None:
-        """Populate ``self._multi_turn_states`` (one ``MultiTurnState``
-        per doc on this rank) for the evaluator driver to consume.
+    # =========================================================================
+    # Multi-turn rollout — core-hook defaults for scripted tasks
+    # =========================================================================
+    # Concrete implementations of the five core hooks (declared abstract on
+    # ``Task``) that drive a scripted episode via the three convenience hooks
+    # above. A task that overrides the core hooks (e.g. BFCL) bypasses these.
 
-        ``apply_chat_template`` is checked here — not strictly needed
-        for state-building but it surfaces the requirement early; the
-        per-doc system prompt becomes a plain-text prefix without it
-        and the task silently changes meaning.
+    def init_multiturn_state(
+        self,
+        doc: dict,
+        ctx: str,
+        gen_kwargs: dict,
+        apply_chat_template: bool = False,
+        chat_template: Callable | None = None,
+    ) -> Any:
+        """Build scripted episode state from :meth:`build_initial_messages`.
+
+        Requires ``--apply_chat_template``: without the chat template the
+        per-doc system prompt becomes a plain-text prefix and the task
+        silently changes meaning (the system role is load-bearing for every
+        scripted multi-turn benchmark).
         """
         from lm_eval.api.multi_turn import MultiTurnState
 
-        if not apply_chat_template:
+        if not apply_chat_template or chat_template is None:
             raise RuntimeError(
-                "multi_turn_generate tasks require --apply_chat_template; "
-                "without the chat template the per-doc system prompt becomes "
-                "a plain-text prefix and the task silently changes meaning."
+                "multi_turn_generate scripted tasks require --apply_chat_template; "
+                "without the chat template the per-doc system prompt becomes a "
+                "plain-text prefix and the task silently changes meaning. (Agentic "
+                "tasks that render prompts themselves override init_multiturn_state.)"
             )
+        return MultiTurnState(
+            doc=doc,
+            history=list(self.build_initial_messages(doc)),
+            gen_kwargs=deepcopy(gen_kwargs),
+            chat_template=chat_template,
+        )
 
-        # Per-instance replication isn't supported: the driver does not
-        # clone by `repeats` the way the single-shot dispatch loop in
-        # `evaluate()` does. Erroring early so a `repeats: 3` YAML
-        # doesn't silently produce single samples per turn.
-        repeats = getattr(self.config, "repeats", None) or 1
-        if repeats != 1:
-            raise ValueError(
-                f"Task {self.config.task!r} has output_type=multi_turn_generate "
-                f"with repeats={repeats}. Multi-turn rollout supports only "
-                f"repeats=1; remove or set `repeats: 1` in the task YAML."
-            )
+    def multiturn_is_done(self, state: Any) -> bool:
+        return state.done
 
-        self._multi_turn_states: dict[int, MultiTurnState] = {}
-        for doc_id, doc in self.doc_iterator(
-            rank=rank, limit=limit, samples=samples, world_size=world_size
-        ):
-            initial = self.build_initial_messages(doc)
-            self._multi_turn_states[doc_id] = MultiTurnState(
-                doc=doc,
-                history=list(initial),
-                done=False,
-            )
+    def multiturn_next_request(self, state: Any) -> tuple[str, dict] | None:
+        if state.done:
+            return None
+        user_text = self.next_user_turn(state.doc, state.history, state.turn_idx)
+        if user_text is None:
+            state.done = True
+            return None
+        state.history.append(Message("user", user_text))
+        chat = [m.to_dict() for m in state.history]
+        try:
+            prompt = state.chat_template(chat, add_generation_prompt=True)
+        except TypeError:
+            prompt = state.chat_template(chat)
+        return prompt, deepcopy(state.gen_kwargs)
+
+    def multiturn_consume_response(self, state: Any, response: str) -> None:
+        state.history.append(Message("assistant", response))
+        state.responses.append(response)
+        # `should_stop` runs AFTER the assistant append for this turn, with
+        # `turn_idx` still pointing at the turn just generated (matches the
+        # upstream evaluate_batched.py early-exit ordering).
+        if self.should_stop(state.doc, state.history, state.turn_idx):
+            state.done = True
+        state.turn_idx += 1
+
+    def multiturn_result(self, state: Any) -> list[str]:
+        """The list of model-generated assistant turns, in turn order."""
+        return state.responses
 
     def doc_to_audio(self, doc: Any, doc_to_audio=None) -> int | str | list | None:
         if doc_to_audio is not None:
@@ -1655,15 +1704,12 @@ class ConfigurableTask(Task):
 
                 arguments.extend(aux_arguments)
 
-        elif self.OUTPUT_TYPE == "generate_until":
+        elif self.OUTPUT_TYPE in {"generate_until", "multi_turn_generate"}:
+            # `multi_turn_generate` builds one placeholder Instance per doc
+            # (carrying the per-doc episode context). The evaluator's
+            # `run_multi_turn_rollout` driver owns the turn-by-turn loop and
+            # appends the rollout result to this Instance's `resps`.
             arguments = (ctx, deepcopy(self.config.generation_kwargs))
-        elif self.OUTPUT_TYPE == "multi_turn_generate":
-            # Multi-turn tasks do not build per-doc requests here. The
-            # evaluator's `run_multi_turn_rollout` driver constructs
-            # `Instance` objects one turn at a time as the conversation
-            # unfolds. `build_all_requests` already early-returned for
-            # this OUTPUT_TYPE after populating `task._multi_turn_states`.
-            return []
 
         multimodal_arg = {}
         if (
@@ -1839,7 +1885,7 @@ class ConfigurableTask(Task):
                     [gold, pred_text]
                 )
 
-        elif self.OUTPUT_TYPE == "generate_until":
+        elif self.OUTPUT_TYPE in {"generate_until", "multi_turn_generate"}:
             gold = self.doc_to_target(doc)
             result = results[0]
             if self.config.doc_to_choice is not None:
@@ -1913,7 +1959,8 @@ class ConfigurableTask(Task):
         else:
             raise ValueError(
                 f"Passed invalid output_type '{self.OUTPUT_TYPE}' ! Please use one of ",
-                "'loglikelihood', 'loglikelihood_rolling', 'generate_until' or 'multiple_choice'",
+                "'loglikelihood', 'loglikelihood_rolling', 'generate_until', "
+                "'multi_turn_generate' or 'multiple_choice'",
             )
 
         return result_dict

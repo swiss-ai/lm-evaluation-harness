@@ -1,0 +1,8 @@
+include: _bfcl_v3_template.yaml
+task: bfcl_v3_apertus_javascript
+class: !function task.BFCLV3Task
+metadata:
+  version: 3
+  bfcl_category: javascript
+  bfcl_language: JavaScript
+  bfcl_tool_format: apertus
