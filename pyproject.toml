@@ -141,6 +141,20 @@ plugins.md028.enabled = false # no-blanks-blockquote
 plugins.md029.allow_extended_start_values = true # ol-prefix
 plugins.md034.enabled = false # no-bare-urls
 
+[tool.ruff]
+# pre-commit hands ruff explicit file paths, and ruff lints/formats explicitly-passed
+# files even when they match an exclude. force-exclude makes the exclude below apply.
+force-exclude = true
+
+[tool.ruff.format]
+# Vendored upstream sources are kept byte-for-byte; the lint side is silenced via
+# extend-per-file-ignores below, but the formatter needs its own exclude.
+exclude = [
+    "lm_eval/tasks/ifbench/instructions.py",
+    "lm_eval/tasks/ifbench/instructions_util.py",
+    "lm_eval/tasks/ifbench/instructions_registry.py",
+]
+
 [tool.ruff.lint]
 preview = true
 explicit-preview-rules = true
@@ -199,6 +213,12 @@ ignore = [
 # Kept verbatim; do not lint upstream style.
 "lm_eval/tasks/realguardrails/s_rules/message.py" = ["ALL"]
 "lm_eval/tasks/realguardrails/s_rules/scenarios/**/*.py" = ["ALL"]
+# Vendored from github.com/allenai/IFBench (Apache-2.0).
+# Kept verbatim (tab-indented upstream); do not lint upstream style.
+# utils.py is our own lm-eval glue and stays linted.
+"lm_eval/tasks/ifbench/instructions.py" = ["ALL"]
+"lm_eval/tasks/ifbench/instructions_util.py" = ["ALL"]
+"lm_eval/tasks/ifbench/instructions_registry.py" = ["ALL"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true

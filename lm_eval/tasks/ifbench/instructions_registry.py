@@ -77,4 +77,3 @@ INSTRUCTION_DICT = {
     "format:output_template" : instructions.OutputTemplateChecker,
     "format:no_whitespace" : instructions.NoWhitespaceChecker,
 }
-
