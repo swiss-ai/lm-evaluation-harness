@@ -208,9 +208,11 @@ class VLLM(TemplateLM):
         if disable_flashinfer_allreduce_fusion:
             # Avoid FlashInfer's fused all-reduce/RMS workspace while retaining
             # vLLM's ordinary all-reduce and the rest of torch.compile.
-            kwargs["compilation_config"] = {
-                "pass_config": {"fuse_allreduce_rms": False}
-            }
+            compilation_config = kwargs.get("compilation_config") or {}
+            pass_config = dict(compilation_config.get("pass_config") or {})
+            pass_config["fuse_allreduce_rms"] = False
+            compilation_config["pass_config"] = pass_config
+            kwargs["compilation_config"] = compilation_config
         self.model_args = {
             "model": pretrained,
             "gpu_memory_utilization": float(gpu_memory_utilization),
