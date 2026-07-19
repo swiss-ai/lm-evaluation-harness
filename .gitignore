@@ -55,3 +55,6 @@ out/*
 
 #uv
 uv.lock
+
+# IFBench downloads nltk resources into the task dir at import time
+lm_eval/tasks/ifbench/.nltk_data/
