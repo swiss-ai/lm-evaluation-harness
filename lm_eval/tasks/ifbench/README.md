@@ -55,7 +55,8 @@ building each instruction description. The harness `process_results` was verifie
 to reproduce IFBench's reference `run_eval.py` scores exactly on the upstream
 `sample_output.jsonl` (prompt-level strict 0.2621, prompt-level loose 0.2966).
 
-Extra Python dependencies beyond IFEval: `emoji`, `syllapy`, `unicodedata2`
+Extra Python dependencies beyond IFEval: `emoji`, `syllapy` (which needs
+`setuptools<81`, as it imports `pkg_resources` without declaring it)
 (plus `nltk` resources `punkt`, `punkt_tab`, `stopwords`,
 `averaged_perceptron_tagger_eng`, which `instructions_util.py` downloads on
 import).

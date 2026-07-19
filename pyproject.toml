@@ -77,7 +77,11 @@ alpaca_eval = ["alpaca-eval>=0.6.2"]
 arena_hard = ["openai", "tiktoken"]
 dev = ["pytest", "pytest-cov", "pytest-xdist", "pre-commit", "requests", "aiohttp", "tenacity", "tqdm", "tiktoken", "sentencepiece", "ruff", "pillow"]
 ifeval = ["langdetect", "immutabledict", "nltk>=3.9.1", "spacy"]
-ifbench = ["emoji>=2.0.0", "syllapy", "unicodedata2", "lm_eval[ifeval]"]
+# syllapy imports pkg_resources at module load but declares no dependency on it.
+# setuptools >= 81 no longer ships pkg_resources, so `import syllapy` -- and with it the
+# whole ifbench task -- fails in any environment that does not happen to have an older
+# setuptools (e.g. a fresh uv venv, as CI uses).
+ifbench = ["emoji>=2.0.0", "syllapy", "setuptools<81", "lm_eval[ifeval]"]
 japanese_leaderboard = ["emoji==2.14.0", "neologdn==0.5.3", "fugashi[unidic-lite]", "rouge_score>=0.1.2"]
 longbench = ["jieba", "fuzzywuzzy", "rouge"]
 libra = ["pymorphy2"]
