@@ -266,11 +266,9 @@ def calculate_all_metrics(final_results_df, k=32):
     final_results_df["recall"] = final_results_df.groupby(
         "prompt"
     ).is_supported.transform(lambda g: min(g.sum() / k, 1))
-    final_results_df = (
-        final_results_df.groupby("prompt", group_keys=False)
-        .apply(f1_score)  # , include_groups=False) # NOTE: python 3.9 <
-        .reset_index()
-    )
+    final_results_df["f1"] = (
+        2 * final_results_df.precision * final_results_df.recall
+    ) / (final_results_df.precision + final_results_df.recall).replace(0, 1)
     final_results_df["k"] = k
     final_results_df["n_claims"] = final_results_df.groupby(
         "prompt"
@@ -292,17 +290,6 @@ def calculate_all_metrics(final_results_df, k=32):
     print(f"med_n_claims", "%.3f" % med_n_claims)
 
     return final_results_df
-
-
-def f1_score(g):
-    prec = g.precision.iloc[0]
-    rec = g.recall.iloc[0]
-    if (prec + rec) == 0:
-        f1 = 0
-    else:
-        f1 = 2 * prec * rec / (prec + rec)
-    g["f1"] = f1
-    return g
 
 
 def jsonify_ans(
