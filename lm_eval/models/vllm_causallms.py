@@ -180,6 +180,7 @@ class VLLM(TemplateLM):
         # force the thinking-format/length metrics on/off; None = derive from whether a
         # reasoning close token is known.
         track_thinking_metrics: bool | None = None,
+        disable_flashinfer_allreduce_fusion: bool = False,
         max_lora_rank: int = 16,
         truncation_side: Literal["left", "right", "middle"] = "left",
         **kwargs,
@@ -204,6 +205,14 @@ class VLLM(TemplateLM):
         # truncation strategy for inputs exceeding max length
         self.truncation_side = truncation_side
         self.data_parallel_size = int(data_parallel_size)
+        if disable_flashinfer_allreduce_fusion:
+            # Avoid FlashInfer's fused all-reduce/RMS workspace while retaining
+            # vLLM's ordinary all-reduce and the rest of torch.compile.
+            compilation_config = kwargs.get("compilation_config") or {}
+            pass_config = dict(compilation_config.get("pass_config") or {})
+            pass_config["fuse_allreduce_rms"] = False
+            compilation_config["pass_config"] = pass_config
+            kwargs["compilation_config"] = compilation_config
         self.model_args = {
             "model": pretrained,
             "gpu_memory_utilization": float(gpu_memory_utilization),
