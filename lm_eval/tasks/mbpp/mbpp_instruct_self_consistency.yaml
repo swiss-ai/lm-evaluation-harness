@@ -16,6 +16,12 @@ metric_list:
     aggregation: mean
     higher_is_better: true
     k: [1, 8]
+  # Measured on the extracted code block, so it catches a sample that loops inside
+  # the block but not one that never closes the fence (extraction yields "" there).
+  # Use --log_length_metrics to see samples running to the max_gen_toks cap.
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
 filter_list:
   # all 8 samples -> pass@1 (== mean@8) and pass@8
   - name: "all"
