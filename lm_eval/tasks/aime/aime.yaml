@@ -46,4 +46,4 @@ filter_list:
       - function: !function utils.PassAtKFilter
       - function: "take_first"
 metadata:
-  version: 0.0
+  version: 1.0

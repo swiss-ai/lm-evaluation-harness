@@ -55,26 +55,54 @@ from collections import Counter
 from lm_eval.api.metrics import is_degenerating_text
 
 
+# AIME answers are integers in [0, 999], and the prompt ("Question: ...\nAnswer:")
+# never asks for a boxed answer -- so extraction cannot depend on \boxed{}: a model
+# that simply ends with "Answer: 16" has to be scored too. Order matters below: an
+# explicit answer marker beats trailing inline math, which is often a congruence
+# ("$$2016 \equiv 16 \pmod{1000}$$") whose last number is the modulus.
+_INT_RE = re.compile(r"[+-]?\d[\d,]*")
+_ANSWER_MARKER_RE = re.compile(
+    r"(?:final\s+answer|answer)\s*(?:is)?\s*[:=]?", re.IGNORECASE
+)
+_MATH_SPAN_RE = re.compile(r"\$\$?(.+?)\$\$?", re.DOTALL)
+
+
+def _as_int(text: str) -> str | None:
+    """Canonical form of a bare integer answer (``"016"``, ``"1,260"``), else ``None``."""
+    cleaned = text.strip().strip("$").replace(",", "").replace(" ", "")
+    return str(int(cleaned)) if re.fullmatch(r"[+-]?\d+", cleaned) else None
+
+
 def extract_answer(response: str) -> str:
-    """Extract the final answer from a response (``$...$`` then ``\\boxed{}``)."""
-    # Try to extract answer from $...$ format first
-    indices = [pos for pos, char in enumerate(response) if char == "$"]
-    if len(indices) <= 1:
-        answer = response
-    else:
-        answer = response[indices[0] + 1 : indices[-1]]
+    """Extract the final answer from a response (``""`` if it has none).
 
-    # Extract from \\boxed{} if present
-    boxed_answer = last_boxed_only_string(response)
-    if boxed_answer is not None:
+    Tries, in order: ``\\boxed{...}``, the first number after the last explicit
+    answer marker, the last ``$...$`` span when it is a bare number, and finally the
+    last number anywhere in the response.
+    """
+    boxed = last_boxed_only_string(response)
+    if boxed is not None:
         try:
-            boxed_content = remove_boxed(boxed_answer)
-            if boxed_content is not None:
-                answer = boxed_content
+            content = remove_boxed(boxed)
         except (AssertionError, IndexError):
-            pass
+            content = None
+        if content:
+            return _as_int(content) or content.strip()
 
-    return answer
+    markers = list(_ANSWER_MARKER_RE.finditer(response))
+    if markers:
+        match = _INT_RE.search(response[markers[-1].end() :])
+        if match:
+            return _as_int(match.group(0)) or ""
+
+    spans = _MATH_SPAN_RE.findall(response)
+    if spans:
+        value = _as_int(spans[-1])
+        if value is not None:
+            return value
+
+    numbers = _INT_RE.findall(response)
+    return _as_int(numbers[-1]) or "" if numbers else ""
 
 
 def _normalize_answer(response: str) -> str:
@@ -102,7 +130,9 @@ class MajorityVoteFilter:
     def apply(self, resps, docs):
         def select(resp_list):
             normalized = [_normalize_answer(r) for r in resp_list]
-            winner = Counter(normalized).most_common(1)[0][0]
+            # Responses with no extractable answer must not win the vote.
+            votable = [a for a in normalized if a] or normalized
+            winner = Counter(votable).most_common(1)[0][0]
             for resp, norm in zip(resp_list, normalized):
                 if norm == winner:
                     return resp
@@ -113,7 +143,11 @@ class MajorityVoteFilter:
 
 def _score_response(response: str, target: str) -> int:
     """1 if the response's extracted answer matches the target, else 0."""
-    return int(is_equiv(extract_answer(response), target))
+    answer = extract_answer(response)
+    if not answer:
+        return 0
+    # Compare integers as integers so a zero-padded gold ("016") still matches.
+    return int(is_equiv(answer, _as_int(target) or target))
 
 
 def _doc_target(doc: dict) -> str:
