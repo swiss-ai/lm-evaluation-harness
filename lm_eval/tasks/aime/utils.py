@@ -67,10 +67,21 @@ _ANSWER_MARKER_RE = re.compile(
 _MATH_SPAN_RE = re.compile(r"\$\$?(.+?)\$\$?", re.DOTALL)
 
 
+# Python caps int()-from-str conversion at 4300 digits and raises ValueError beyond
+# it; a degenerate/looping response can emit a far longer digit run. Cap well under
+# that (an AIME answer is 3 digits) so such a run is treated as "no answer" rather
+# than crashing the whole eval.
+_MAX_ANSWER_DIGITS = 100
+
+
 def _as_int(text: str) -> str | None:
     """Canonical form of a bare integer answer (``"016"``, ``"1,260"``), else ``None``."""
     cleaned = text.strip().strip("$").replace(",", "").replace(" ", "")
-    return str(int(cleaned)) if re.fullmatch(r"[+-]?\d+", cleaned) else None
+    if not re.fullmatch(r"[+-]?\d+", cleaned):
+        return None
+    if len(cleaned.lstrip("+-")) > _MAX_ANSWER_DIGITS:
+        return None
+    return str(int(cleaned))
 
 
 def extract_answer(response: str) -> str:
