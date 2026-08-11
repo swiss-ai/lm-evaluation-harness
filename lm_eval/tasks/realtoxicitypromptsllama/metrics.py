@@ -1,9 +1,10 @@
-import json
+import concurrent.futures
 import logging
 import os
+
 import numpy as np
-import concurrent.futures
 import requests
+
 
 MODEL_NAME = "meta-llama/Llama-Guard-4-12B"
 
@@ -35,9 +36,7 @@ def try_remote_generate(messages, temperature=0.0, max_tokens=50):
         )
 
         if resp.status_code != 200:
-            raise RuntimeError(
-                f"API returned status {resp.status_code}: {resp.text}"
-            )
+            raise RuntimeError(f"API returned status {resp.status_code}: {resp.text}")
 
         data = resp.json()
         return data["choices"][0]["message"]["content"].strip()
