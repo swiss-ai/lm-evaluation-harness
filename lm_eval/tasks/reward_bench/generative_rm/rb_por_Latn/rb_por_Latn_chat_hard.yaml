@@ -1,0 +1,6 @@
+dataset_name: por_Latn
+dataset_path: CohereLabsCommunity/multilingual-reward-bench
+include: ../_rb_base_yaml
+process_docs: !function ../../utils.process_docs_chat_hard
+task: reward_bench_por_Latn_chat_hard
+test_split: test
