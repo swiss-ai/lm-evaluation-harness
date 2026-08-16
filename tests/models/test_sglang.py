@@ -15,7 +15,7 @@ task_manager = tasks.TaskManager()
 class Test_SGlang:
     sglang = pytest.importorskip("sglang")
 
-    task_list = task_manager.load_task_or_group(["arc_easy", "gsm8k", "wikitext"])
+    task_list = task_manager.load(["arc_easy", "gsm8k", "wikitext"])["tasks"]
     multiple_choice_task = task_list["arc_easy"]  # type: ignore
     multiple_choice_task.build_all_requests(limit=10, rank=0, world_size=1)
     MULTIPLE_CH: list[Instance] = multiple_choice_task.instances

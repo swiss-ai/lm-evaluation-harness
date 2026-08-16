@@ -100,16 +100,20 @@ def test_mt_bench_multiturn_uses_chat_template_when_enabled():
 
 
 def test_mt_bench_multiturn_collects_two_responses(monkeypatch):
-    monkeypatch.setattr(
-        metric,
-        "_run_judging",
-        lambda items: [
+    def fake_run_judging(items):
+        return [
             {"question_id": items[0]["question_id"], "turn": 1, "score": 8.0},
             {"question_id": items[0]["question_id"], "turn": 2, "score": 6.0},
-        ],
-    )
+        ]
 
     task = _make_task()
+    # The refactored task loader may reload task-local modules while indexing. Patch
+    # the globals used by the concrete aggregation functions held by this task.
+    for aggregation in task.aggregation().values():
+        if hasattr(aggregation, "__globals__"):
+            monkeypatch.setitem(
+                aggregation.__globals__, "_run_judging", fake_run_judging
+            )
     task.build_all_requests(rank=0, world_size=1, limit=1)
     results = evaluate(
         lm=ScriptedLM(),

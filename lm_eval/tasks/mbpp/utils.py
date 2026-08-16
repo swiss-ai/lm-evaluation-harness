@@ -1,3 +1,4 @@
+import os
 import re
 
 import evaluate as hf_evaluate
@@ -12,6 +13,17 @@ try:
     results = pass_at_k.compute(references=test_cases, predictions=candidates, k=[1])
 except Exception as e:
     raise e
+
+
+def num_workers(predictions: list[list[str]]) -> int:
+    """Threads for ``code_eval``: one per candidate program.
+
+    Custom metrics are called once per document, so ``compute`` only ever sees that
+    doc's candidates and HF's default of 4 splits a self-consistency run's k samples
+    into several waves for no reason. Never drops below that default.
+    """
+    candidates = sum(len(p) for p in predictions)
+    return max(4, min(candidates, os.cpu_count() or 4))
 
 
 def pass_at_1(references: str | list[str], predictions: str | list[list[str]]) -> float:
@@ -52,6 +64,7 @@ def pass_at_k_metric(
         references=references,
         predictions=predictions,
         k=k,
+        num_workers=num_workers(predictions),
     )[0]
 
 

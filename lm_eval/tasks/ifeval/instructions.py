@@ -12,7 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Library of instructions."""
+"""Library of instructions.
+
+Note: the following checker classes are defined here but are NOT registered in
+`instructions_registry.INSTRUCTION_DICT` and are not referenced by any row in
+the published `google/IFEval` dataset — they are dead code retained from the
+upstream Google import (see TODOs in `instructions_registry.py`):
+
+  - `ConstrainedStartChecker`
+  - `RephraseChecker` (requires an `original_message` kwarg the dataset does not provide)
+  - `KeySentenceChecker`
+  - `RephraseParagraph`
+"""
 
 import collections
 import json
@@ -175,7 +186,7 @@ class ResponseLanguageChecker(Instruction):
             return langdetect.detect(value) == self._language
         except langdetect.LangDetectException as e:
             # Count as instruction is followed.
-            logging.error(
+            logger.error(
                 "Unable to detect language for text %s due to %s", value, e
             )  # refex: disable=pytotw.037
             return True
@@ -363,7 +374,7 @@ class ConstrainedResponseChecker(Instruction):
 
     def get_instruction_args(self):
         """Returns the keyword args of `build_description`."""
-        return None
+        return
 
     def get_instruction_args_keys(self):
         """Returns the args keys of `build_description`."""
@@ -386,6 +397,7 @@ class ConstrainedResponseChecker(Instruction):
         return False
 
 
+# Unused: disabled in instructions_registry.INSTRUCTION_DICT (no dataset rows reference this id).
 class ConstrainedStartChecker(Instruction):
     """Checks the response start."""
 
@@ -671,6 +683,8 @@ class PostscriptChecker(Instruction):
         return bool(postscript)
 
 
+# Unused: disabled in instructions_registry.INSTRUCTION_DICT (requires an `original_message`
+# kwarg that the published google/IFEval dataset does not provide).
 class RephraseChecker(Instruction):
     """Checks the rephrase."""
 
@@ -719,7 +733,6 @@ class RephraseChecker(Instruction):
           True if `value` and `instruction_args` only differ by the words/sentences
           in between two asterisks such as *change me*; otherwise, False.
         """
-
         if not self.is_change(value):
             raise ValueError(
                 f"value {value} does not contain changes in the form of *change me*."
@@ -736,7 +749,7 @@ class RephraseChecker(Instruction):
 
     def strip_changes(self, response):
         """Strips off the changes."""
-        return re.sub(r"\*.*\*", "", response)
+        return re.sub(r"\*.*?\*", "", response)
 
 
 class KeywordChecker(Instruction):
@@ -752,7 +765,6 @@ class KeywordChecker(Instruction):
         Returns:
           A string representing the instruction description.
         """
-
         if not keywords:
             self._keywords = instructions_util.generate_keywords(
                 num_keywords=_NUM_KEYWORDS
@@ -870,7 +882,6 @@ class NumberOfWords(Instruction):
         Returns:
           A string representing the instruction description.
         """
-
         self._num_words = num_words
         if self._num_words is None or self._num_words < 0:
             self._num_words = random.randint(
@@ -923,7 +934,7 @@ class JsonFormat(Instruction):
 
     def get_instruction_args(self):
         """Returns the keyword args of `build_description`."""
-        return None
+        return
 
     def get_instruction_args_keys(self):
         """Returns the args keys of `build_description`."""
@@ -1019,7 +1030,6 @@ class ParagraphFirstWordCheck(Instruction):
           True if the number of paragraphs is the same as required and the first
           word of the specified paragraph is the same as required. Otherwise, false.
         """
-
         paragraphs = re.split(r"\n\n", value)
         num_paragraphs = len(paragraphs)
 
@@ -1053,6 +1063,7 @@ class ParagraphFirstWordCheck(Instruction):
 
 
 # TODO(jeffrey) add relation - at least/at most?
+# Unused: disabled in instructions_registry.INSTRUCTION_DICT (no dataset rows reference this id).
 class KeySentenceChecker(Instruction):
     """Check the existence of certain key sentences."""
 
@@ -1068,10 +1079,9 @@ class KeySentenceChecker(Instruction):
         Returns:
           A string representing the instruction description.
         """
-
         if not key_sentences:
             # TODO(jeffrey) make a generate sentences function? wonderwords package
-            self._key_sentences = set(["For now, this is fine."])
+            self._key_sentences = {"For now, this is fine."}
         else:
             self._key_sentences = key_sentences
 
@@ -1123,7 +1133,6 @@ class ForbiddenWords(Instruction):
         Returns:
           A string representing the instruction description.
         """
-
         if not forbidden_words:
             self._forbidden_words = instructions_util.generate_keywords(
                 num_keywords=_NUM_KEYWORDS
@@ -1153,6 +1162,7 @@ class ForbiddenWords(Instruction):
         return True
 
 
+# Unused: disabled in instructions_registry.INSTRUCTION_DICT (no dataset rows reference this id).
 class RephraseParagraph(Instruction):
     """Checks that the paragraph is rephrased."""
 
@@ -1226,7 +1236,7 @@ class TwoResponsesChecker(Instruction):
 
     def get_instruction_args(self):
         """Returns the keyword args of `build_description`."""
-        return None
+        return
 
     def get_instruction_args_keys(self):
         """Returns the args keys of `build_description`."""
@@ -1241,7 +1251,7 @@ class TwoResponsesChecker(Instruction):
         Returns:
           True if two responses are detected and false otherwise.
         """
-        valid_responses = list()
+        valid_responses = []
         responses = value.split("******")
         for index, response in enumerate(responses):
             if not response.strip():
@@ -1457,7 +1467,7 @@ class CapitalLettersEnglishChecker(Instruction):
             return value.isupper() and langdetect.detect(value) == "en"
         except langdetect.LangDetectException as e:
             # Count as instruction is followed.
-            logging.error(
+            logger.error(
                 "Unable to detect language for text %s due to %s", value, e
             )  # refex: disable=pytotw.037
             return True
@@ -1489,7 +1499,7 @@ class LowercaseLettersEnglishChecker(Instruction):
             return value.islower() and langdetect.detect(value) == "en"
         except langdetect.LangDetectException as e:
             # Count as instruction is followed.
-            logging.error(
+            logger.error(
                 "Unable to detect language for text %s due to %s", value, e
             )  # refex: disable=pytotw.037
             return True
@@ -1595,7 +1605,7 @@ class QuotationChecker(Instruction):
 
     def get_instruction_args(self):
         """Returns the keyword args of build description."""
-        return None
+        return
 
     def get_instruction_args_keys(self):
         """Returns the args keys of `build_description`."""

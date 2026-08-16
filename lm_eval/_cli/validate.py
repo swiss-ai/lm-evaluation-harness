@@ -95,6 +95,7 @@ class Validate(SubCommand):
     def _execute(self, args: argparse.Namespace) -> None:
         """Execute the validate command."""
         from lm_eval.tasks import TaskManager
+        from lm_eval.tasks.manager import task_not_found_message
 
         task_manager = TaskManager(include_path=args.include_path)
         task_list = args.tasks.split(",")
@@ -106,7 +107,7 @@ class Validate(SubCommand):
 
         if task_missing:
             missing = ", ".join(task_missing)
-            print(f"Tasks not found: {missing}")
+            print(task_not_found_message(missing))
             sys.exit(1)
         else:
             print("All tasks found and valid")

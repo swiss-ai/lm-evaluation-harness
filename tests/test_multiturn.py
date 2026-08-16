@@ -2,7 +2,8 @@ import numpy as np
 
 from lm_eval.api.model import LM
 from lm_eval.api.task import ConfigurableTask
-from lm_eval.evaluator import evaluate
+from lm_eval.evaluator import evaluate, simple_evaluate
+from lm_eval.tasks import TaskManager
 
 
 class ListDocs(list):
@@ -19,6 +20,13 @@ class ScriptedLM(LM):
         raise NotImplementedError
 
     def generate_until(self, requests):
+        for request in requests:
+            request.length_info.append(
+                {
+                    "response_length_chars": len(request.arguments[0]),
+                    "thinking_format_correct": int(request.arguments[0] == "first"),
+                }
+            )
         return [f"response to {request.arguments[0]}" for request in requests]
 
 
@@ -95,9 +103,45 @@ def test_multi_turn_generate_batches_episode_waves():
         limit=1,
         bootstrap_iters=0,
         log_samples=True,
+        log_length_metrics=True,
     )
 
     assert results["results"]["toy_multiturn"]["acc,none"] == 1.0
+    assert results["results"]["toy_multiturn"]["response_length_chars,none"] == 5.5
+    assert results["results"]["toy_multiturn"]["thinking_format_correct,none"] == 0.5
+    assert len(results["samples"]["toy_multiturn"][0]["length_info"][0]) == 2
+
+
+def test_simple_evaluate_applies_overrides_to_flat_multiturn_task_mapping():
+    task = ToyMultiturnTask(
+        config={
+            "task": "toy_multiturn_simple_evaluate",
+            "output_type": "multi_turn_generate",
+            "test_split": "test",
+            "num_fewshot": 0,
+            "metric_list": [
+                {
+                    "metric": "acc",
+                    "aggregation": "mean",
+                    "higher_is_better": True,
+                }
+            ],
+            "generation_kwargs": {"until": []},
+            "metadata": {"version": 1},
+        }
+    )
+
+    results = simple_evaluate(
+        model=ScriptedLM(),
+        tasks=[task],
+        task_manager=TaskManager(),
+        gen_kwargs={"max_gen_toks": 7},
+        limit=1,
+        bootstrap_iters=0,
+    )
+
+    assert results["results"]["toy_multiturn_simple_evaluate"]["acc,none"] == 1.0
+    assert task.config.generation_kwargs == {"until": [], "max_gen_toks": 7}
 
 
 class ToyScriptedTask(ConfigurableTask):

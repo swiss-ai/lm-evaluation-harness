@@ -17,7 +17,9 @@ if _METRICS_CACHE_KEY not in sys.modules:
     # Verify remote API connection
     _test = try_remote_generate("hello there")
 
-    _tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen3.5-27B")
+    _tokenizer = AutoTokenizer.from_pretrained(
+        os.getenv("HALLULENS_JUDGE_TOKENIZER", "Qwen/Qwen3.5-27B")
+    )
     if _test is None:
         raise RuntimeError(
             "Remote generation failed, cannot connect to the model API. Please check your connection and API key."
@@ -38,35 +40,38 @@ model = _metrics_cache["model"]
 home_dir = os.path.expanduser("~")
 local_db = os.path.join(home_dir, "wiki_data/enwiki-20230401.db")
 local_titles = os.path.join(home_dir, "wiki_data/enwiki-2024.titles.txt")
-
-if not os.path.exists(local_db):
-    hf_hub_download(
-        repo_id="swiss-ai/hallulens",
-        filename="wiki_data/enwiki-20230401.db",
-        local_dir=home_dir,
-        repo_type="dataset",
-    )
-
 local_title_db = local_db.replace(".db", "-title.db")
-# Use size check: SQLite auto-creates an empty file (~0 bytes) when connecting
-# to a non-existent path, so os.path.exists alone is not a reliable guard.
-if not os.path.exists(local_title_db) or os.path.getsize(local_title_db) < 1024:
-    if os.path.exists(local_title_db):
-        os.remove(local_title_db)
-    hf_hub_download(
-        repo_id="alexanderstern/hallulens",
-        filename="wiki_data/enwiki-20230401-title.db",
-        local_dir=home_dir,
-        repo_type="dataset",
-    )
 
-if not os.path.exists(local_titles):
-    hf_hub_download(
-        repo_id="swiss-ai/hallulens",
-        filename="wiki_data/enwiki-2024.titles.txt",
-        local_dir=home_dir,
-        repo_type="dataset",
-    )
+
+def _download_wiki_data():
+    """Download the LongWiki DB (~22GB) + title DB + titles. Called lazily (only
+    when a longwiki task actually runs), so precise_wiki / nonsensical / generated /
+    mixed do not need the ~22GB DB just to import this module."""
+    if not os.path.exists(local_db):
+        hf_hub_download(
+            repo_id="swiss-ai/hallulens",
+            filename="wiki_data/enwiki-20230401.db",
+            local_dir=home_dir,
+            repo_type="dataset",
+        )
+    # Use size check: SQLite auto-creates an empty file (~0 bytes) when connecting
+    # to a non-existent path, so os.path.exists alone is not a reliable guard.
+    if not os.path.exists(local_title_db) or os.path.getsize(local_title_db) < 1024:
+        if os.path.exists(local_title_db):
+            os.remove(local_title_db)
+        hf_hub_download(
+            repo_id="alexanderstern/hallulens",
+            filename="wiki_data/enwiki-20230401-title.db",
+            local_dir=home_dir,
+            repo_type="dataset",
+        )
+    if not os.path.exists(local_titles):
+        hf_hub_download(
+            repo_id="swiss-ai/hallulens",
+            filename="wiki_data/enwiki-2024.titles.txt",
+            local_dir=home_dir,
+            repo_type="dataset",
+        )
 
 
 IS_HALLUCINATION_RESPONSE = """You are given a question, a response, and a correct answer to the prompt.\
@@ -174,19 +179,24 @@ _eval_cache = sys.modules[_EVAL_CACHE_KEY]
 _eval_cache_lock = sys.modules[_EVAL_CACHE_LOCK_KEY]
 
 _LONGWIKI_EVALUATOR_KEY = "__hallulens_longwiki_evaluator__"
-if _LONGWIKI_EVALUATOR_KEY not in sys.modules:
-    sys.modules[_LONGWIKI_EVALUATOR_KEY] = FactHalu(
-        abstention_model=model,
-        abstention_tokenizer=tokenizer,
-        claim_extractor=model,
-        claim_extractor_tokenizer=tokenizer,
-        claim_verifier=model,
-        claim_verifier_tokenizer=tokenizer,
-        k=32,
-        db_path=local_db,
-    )
 
-_longwiki_evaluator = sys.modules[_LONGWIKI_EVALUATOR_KEY]
+
+def _get_longwiki_evaluator():
+    """Build the LongWiki evaluator on first use -- it opens the ~22GB DB, so only
+    longwiki pays for it (precise_wiki / nonsensical / generated / mixed do not)."""
+    if _LONGWIKI_EVALUATOR_KEY not in sys.modules:
+        _download_wiki_data()
+        sys.modules[_LONGWIKI_EVALUATOR_KEY] = FactHalu(
+            abstention_model=model,
+            abstention_tokenizer=tokenizer,
+            claim_extractor=model,
+            claim_extractor_tokenizer=tokenizer,
+            claim_verifier=model,
+            claim_verifier_tokenizer=tokenizer,
+            k=32,
+            db_path=local_db,
+        )
+    return sys.modules[_LONGWIKI_EVALUATOR_KEY]
 
 
 def replace_none_with_nan(scores):
@@ -221,7 +231,7 @@ def _evaluate_single(item):
         title = doc["title"]
         reference = doc["reference"]
         result = replace_none_with_nan(
-            _longwiki_evaluator.run(original_prompt, completion, title, reference)
+            _get_longwiki_evaluator().run(original_prompt, completion, title, reference)
         )
 
     elif category == "mixed_entities":
@@ -270,7 +280,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
         idx = longwiki_indices[pos]
         doc = items[idx]["doc"]
         completion = items[idx]["completion"]
-        gen, claims, partial_result = _longwiki_evaluator.extract_phase(
+        gen, claims, partial_result = _get_longwiki_evaluator().extract_phase(
             doc["prompt"], completion, doc["title"], doc.get("reference")
         )
         return pos, gen, claims, partial_result
@@ -294,7 +304,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
         flush=True,
     )
 
-    _longwiki_evaluator.bulk_prewarm(all_claims_tuples)
+    _get_longwiki_evaluator().bulk_prewarm(all_claims_tuples)
 
     print("[LONGWIKI] Phase 3: verify + score in parallel...", flush=True)
 
@@ -303,7 +313,7 @@ def _run_longwiki_batch(items, longwiki_indices, results, max_workers):
         gen, claims, partial_result = extraction_data[pos]
         if not claims:
             return pos, partial_result
-        result = _longwiki_evaluator.verify_and_score_phase(gen, claims, partial_result)
+        result = _get_longwiki_evaluator().verify_and_score_phase(gen, claims, partial_result)
         return pos, result
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:

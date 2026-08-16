@@ -2140,7 +2140,6 @@ def doc_to_text_hard(doc) -> str:
         f"D. {choices[3]} \nAnswer:"
     )
 
-    print(prompt)
     return prompt
 
 

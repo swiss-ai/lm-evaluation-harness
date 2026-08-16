@@ -36,7 +36,7 @@ def parse_args():
 
 
 def sanitize_string(model_args_raw: str | dict) -> str:
-    """Sanitize the model_args string or dict"""
+    """Sanitize the model_args string or dict."""
     # Convert to string if it's a dictionary
     model_args_str = (
         json.dumps(model_args_raw)
@@ -78,11 +78,15 @@ def main():
         old_tasks = tasks.copy()
         task_count = len(tasks)
         model_tasks = set(tasks_for_model(model, args.data_path))
-        tasks.intersection(set(model_tasks))
+        tasks &= set(model_tasks)
 
         if task_count != len(tasks):
             eval_logger.warning(
-                f"All models must have the same tasks. {model} has tasks: {model_tasks} but have already recorded tasks: {old_tasks}. Taking intersection {tasks}"
+                "All models must have the same tasks. %s has tasks: %s but have already recorded tasks: %s. Taking intersection %s",
+                model,
+                model_tasks,
+                old_tasks,
+                tasks,
             )
 
     assert len(tasks) > 0, (

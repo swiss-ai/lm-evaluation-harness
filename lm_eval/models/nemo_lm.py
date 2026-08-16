@@ -16,6 +16,7 @@ import contextlib
 import importlib
 import logging
 import pathlib
+import tempfile
 from copy import deepcopy
 from typing import Literal
 
@@ -307,24 +308,23 @@ class NeMoLM(LM):
     def world_size(self):
         return self._world_size
 
-    @property
-    def accelerator(self):
-        return self._Accelerator(self.world_size)
+    def all_gather(self, tensor):
+        if self.world_size <= 1:
+            return tensor
+        gathered = [torch.zeros_like(tensor) for _ in range(self.world_size)]
+        torch.distributed.all_gather(gathered, tensor)
+        return torch.cat(gathered)
 
-    class _Accelerator:
-        def __init__(self, world_size):
-            self.world_size = world_size
+    def gather_object(self, obj, dst=0):
+        if self.world_size <= 1:
+            return [obj]
+        result = [None] * self.world_size if self.rank == dst else None
+        torch.distributed.gather_object(obj=obj, object_gather_list=result, dst=dst)
+        return result
 
-        def wait_for_everyone(self):
+    def barrier(self):
+        if self.world_size > 1:
             torch.distributed.barrier()
-
-        def gather(self, local_tensor):
-            gathered_tensors = [
-                torch.zeros(1, dtype=local_tensor.dtype).cuda()
-                for _ in range(self.world_size)
-            ]
-            torch.distributed.all_gather(gathered_tensors, local_tensor)
-            return torch.cat(gathered_tensors)
 
     def tok_encode(self, string: str):
         return self.tokenizer.text_to_ids(string)
@@ -459,6 +459,7 @@ class NeMoLM(LM):
                 ctxlens,
                 contlens,
                 chunk,
+                strict=True,
             ):
                 # Trim at contlen since shorter contexts in a batch will have more than one token generated.
                 # Use ctxlen-1 instead of ctxlen same as for full_logprob in batch_greedy_tokens calculation
@@ -506,7 +507,7 @@ class NeMoLM(LM):
         )
         chunks = re_ords.get_batched(n=self.batch_size, batch_fn=None)
         for chunk in chunks:
-            contexts, all_gen_kwargs = zip(*chunk)
+            contexts, all_gen_kwargs = zip(*chunk, strict=True)
             # we assume all gen kwargs in the batch are the same
             # this is safe to assume because the `grouper` object ensures it.
             req_args = all_gen_kwargs[0]
@@ -532,13 +533,13 @@ class NeMoLM(LM):
             answers = output["sentences"]
 
             continuations = []
-            for context, answer in zip(contexts, answers):
+            for context, answer in zip(contexts, answers, strict=True):
                 continuations.append(answer[len(context) :])
 
             for term in until:
                 continuations = [answer.split(term)[0] for answer in continuations]
 
-            for request, answer in zip(chunk, continuations):
+            for request, answer in zip(chunk, continuations, strict=True):
                 self.cache_hook.add_partial("greedy_until", request, answer)
                 res.append(answer)
 

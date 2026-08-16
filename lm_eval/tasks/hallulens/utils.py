@@ -9,7 +9,7 @@ import torch
 
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
-MODEL_NAME = "Qwen/Qwen3.5-27B"
+MODEL_NAME = os.getenv("HALLULENS_JUDGE_MODEL", "Qwen/Qwen3.5-27B")
 
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=20):
@@ -186,10 +186,11 @@ def generate_batch(
 
 def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
     def check_validity(gen):
-        if f'{{"{key}":false}}' in gen.lower():
-            return f'{{"{key}":false}}'
-        elif f'{{"{key}":true}}' in gen.lower():
-            return f'{{"{key}":true}}'
+        g = "".join(gen.lower().split())  # drop all whitespace; matches ": true" and ```json fences
+        if '{{"{}":false}}'.format(key) in g:
+            return '{{"{}":false}}'.format(key)
+        elif '{{"{}":true}}'.format(key) in g:
+            return '{{"{}":true}}'.format(key)
         else:
             return -1
 
@@ -275,11 +276,9 @@ def calculate_all_metrics(final_results_df, k=32):
     final_results_df["recall"] = final_results_df.groupby(
         "prompt"
     ).is_supported.transform(lambda g: min(g.sum() / k, 1))
-    final_results_df = (
-        final_results_df.groupby("prompt", group_keys=False)
-        .apply(f1_score)  # , include_groups=False) # NOTE: python 3.9 <
-        .reset_index()
-    )
+    final_results_df["f1"] = (
+        2 * final_results_df.precision * final_results_df.recall
+    ) / (final_results_df.precision + final_results_df.recall).replace(0, 1)
     final_results_df["k"] = k
     final_results_df["n_claims"] = final_results_df.groupby(
         "prompt"
@@ -303,23 +302,15 @@ def calculate_all_metrics(final_results_df, k=32):
     return final_results_df
 
 
-def f1_score(g):
-    prec = g.precision.iloc[0]
-    rec = g.recall.iloc[0]
-    f1 = 0 if prec + rec == 0 else 2 * prec * rec / (prec + rec)
-    g["f1"] = f1
-    return g
-
-
 def jsonify_ans(
     raw_response: list[str], eval_prompt: list[str], key: str, model, tokenizer
 ):
     def check_validity(gen):
-        gen_nospace = gen.replace(" ", "")
-        if f'{{"{key}":false}}' in gen_nospace:
-            return f'{{"{key}":false}}'
-        elif f'{{"{key}":true}}' in gen_nospace:
-            return f'{{"{key}":true}}'
+        gen_nospace = "".join(gen.lower().split())  # drop all whitespace + lowercase; handles ": true", newlines, ```json fences
+        if '{{"{}":false}}'.format(key) in gen_nospace:
+            return '{{"{}":false}}'.format(key)
+        elif '{{"{}":true}}'.format(key) in gen_nospace:
+            return '{{"{}":true}}'.format(key)
         else:
             return -1
 

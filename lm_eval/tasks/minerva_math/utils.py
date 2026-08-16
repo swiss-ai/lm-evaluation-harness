@@ -2,20 +2,25 @@ import logging
 import re
 import signal
 from collections import Counter
+from functools import cache
 from importlib.metadata import version
+from importlib.util import find_spec
 
 import datasets
 
 
 eval_logger = logging.getLogger(__name__)
 
+INVALID_ANSWER = "[invalidanswer]"
+
 
 try:
-    import antlr4  # noqa: F401
     import sympy
     from math_verify import parse, verify
     from sympy.parsing.latex import parse_latex
 
+    if find_spec("antlr4") is None:
+        raise ModuleNotFoundError("No module named 'antlr4'")
     assert version("antlr4-python3-runtime").startswith("4.11")
 except (ModuleNotFoundError, AssertionError) as e:
     raise type(e)(
@@ -77,10 +82,7 @@ def process_results(doc: dict, results: list[str]) -> dict[str, int]:
     unnormalized_answer = get_unnormalized_answer(candidates)
     answer = normalize_final_answer(unnormalized_answer)
 
-    if is_equiv(answer, doc["answer"]):
-        retval = 1
-    else:
-        retval = 0
+    retval = 1 if is_equiv(answer, doc["answer"]) else 0
 
     # math_verify
     _mvres = verify(
@@ -100,15 +102,58 @@ def process_results(doc: dict, results: list[str]) -> dict[str, int]:
 # The filters below collapse the k repeats to one representative response; the
 # mean@k filter (take_first_k) instead passes them all through, and
 # process_results_sc averages exact_match / math_verify over the list.
+#
+# Scoring one response is expensive -- `is_equiv` runs sympy `simplify` under a 5s
+# timeout and math_verify has to parse the whole generation -- and the same
+# response is scored many times over: once inside PassAtKFilter, and again for
+# every filter that selects it (score-first / maj@k / pass@k all tend to pick a
+# response that mean@k already scored). So per-response scores and the parsed gold
+# solution are memoized. The cache keys are response/solution strings that the
+# Instances hold onto anyway, so this costs references, not copies.
+
+
+@cache
+def _parse_gold(solution: str):
+    """math_verify's parse of the gold solution -- identical for all k samples of a doc."""
+    return parse(solution)
+
+
+@cache
+def _score(response: str, gold_answer: str, solution: str) -> tuple[int, int]:
+    """``(exact_match, math_verify)`` for a single response against a doc's gold."""
+    answer = _sc_answer(response)
+    em = 1 if answer and is_equiv(answer, gold_answer) else 0
+    try:
+        mv = 1 if verify(gold=_parse_gold(solution), target=parse(response)) else 0
+    except Exception:
+        mv = 0
+    return em, mv
+
+
+def _score_doc(response: str, doc: dict) -> tuple[int, int]:
+    return _score(response, doc["answer"], doc["solution"])
 
 
 def _sc_answer(response: str) -> str:
-    """Normalized final answer extracted from a response (for voting / equivalence)."""
-    return normalize_final_answer(get_unnormalized_answer(response))
+    """Normalized final answer extracted from a response (``""`` if it has none).
 
-
-def _is_correct(response: str, doc: dict) -> bool:
-    return is_equiv(_sc_answer(response), doc["answer"])
+    Prefers the Minerva few-shot format (``Final Answer: The final answer is ...``)
+    and falls back to the last ``\\boxed{...}``, which is what models actually emit
+    zero-shot. Without the fallback every zero-shot response extracts as
+    ``[invalidanswer]``: exact_match collapses to 0 and the majority vote becomes a
+    tie between non-answers. Returning ``""`` rather than the sentinel is what lets
+    the filters below drop responses with no answer.
+    """
+    answer = get_unnormalized_answer(response)
+    if answer == INVALID_ANSWER:
+        boxed = last_boxed_only_string(response)
+        if boxed is None:
+            return ""
+        try:
+            answer = remove_boxed(boxed)
+        except AssertionError:
+            return ""
+    return normalize_final_answer(answer)
 
 
 class MajorityVoteFilter:
@@ -133,19 +178,22 @@ class MajorityVoteFilter:
 
 
 class PassAtKFilter:
-    """pass@k: returns a correct response if any of the k exists, else the first
-    (correctness via ``is_equiv``). With n == k this is the unbiased pass@k.
-    Chain a ``take_first`` after this filter."""
+    """pass@k: returns a correct response if any of the k exists, else the first.
+    With n == k this is the unbiased pass@k. Chain a ``take_first`` after this filter.
+
+    A response correct under *both* exact_match and math_verify is preferred, so
+    that both reported metrics are a true pass@k whenever one response satisfies
+    both; otherwise exact_match wins the tie-break."""
 
     def __init__(self, **kwargs) -> None:
         pass
 
     def apply(self, resps, docs):
         def select(resp_list, doc):
-            for resp in resp_list:
-                if _is_correct(resp, doc):
-                    return resp
-            return resp_list[0]
+            # `max` keeps the first maximal element, so an all-wrong set of samples
+            # falls back to the first response.
+            scored = [(_score_doc(resp, doc), resp) for resp in resp_list]
+            return max(scored, key=lambda item: (sum(item[0]), item[0][0]))[1]
 
         return [[select(r, d)] for r, d in zip(resps, docs)]
 
@@ -161,19 +209,11 @@ def process_results_sc(doc: dict, results: list) -> dict[str, float]:
     response = results[0]
     responses = list(response) if isinstance(response, list) else [response]
 
-    em, mv = [], []
-    for cand in responses:
-        answer = normalize_final_answer(get_unnormalized_answer(cand))
-        em.append(1 if is_equiv(answer, doc["answer"]) else 0)
-        try:
-            ok = verify(gold=parse(doc["solution"]), target=parse(cand))
-        except Exception:
-            ok = False
-        mv.append(1 if ok else 0)
+    scores = [_score_doc(cand, doc) for cand in responses]
 
     return {
-        "exact_match": sum(em) / len(em),
-        "math_verify": sum(mv) / len(mv),
+        "exact_match": sum(em for em, _ in scores) / len(scores),
+        "math_verify": sum(mv for _, mv in scores) / len(scores),
     }
 
 
@@ -199,10 +239,7 @@ def last_boxed_only_string(string: str) -> str | None:
                 break
         i += 1
 
-    if right_brace_idx is None:
-        retval = None
-    else:
-        retval = string[idx : right_brace_idx + 1]
+    retval = None if right_brace_idx is None else string[idx : right_brace_idx + 1]
 
     return retval
 
@@ -278,17 +315,28 @@ def is_equiv(x1: str, x2: str) -> bool:
 
 
 def get_unnormalized_answer(text: str) -> str:
-    INVALID_ANSWER = "[invalidanswer]"
     end_seq = "I hope it is correct."
-    text += end_seq
     match = re.search(
         r"Final Answer: The final answer is(.*?). I hope it is correct.",
-        text,
+        # NB: end_seq is appended with a separating space. Concatenating it directly
+        # produces "...is 7.I hope it is correct.", and the pattern requires ". I hope",
+        # so the patch-up never fired for text ending on a bare period.
+        text + " " + end_seq,
     )
     if match:
         return match.group(1).strip()
-    else:
-        return INVALID_ANSWER
+
+    # Fall back to the model's own \boxed{...} (as used for the gold solution
+    # above): some completions never emit the "I hope it is correct." phrase at
+    # all, so the regex above never matches even when $X$ is correct.
+    boxed = last_boxed_only_string(text)
+    if boxed is not None:
+        try:
+            return remove_boxed(boxed)
+        except (AssertionError, IndexError):
+            pass
+
+    return INVALID_ANSWER
 
 
 SUBSTITUTIONS = [

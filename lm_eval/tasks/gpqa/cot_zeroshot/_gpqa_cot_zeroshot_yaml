@@ -50,4 +50,4 @@ metric_list:
     ignore_punctuation: true
     #filter_list: ordered-extract
 metadata:
-  version: 1.0
+  version: 2.2
