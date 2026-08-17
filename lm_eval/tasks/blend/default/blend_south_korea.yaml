@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_south_korea_processor_yaml
 task: blend_south_korea
-process_docs: !function ../utils.process_south_korea 

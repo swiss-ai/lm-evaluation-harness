@@ -1,4 +1,3 @@
-include: ../_base_template_yaml
+include: ../_geography_template_yaml
 dataset_name: English
-process_docs: !function ../utils.process_geography
 task: switzerland_qa_en_geography_0shot_cot

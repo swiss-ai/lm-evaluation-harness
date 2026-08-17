@@ -1,0 +1,2 @@
+include: _base_template.yaml
+process_docs: !function utils.process_geography

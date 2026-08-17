@@ -1,0 +1,2 @@
+include: _base_template_yaml
+process_docs: !function utils.process_social_life

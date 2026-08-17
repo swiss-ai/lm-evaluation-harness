@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_indonesia_processor_yaml
 task: blend_indonesia_sample
-process_docs: !function ../utils.process_indonesia 

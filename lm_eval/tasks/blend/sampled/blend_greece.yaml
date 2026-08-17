@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_greece_processor_yaml
 task: blend_greece_sample
-process_docs: !function ../utils.process_greece 
