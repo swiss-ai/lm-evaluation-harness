@@ -11,7 +11,7 @@ import aiohttp
 
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
-MODEL_NAME = "Qwen/Qwen3.5-27B"
+MODEL_NAME = os.getenv("HALLULENS_JUDGE_MODEL", "Qwen/Qwen3.5-27B")
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=20):
     """
@@ -182,9 +182,10 @@ def generate_batch(
 
 def jsonify_ans_longwiki(raw_responses, eval_prompts, model, tokenizer, key):
     def check_validity(gen):
-        if '{{"{}":false}}'.format(key) in gen.lower():
+        g = "".join(gen.lower().split())  # drop all whitespace; matches ": true" and ```json fences
+        if '{{"{}":false}}'.format(key) in g:
             return '{{"{}":false}}'.format(key)
-        elif '{{"{}":true}}'.format(key) in gen.lower():
+        elif '{{"{}":true}}'.format(key) in g:
             return '{{"{}":true}}'.format(key)
         else:
             return -1
@@ -296,7 +297,7 @@ def jsonify_ans(
     raw_response: List[str], eval_prompt: List[str], key: str, model, tokenizer
 ):
     def check_validity(gen):
-        gen_nospace = gen.replace(" ", "")
+        gen_nospace = "".join(gen.lower().split())  # drop all whitespace + lowercase; handles ": true", newlines, ```json fences
         if '{{"{}":false}}'.format(key) in gen_nospace:
             return '{{"{}":false}}'.format(key)
         elif '{{"{}":true}}'.format(key) in gen_nospace:

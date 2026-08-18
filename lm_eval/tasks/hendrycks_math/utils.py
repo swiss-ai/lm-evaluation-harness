@@ -2,7 +2,7 @@ import logging
 import re
 import signal
 from importlib.metadata import version
-from typing import Dict, List, Optional
+from importlib.util import find_spec
 
 import datasets
 
@@ -11,11 +11,12 @@ eval_logger = logging.getLogger(__name__)
 
 
 try:
-    import antlr4
     import sympy
     from math_verify import parse, verify
     from sympy.parsing.latex import parse_latex
 
+    if find_spec("antlr4") is None:
+        raise ModuleNotFoundError("No module named 'antlr4'")
     assert version("antlr4-python3-runtime").startswith("4.11")
 except (ModuleNotFoundError, AssertionError) as e:
     raise type(e)(
@@ -69,28 +70,25 @@ def list_fewshot_samples() -> list[dict]:
             "few_shot": "1",
         },
         {
-            "problem": "One sphere is centered at $(3,-5,7)$ with radius $5 \sqrt{5}.$ A second sphere is centered at $(0,1,1)$ with radius $2 \sqrt{17}.$ The two spheres intersect in a circle. Find the radius of this circle.",
-            "solution": 'Let $A = (3,-5,7),$ the center of the first sphere, and let $B = (0,1,1),$ the center of the second sphere. We can compute that $AB = 9.$ Let $C$ be a point on the intersection of both spheres, so $AC = 5 \sqrt{5}$ and $BC = 2 \sqrt{17}.$ [asy] unitsize(0.3 cm);\n\npair A, B, C;\n\nA = (0,0);\nB = (9,0);\nC = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\n\ndraw(A--B--C--cycle);\ndraw(Circle(A,5*sqrt(5)));\ndraw(Circle(B,2*sqrt(17)));\n\nlabel("$A$", A, W);\nlabel("$B$", B, S);\nlabel("$C$", C, N);\nlabel("$9$", (A + B)/2, S, red);\nlabel("$5 \\sqrt{5}$", (A + C)/2, NW, red, UnFill);\nlabel("$2 \\sqrt{17}$", (B + C)/2, E, red, UnFill);\n[/asy]\n\nBy Heron\'s formula, we can compute that $[ABC] = 3 \\sqrt{149}.$\n\nLet $D$ be the foot of the perpendicular from $C$ to $\\overline{AB}.$\n\n[asy]\nunitsize(0.3 cm);\n\npair A, B, C, D;\n\nA = (0,0);\nB = (9,0);\nC = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\nD = (C.x,0);\n\ndraw(A--B--C--cycle);\ndraw(C--D);\n\nlabel("$A$", A, W);\nlabel("$B$", B, S);\nlabel("$C$", C, N);\nlabel("$D$", D, S);\n[/asy]\n\nThen the intersection of both spheres is the circle centered at $D$ with radius $CD.$ Thus,\n\\[CD = \\frac{2 [ABC]}{AB} = \\frac{6 \\sqrt{149}}{9} = \\boxed{\\frac{2 \\sqrt{149}}{3}}.\\] \nFinal Answer: The final answer is $\\frac{2 \\sqrt{149}}{3}$.',
+            "problem": "One sphere is centered at $(3,-5,7)$ with radius $5 \\sqrt{5}.$ A second sphere is centered at $(0,1,1)$ with radius $2 \\sqrt{17}.$ The two spheres intersect in a circle. Find the radius of this circle.",
+            "solution": 'Let $A = (3,-5,7),$ the center of the first sphere, and let $B = (0,1,1),$ the center of the second sphere. We can compute that $AB = 9.$ Let $C$ be a point on the intersection of both spheres, so $AC = 5 \\sqrt{5}$ and $BC = 2 \\sqrt{17}.$ [asy] unitsize(0.3 cm);\n\npair A, B, C;\n\nA = (0,0);\nB = (9,0);\nC = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\n\ndraw(A--B--C--cycle);\ndraw(Circle(A,5*sqrt(5)));\ndraw(Circle(B,2*sqrt(17)));\n\nlabel("$A$", A, W);\nlabel("$B$", B, S);\nlabel("$C$", C, N);\nlabel("$9$", (A + B)/2, S, red);\nlabel("$5 \\sqrt{5}$", (A + C)/2, NW, red, UnFill);\nlabel("$2 \\sqrt{17}$", (B + C)/2, E, red, UnFill);\n[/asy]\n\nBy Heron\'s formula, we can compute that $[ABC] = 3 \\sqrt{149}.$\n\nLet $D$ be the foot of the perpendicular from $C$ to $\\overline{AB}.$\n\n[asy]\nunitsize(0.3 cm);\n\npair A, B, C, D;\n\nA = (0,0);\nB = (9,0);\nC = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\nD = (C.x,0);\n\ndraw(A--B--C--cycle);\ndraw(C--D);\n\nlabel("$A$", A, W);\nlabel("$B$", B, S);\nlabel("$C$", C, N);\nlabel("$D$", D, S);\n[/asy]\n\nThen the intersection of both spheres is the circle centered at $D$ with radius $CD.$ Thus,\n\\[CD = \\frac{2 [ABC]}{AB} = \\frac{6 \\sqrt{149}}{9} = \\boxed{\\frac{2 \\sqrt{149}}{3}}.\\] \nFinal Answer: The final answer is $\\frac{2 \\sqrt{149}}{3}$.',
             "few_shot": "1",
         },
         {
             "problem": "Ryan has 3 red lava lamps and 3 blue lava lamps. He arranges them in a row on a shelf randomly, then turns 3 random lamps on. What is the probability that the leftmost lamp on the shelf is red, and the leftmost lamp which is turned on is also red?",
-            "solution": "There are $\binom{6}{3}=20$ ways for Ryan to arrange the lamps, and $\binom{6}{3}=20$ ways for him to choose which lamps are on, giving $20\cdot20=400$ total possible outcomes. There are two cases for the desired outcomes: either the left lamp is on, or it isn't. If the left lamp is on, there are $\binom{5}{2}=10$ ways to choose which other lamps are on, and $\binom{5}{2}=10$ ways to choose which other lamps are red. This gives $10\cdot10=100$ possibilities. If the first lamp isn't on, there are $\binom{5}{3}=10$ ways to choose which lamps are on, and since both the leftmost lamp and the leftmost lit lamp must be red, there are $\binom{4}{1}=4$ ways to choose which other lamp is red. This case gives 40 valid possibilities, for a total of 140 valid arrangements out of 400. Therefore, the probability is $\dfrac{140}{400}=\boxed{\dfrac{7}{20}}$. \nFinal Answer: The final answer is $\dfrac{7}{20}$.",
+            "solution": "There are $\binom{6}{3}=20$ ways for Ryan to arrange the lamps, and $\binom{6}{3}=20$ ways for him to choose which lamps are on, giving $20\\cdot20=400$ total possible outcomes. There are two cases for the desired outcomes: either the left lamp is on, or it isn't. If the left lamp is on, there are $\binom{5}{2}=10$ ways to choose which other lamps are on, and $\binom{5}{2}=10$ ways to choose which other lamps are red. This gives $10\\cdot10=100$ possibilities. If the first lamp isn't on, there are $\binom{5}{3}=10$ ways to choose which lamps are on, and since both the leftmost lamp and the leftmost lit lamp must be red, there are $\binom{4}{1}=4$ ways to choose which other lamp is red. This case gives 40 valid possibilities, for a total of 140 valid arrangements out of 400. Therefore, the probability is $\\dfrac{140}{400}=\boxed{\\dfrac{7}{20}}$. \nFinal Answer: The final answer is $\\dfrac{7}{20}$.",
             "few_shot": "1",
         },
     ]
 
 
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
+def process_results(doc: dict, results: list[str]) -> dict[str, int]:
     candidates = results[0]
 
     unnormalized_answer = get_unnormalized_answer(candidates)
     answer = normalize_final_answer(unnormalized_answer)
 
-    if is_equiv(answer, doc["answer"]):
-        retval = 1
-    else:
-        retval = 0
+    retval = 1 if is_equiv(answer, doc["answer"]) else 0
 
     # math_verify
     res = verify(parse(doc["answer"]), parse(candidates))
@@ -103,7 +101,7 @@ def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
     return results
 
 
-def last_boxed_only_string(string: str) -> Optional[str]:
+def last_boxed_only_string(string: str) -> str | None:
     idx = string.rfind("\\boxed")
     if "\\boxed " in string:
         return "\\boxed " + string.split("\\boxed ")[-1].split("$")[0]
@@ -125,10 +123,7 @@ def last_boxed_only_string(string: str) -> Optional[str]:
                 break
         i += 1
 
-    if right_brace_idx is None:
-        retval = None
-    else:
-        retval = string[idx : right_brace_idx + 1]
+    retval = None if right_brace_idx is None else string[idx : right_brace_idx + 1]
 
     return retval
 
@@ -187,10 +182,7 @@ def is_equiv(x1: str, x2: str) -> bool:
                 return False
 
             try:
-                if sympy.simplify(diff) == 0:
-                    return True
-                else:
-                    return False
+                return sympy.simplify(diff) == 0
             except ValueError:
                 eval_logger.debug(
                     f"Had some trouble simplifying when comparing {x1} and {x2}"
@@ -209,15 +201,29 @@ def is_equiv(x1: str, x2: str) -> bool:
 def get_unnormalized_answer(text: str) -> str:
     INVALID_ANSWER = "[invalidanswer]"
     end_seq = "I hope it is correct."
-    text += end_seq
     match = re.search(
         r"Final Answer: The final answer is(.*?). I hope it is correct.",
-        text,
+        # NB: end_seq is appended with a separating space. Concatenating it directly
+        # produces "...is 7.I hope it is correct.", and the pattern requires ". I hope",
+        # so the patch-up never fired for text ending on a bare period.
+        text + " " + end_seq,
     )
     if match:
         return match.group(1).strip()
-    else:
-        return INVALID_ANSWER
+
+    # Fall back to the model's own \boxed{...} (as used for the gold solution
+    # above): the few-shot examples in list_fewshot_samples() end each solution
+    # right after "Final Answer: The final answer is $X$." without the phrase, so
+    # a model mirroring that style may omit it entirely and the regex above never
+    # matches, even when $X$ is correct.
+    boxed = last_boxed_only_string(text)
+    if boxed is not None:
+        try:
+            return remove_boxed(boxed)
+        except (AssertionError, IndexError):
+            pass
+
+    return INVALID_ANSWER
 
 
 SUBSTITUTIONS = [
