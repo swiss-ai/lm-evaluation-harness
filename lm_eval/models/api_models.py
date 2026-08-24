@@ -234,6 +234,7 @@ class TemplateAPI(TemplateLM):
                         self.verify_certificate,
                         self.ca_cert_path,
                         self.auth_token,
+                        model=self.model,
                     )
                     eval_logger.info(f"Using remote tokenizer from {self.base_url}")
             else:

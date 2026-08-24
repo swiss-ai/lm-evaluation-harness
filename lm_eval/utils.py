@@ -700,9 +700,16 @@ class RemoteTokenizer:
         ca_cert_path: str | None = None,
         auth_token: str | None = None,
         max_retries: int = 3,
+        model: str | None = None,
     ):
         self.timeout = timeout
         self.max_retries = max_retries
+        # Some gateways (e.g. the SwissAI serving gateway) sit in front of
+        # multiple models and route /tokenize, /detokenize, and
+        # /tokenizer_info on the "model" field, 404ing ("Model 'None' not
+        # found") when it's absent -- so it has to ride along on every
+        # request just like it does for /completions.
+        self.model = model
         self._lock = threading.RLock()
         self._tokenizer_info: dict | None = None
         self._tokenizer_info_available: bool | None = None  # None = not checked yet
@@ -758,6 +765,14 @@ class RemoteTokenizer:
             f"RemoteTokenizer: {method} {url} failed after {self.max_retries} attempts: {last_exc}"
         )
 
+    def _payload(self, **fields) -> dict:
+        """Build a request payload, attaching `model` when known -- required
+        by gateways that route /tokenize, /detokenize, and /tokenizer_info
+        on it (see __init__)."""
+        if self.model is not None:
+            fields["model"] = self.model
+        return fields
+
     def _call(self, method: str, path: str, **kwargs):
         """Call `path` against each candidate server root in turn (no
         cross-root retries -- a 404 means "wrong root", not a transient
@@ -784,7 +799,7 @@ class RemoteTokenizer:
             resp = self._call(
                 "POST",
                 "/tokenize",
-                json={"prompt": "test", "add_special_tokens": False},
+                json=self._payload(prompt="test", add_special_tokens=False),
             )
         except RuntimeError as e:
             raise RuntimeError(
@@ -798,7 +813,9 @@ class RemoteTokenizer:
         with self._lock:
             if self._tokenizer_info_available is None:
                 try:
-                    resp = self._call("GET", "/tokenizer_info")
+                    resp = self._call(
+                        "GET", "/tokenizer_info", params=self._payload()
+                    )
                     self._tokenizer_info = resp.json()
                     self._tokenizer_info_available = True
                 except RuntimeError:
@@ -841,7 +858,7 @@ class RemoteTokenizer:
         resp = self._call(
             "POST",
             "/tokenize",
-            json={"prompt": text, "add_special_tokens": add_special_tokens},
+            json=self._payload(prompt=text, add_special_tokens=add_special_tokens),
         )
         tokens = resp.json().get("tokens")
         if not isinstance(tokens, list):
@@ -852,7 +869,9 @@ class RemoteTokenizer:
         resp = self._call(
             "POST",
             "/detokenize",
-            json={"tokens": tokens, "skip_special_tokens": skip_special_tokens},
+            json=self._payload(
+                tokens=tokens, skip_special_tokens=skip_special_tokens
+            ),
         )
         body = resp.json()
         # vLLM's field is "prompt"; SGLang's is "text" -- accept either.
@@ -887,10 +906,10 @@ class RemoteTokenizer:
         resp = self._call(
             "POST",
             "/tokenize",
-            json={
-                "messages": chat_history,
-                "continue_final_message": not add_generation_prompt,
-            },
+            json=self._payload(
+                messages=chat_history,
+                continue_final_message=not add_generation_prompt,
+            ),
         )
         tokens = resp.json().get("tokens")
         if not isinstance(tokens, list):
