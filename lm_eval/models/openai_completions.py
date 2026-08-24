@@ -62,28 +62,34 @@ class LocalCompletionsAPI(TemplateAPI):
         self, chat_history: List[Dict[str, str]], add_generation_prompt: bool = True
     ):
         # The /v1/completions endpoint takes a flat string prompt, never a
-        # messages array -- so whenever a local HF tokenizer is available we
-        # can render the template to text ourselves, regardless of
-        # tokenized_requests (which only controls whether *that* string then
-        # gets sent as token IDs or decoded back to text). Without this
-        # override, TemplateAPI falls back to JsonChatStr whenever
-        # tokenized_requests=False, which breaks loglikelihood tasks
-        # (_encode_pair needs a real str to .rstrip()) and produces an
-        # invalid completions payload for generate_until.
-        #
-        # Note this template is resolved independently, client-side, from
-        # whatever the serving engine was actually launched with -- if the
-        # server is running a custom --chat-template override that differs
-        # from this tokenizer's own bundled default, this will silently
-        # score against a different template than what real inference
-        # traffic sees. They match as long as serving wasn't given an
-        # explicit template override.
+        # messages array -- so whenever a tokenizer capable of rendering the
+        # template is available (local HF, or the server itself over
+        # tokenizer_backend="remote") we can render it to text ourselves,
+        # regardless of tokenized_requests (which only controls whether
+        # *that* string then gets sent as token IDs or decoded back to
+        # text). Without this override, TemplateAPI falls back to
+        # JsonChatStr whenever tokenized_requests=False, which breaks
+        # loglikelihood tasks (_encode_pair needs a real str to .rstrip())
+        # and produces an invalid completions payload for generate_until.
         if self.tokenizer_backend == "huggingface":
+            # Note this template is resolved independently, client-side,
+            # from whatever the serving engine was actually launched with --
+            # if the server is running a custom --chat-template override
+            # that differs from this tokenizer's own bundled default, this
+            # will silently score against a different template than what
+            # real inference traffic sees. They match as long as serving
+            # wasn't given an explicit template override. tokenizer_backend
+            # ="remote" below doesn't have this gap: it asks the server for
+            # its actual template rather than guessing.
             return self.tokenizer.apply_chat_template(
                 chat_history,
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+            )
+        if self.tokenizer_backend == "remote":
+            return self.tokenizer.apply_chat_template(
+                chat_history, add_generation_prompt=add_generation_prompt
             )
         return super().apply_chat_template(chat_history, add_generation_prompt)
 

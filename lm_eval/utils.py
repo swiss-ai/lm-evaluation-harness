@@ -669,7 +669,27 @@ def hash_dict_images(data_dict):
 
 class RemoteTokenizer:
     """
-    Minimal robust tokenizer that uses vLLM server's tokenizer endpoints.
+    Minimal robust tokenizer that uses an OpenAI-compatible server's own
+    /tokenize and /detokenize endpoints instead of a locally loaded HF
+    tokenizer -- so tokenization (and chat-template rendering) uses
+    whatever the server is actually running, and never needs Hugging Face
+    Hub access (no network dependency beyond the server itself, no gated
+    repo access to arrange).
+
+    Works against both vLLM and SGLang, and tries the versioned /v1/*
+    routes before the bare ones, since a gateway sitting in front of
+    either may only proxy the OpenAI-standard namespace (confirmed against
+    the SwissAI serving gateway: /v1/tokenize and /v1/detokenize are
+    proxied, the bare /tokenize and /tokenizer_info are not).
+
+    /tokenizer_info -- used for eos/bos/pad token strings and (on vLLM)
+    the raw chat_template Jinja string -- is treated as optional: SGLang
+    doesn't implement it at all. When it's unavailable, eos_token/
+    bos_token/pad_token come back None, and apply_chat_template falls
+    back to asking the server to render+tokenize chat messages directly
+    via /tokenize's `messages` field. SGLang supports that: it's the same
+    code path /chat/completions uses internally to apply the template, so
+    this is the server's actual configured template, not a local guess.
     """
 
     def __init__(
@@ -684,7 +704,8 @@ class RemoteTokenizer:
         self.timeout = timeout
         self.max_retries = max_retries
         self._lock = threading.RLock()
-        self._tokenizer_info = None
+        self._tokenizer_info: dict | None = None
+        self._tokenizer_info_available: bool | None = None  # None = not checked yet
         self._chat_template_obj = None
 
         # Certificate logic
@@ -697,18 +718,25 @@ class RemoteTokenizer:
         if auth_token:
             self.headers["Authorization"] = f"Bearer {auth_token}"
 
-        # Normalize base URL - remove API endpoints to get server base
-        self.base_url = (
+        # Normalize base URL - remove API endpoints to get server base, then
+        # try the versioned root first (see docstring on why).
+        server_base = (
             base_url.replace("/v1/completions", "")
             .replace("/v1/chat/completions", "")
             .rstrip("/")
+        )
+        self._roots = (
+            [server_base]
+            if server_base.endswith("/v1")
+            else [f"{server_base}/v1", server_base]
         )
 
         # Use a session for connection pooling
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
-        # Validate server supports tokenizer_info endpoint
+        # Validate the server supports /tokenize -- the one endpoint every
+        # supported server has (unlike /tokenizer_info).
         self._validate_server()
 
     def _request_with_retries(self, method, url, **kwargs):
@@ -730,21 +758,55 @@ class RemoteTokenizer:
             f"RemoteTokenizer: {method} {url} failed after {self.max_retries} attempts: {last_exc}"
         )
 
+    def _call(self, method: str, path: str, **kwargs):
+        """Call `path` against each candidate server root in turn (no
+        cross-root retries -- a 404 means "wrong root", not a transient
+        failure, so move on immediately), returning the first success."""
+        last_exc = None
+        for root in self._roots:
+            url = f"{root}{path}"
+            try:
+                resp = self.session.request(
+                    method, url, timeout=self.timeout, verify=self.cert_config, **kwargs
+                )
+                if resp.status_code == 404:
+                    continue
+                resp.raise_for_status()
+                return resp
+            except requests.RequestException as e:
+                last_exc = e
+        raise RuntimeError(
+            f"RemoteTokenizer: no working root for {path} (tried {self._roots}): {last_exc}"
+        )
+
     def _validate_server(self):
-        url = f"{self.base_url}/tokenizer_info"
-        resp = self._request_with_retries("GET", url)
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"Server does not support tokenizer_info endpoint. Status: {resp.status_code}"
+        try:
+            resp = self._call(
+                "POST",
+                "/tokenize",
+                json={"prompt": "test", "add_special_tokens": False},
             )
+        except RuntimeError as e:
+            raise RuntimeError(
+                f"Server does not support the /tokenize endpoint: {e}"
+            ) from e
+        if not isinstance(resp.json().get("tokens"), list):
+            raise RuntimeError("Malformed response from /tokenize endpoint.")
 
     @property
     def tokenizer_info(self) -> dict:
         with self._lock:
-            if self._tokenizer_info is None:
-                url = f"{self.base_url}/tokenizer_info"
-                resp = self._request_with_retries("GET", url)
-                self._tokenizer_info = resp.json()
+            if self._tokenizer_info_available is None:
+                try:
+                    resp = self._call("GET", "/tokenizer_info")
+                    self._tokenizer_info = resp.json()
+                    self._tokenizer_info_available = True
+                except RuntimeError:
+                    # SGLang doesn't implement this endpoint at all -- not
+                    # fatal, callers fall back to server-side chat rendering
+                    # via /tokenize instead, and eos/bos/pad tokens go None.
+                    self._tokenizer_info = {}
+                    self._tokenizer_info_available = False
             return self._tokenizer_info
 
     @property
@@ -775,42 +837,71 @@ class RemoteTokenizer:
     def eot_token(self) -> int | None:
         return self.eos_token_id
 
-    def encode(self, text: str) -> list[int]:
-        url = f"{self.base_url}/tokenize"
-        payload = {"prompt": text, "add_special_tokens": False}
-        resp = self._request_with_retries("POST", url, json=payload)
+    def encode(self, text: str, add_special_tokens: bool = False) -> list[int]:
+        resp = self._call(
+            "POST",
+            "/tokenize",
+            json={"prompt": text, "add_special_tokens": add_special_tokens},
+        )
         tokens = resp.json().get("tokens")
         if not isinstance(tokens, list):
             raise RuntimeError("Malformed response from /tokenize endpoint.")
         return tokens
 
-    def decode(self, tokens: list[int]) -> str:
-        url = f"{self.base_url}/detokenize"
-        payload = {"tokens": tokens}
-        resp = self._request_with_retries("POST", url, json=payload)
-        prompt = resp.json().get("prompt")
-        if not isinstance(prompt, str):
+    def decode(self, tokens: list[int], skip_special_tokens: bool = False) -> str:
+        resp = self._call(
+            "POST",
+            "/detokenize",
+            json={"tokens": tokens, "skip_special_tokens": skip_special_tokens},
+        )
+        body = resp.json()
+        # vLLM's field is "prompt"; SGLang's is "text" -- accept either.
+        text = body.get("text", body.get("prompt"))
+        if not isinstance(text, str):
             raise RuntimeError("Malformed response from /detokenize endpoint.")
-        return prompt
+        return text
 
-    def batch_decode(self, tokens_list: list[list[int]]) -> list[str]:
-        return [self.decode(tokens) for tokens in tokens_list]
+    def batch_decode(
+        self, tokens_list: list[list[int]], skip_special_tokens: bool = False
+    ) -> list[str]:
+        return [
+            self.decode(tokens, skip_special_tokens=skip_special_tokens)
+            for tokens in tokens_list
+        ]
 
     def apply_chat_template(
         self, chat_history: list, add_generation_prompt: bool = True, **kwargs
     ) -> str:
-        with self._lock:
-            if self._chat_template_obj is None:
-                template_str = self.tokenizer_info.get("chat_template")
-                if not template_str:
-                    raise ValueError("No chat template available from server")
-                self._chat_template_obj = env.from_string(template_str)
-        return self._chat_template_obj.render(
-            messages=chat_history, add_generation_prompt=add_generation_prompt, **kwargs
+        template_str = self.tokenizer_info.get("chat_template")
+        if template_str:
+            with self._lock:
+                if self._chat_template_obj is None:
+                    self._chat_template_obj = env.from_string(template_str)
+            return self._chat_template_obj.render(
+                messages=chat_history,
+                add_generation_prompt=add_generation_prompt,
+                **kwargs,
+            )
+        # No /tokenizer_info (e.g. SGLang): ask the server to render+tokenize
+        # the chat messages directly instead of rendering a template locally.
+        resp = self._call(
+            "POST",
+            "/tokenize",
+            json={
+                "messages": chat_history,
+                "continue_final_message": not add_generation_prompt,
+            },
         )
+        tokens = resp.json().get("tokens")
+        if not isinstance(tokens, list):
+            raise RuntimeError(
+                "Server has neither /tokenizer_info nor messages-based /tokenize support; "
+                "cannot render the chat template remotely."
+            )
+        return self.decode(tokens)
 
     def __call__(self, text: str, add_special_tokens: bool = False, **kwargs) -> dict:
-        tokens = self.encode(text)
+        tokens = self.encode(text, add_special_tokens=add_special_tokens)
         return {"input_ids": tokens}
 
 
@@ -824,7 +915,9 @@ def check_remote_tokenizer_support(
 ) -> bool:
     """
     Check if server supports remote tokenizer endpoints.
-    Returns True if both /tokenizer_info and /tokenize endpoints are available and functional, False otherwise.
+    Returns True if /tokenize is available and functional (/tokenizer_info
+    is checked too when present, but its absence -- as on SGLang -- doesn't
+    disqualify the server; RemoteTokenizer degrades gracefully without it).
     """
     if not base_url:
         return False
@@ -833,6 +926,11 @@ def check_remote_tokenizer_support(
         base_url.replace("/v1/completions", "")
         .replace("/v1/chat/completions", "")
         .rstrip("/")
+    )
+    roots = (
+        [server_base]
+        if server_base.endswith("/v1")
+        else [f"{server_base}/v1", server_base]
     )
     cert_config = (
         ca_cert_path if verify_certificate and ca_cert_path else verify_certificate
@@ -844,40 +942,29 @@ def check_remote_tokenizer_support(
     session = requests.Session()
     session.headers.update(headers)
 
-    def _request_with_retries(method, url, **kwargs):
-        for _ in range(max_retries):
-            try:
-                resp = session.request(
-                    method,
-                    url,
-                    timeout=kwargs.pop("timeout", timeout),
-                    verify=cert_config,
-                    **kwargs,
-                )
-                resp.raise_for_status()
-                return resp
-            except requests.RequestException:
-                pass
+    def _request(method, path, **kwargs):
+        for root in roots:
+            url = f"{root}{path}"
+            for _ in range(max_retries):
+                try:
+                    resp = session.request(
+                        method, url, timeout=timeout, verify=cert_config, **kwargs
+                    )
+                    if resp.status_code == 404:
+                        break  # try the next root, not another retry
+                    resp.raise_for_status()
+                    return resp
+                except requests.RequestException:
+                    pass
         return None
 
-    # Check /tokenizer_info
-    info_url = f"{server_base}/tokenizer_info"
-    resp = _request_with_retries("GET", info_url)
+    # Check /tokenize -- the one endpoint every supported server has.
+    resp = _request(
+        "POST", "/tokenize", json={"prompt": "test", "add_special_tokens": False}
+    )
     if not resp:
         return False
-    info = resp.json()
-    if not isinstance(info, dict) or "eos_token" not in info:
-        return False
-
-    # Check /tokenize
-    tokenize_url = f"{server_base}/tokenize"
-    test_payload = {"prompt": "test", "add_special_tokens": False}
-    resp = _request_with_retries("POST", tokenize_url, json=test_payload)
-    if not resp:
-        return False
-    tokens = resp.json().get("tokens")
-
-    return isinstance(tokens, list)
+    return isinstance(resp.json().get("tokens"), list)
 
 
 def set_torch_seed(seed: int):
