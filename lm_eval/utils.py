@@ -746,6 +746,19 @@ class RemoteTokenizer:
         # supported server has (unlike /tokenizer_info).
         self._validate_server()
 
+    @staticmethod
+    def _describe_exc(e: requests.RequestException | None) -> str:
+        # requests.HTTPError.__str__ omits the response body, which is where
+        # a gateway puts the actual validation error (e.g. "Model 'None' not
+        # found") -- surface it so failures are diagnosable from the log
+        # alone, without needing to reproduce the request by hand.
+        if e is None:
+            return "None"
+        resp = getattr(e, "response", None)
+        if resp is not None:
+            return f"{e} | body: {resp.text[:500]!r}"
+        return str(e)
+
     def _request_with_retries(self, method, url, **kwargs):
         last_exc = None
         for _ in range(self.max_retries):
@@ -762,7 +775,8 @@ class RemoteTokenizer:
             except requests.RequestException as e:
                 last_exc = e
         raise RuntimeError(
-            f"RemoteTokenizer: {method} {url} failed after {self.max_retries} attempts: {last_exc}"
+            f"RemoteTokenizer: {method} {url} failed after {self.max_retries} attempts: "
+            f"{self._describe_exc(last_exc)}"
         )
 
     def _payload(self, **fields) -> dict:
@@ -791,7 +805,8 @@ class RemoteTokenizer:
             except requests.RequestException as e:
                 last_exc = e
         raise RuntimeError(
-            f"RemoteTokenizer: no working root for {path} (tried {self._roots}): {last_exc}"
+            f"RemoteTokenizer: no working root for {path} (tried {self._roots}): "
+            f"{self._describe_exc(last_exc)}"
         )
 
     def _validate_server(self):
