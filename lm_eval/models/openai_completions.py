@@ -58,6 +58,35 @@ class LocalCompletionsAPI(TemplateAPI):
             **kwargs,
         )
 
+    def apply_chat_template(
+        self, chat_history: List[Dict[str, str]], add_generation_prompt: bool = True
+    ):
+        # The /v1/completions endpoint takes a flat string prompt, never a
+        # messages array -- so whenever a local HF tokenizer is available we
+        # can render the template to text ourselves, regardless of
+        # tokenized_requests (which only controls whether *that* string then
+        # gets sent as token IDs or decoded back to text). Without this
+        # override, TemplateAPI falls back to JsonChatStr whenever
+        # tokenized_requests=False, which breaks loglikelihood tasks
+        # (_encode_pair needs a real str to .rstrip()) and produces an
+        # invalid completions payload for generate_until.
+        #
+        # Note this template is resolved independently, client-side, from
+        # whatever the serving engine was actually launched with -- if the
+        # server is running a custom --chat-template override that differs
+        # from this tokenizer's own bundled default, this will silently
+        # score against a different template than what real inference
+        # traffic sees. They match as long as serving wasn't given an
+        # explicit template override.
+        if self.tokenizer_backend == "huggingface":
+            return self.tokenizer.apply_chat_template(
+                chat_history,
+                tokenize=False,
+                add_generation_prompt=add_generation_prompt,
+                continue_final_message=not add_generation_prompt,
+            )
+        return super().apply_chat_template(chat_history, add_generation_prompt)
+
     def _create_payload(
         self,
         messages: Union[List[List[int]], List[dict], List[str], str],
@@ -171,6 +200,16 @@ class LocalChatCompletion(LocalCompletionsAPI):
                 "Chat completions does not support batching. Defaulting to batch size 1."
             )
             self._batch_size = 1
+
+    def apply_chat_template(
+        self, chat_history: List[Dict[str, str]], add_generation_prompt: bool = True
+    ):
+        # Always needs list[dict] messages (see _create_payload's assert
+        # below) -- never take LocalCompletionsAPI's plain-string override,
+        # which would break the assert here regardless of tokenizer_backend.
+        return TemplateAPI.apply_chat_template(
+            self, chat_history, add_generation_prompt
+        )
 
     def _create_payload(
         self,

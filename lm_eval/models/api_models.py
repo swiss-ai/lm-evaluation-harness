@@ -26,7 +26,6 @@ try:
     from aiohttp import ClientSession, ClientTimeout, TCPConnector
     from tenacity import RetryError, retry, stop_after_attempt, wait_exponential
     from tqdm import tqdm
-    from tqdm.asyncio import tqdm_asyncio
 except ModuleNotFoundError:
     pass
 
@@ -510,6 +509,7 @@ class TemplateAPI(TemplateLM):
         )
         cache_method = "generate_until" if generate else "loglikelihood"
         acquired = await sem.acquire()
+        outputs = None
         try:
             async with session.post(
                 self.base_url,
@@ -614,7 +614,16 @@ class TemplateAPI(TemplateLM):
                 )
             ]
 
-            return await tqdm_asyncio.gather(*tasks, desc="Requesting API")
+            # Wait for every task before returning/raising -- gather()
+            # propagating on the first failure would exit this `async with`
+            # and close the shared session while sibling tasks are still
+            # mid-request or asleep in a retry backoff, so they'd then crash
+            # with "Session is closed" instead of their own real error.
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
+            return results
 
     def _loglikelihood_tokens(self, requests, **kwargs) -> List[Tuple[float, bool]]:
         assert self.tokenizer is not None, (
