@@ -1,4 +1,5 @@
 import re
+
 from datasets import Dataset
 
 
@@ -6,7 +7,7 @@ def extract_year_from_url(url: str) -> str:
     """Extract the year from an AIME problem URL."""
     match = re.search(r"index\.php/(\d{4})_", url)
     if not match:
-        raise ValueError(f"Could not extract year from URL: {{url}}")
+        raise ValueError(f"Could not extract year from URL: {url}")
     return match.group(1)
 
 
@@ -49,41 +50,165 @@ def process_2024(dataset: Dataset) -> Dataset:
     return dataset.filter(filter_by_year)
 
 
-from typing import Dict, List
+from collections import Counter
 
 from lm_eval.api.metrics import is_degenerating_text
 
 
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
-    retval = 0
-    response = results[0]
+# AIME answers are integers in [0, 999], and the prompt ("Question: ...\nAnswer:")
+# never asks for a boxed answer -- so extraction cannot depend on \boxed{}: a model
+# that simply ends with "Answer: 16" has to be scored too. Order matters below: an
+# explicit answer marker beats trailing inline math, which is often a congruence
+# ("$$2016 \equiv 16 \pmod{1000}$$") whose last number is the modulus.
+_INT_RE = re.compile(r"[+-]?\d[\d,]*")
+_ANSWER_MARKER_RE = re.compile(
+    r"(?:final\s+answer|answer)\s*(?:is)?\s*[:=]?", re.IGNORECASE
+)
+_MATH_SPAN_RE = re.compile(r"\$\$?(.+?)\$\$?", re.DOTALL)
 
-    # Try to extract answer from $...$ format first
-    indices = [pos for pos, char in enumerate(response) if char == "$"]
-    if len(indices) <= 1:
-        answer = response
-    else:
-        answer = response[indices[0] + 1 : indices[-1]]
 
-    # Extract from \\boxed{} if present
-    boxed_answer = last_boxed_only_string(response)
-    if boxed_answer is not None:
+# Python caps int()-from-str conversion at 4300 digits and raises ValueError beyond
+# it; a degenerate/looping response can emit a far longer digit run. Cap well under
+# that (an AIME answer is 3 digits) so such a run is treated as "no answer" rather
+# than crashing the whole eval.
+_MAX_ANSWER_DIGITS = 100
+
+
+def _as_int(text: str) -> str | None:
+    """Canonical form of a bare integer answer (``"016"``, ``"1,260"``), else ``None``."""
+    cleaned = text.strip().strip("$").replace(",", "").replace(" ", "")
+    if not re.fullmatch(r"[+-]?\d+", cleaned):
+        return None
+    if len(cleaned.lstrip("+-")) > _MAX_ANSWER_DIGITS:
+        return None
+    return str(int(cleaned))
+
+
+def extract_answer(response: str) -> str:
+    """Extract the final answer from a response (``""`` if it has none).
+
+    Tries, in order: ``\\boxed{...}``, the first number after the last explicit
+    answer marker, the last ``$...$`` span when it is a bare number, and finally the
+    last number anywhere in the response.
+    """
+    boxed = last_boxed_only_string(response)
+    if boxed is not None:
         try:
-            boxed_content = remove_boxed(boxed_answer)
-            if boxed_content is not None:
-                answer = boxed_content
+            content = remove_boxed(boxed)
         except (AssertionError, IndexError):
-            pass
+            content = None
+        if content:
+            return _as_int(content) or content.strip()
 
-    # Check if answer matches target
+    markers = list(_ANSWER_MARKER_RE.finditer(response))
+    if markers:
+        match = _INT_RE.search(response[markers[-1].end() :])
+        if match:
+            return _as_int(match.group(0)) or ""
+
+    spans = _MATH_SPAN_RE.findall(response)
+    if spans:
+        value = _as_int(spans[-1])
+        if value is not None:
+            return value
+
+    numbers = _INT_RE.findall(response)
+    return _as_int(numbers[-1]) or "" if numbers else ""
+
+
+def _normalize_answer(response: str) -> str:
+    """Extract and normalize a response's answer so answers can be compared/voted."""
+    try:
+        return strip_string(extract_answer(response))
+    except Exception:
+        return extract_answer(response)
+
+
+class MajorityVoteFilter:
+    """Self-consistency (maj@k) filter for AIME.
+
+    Reuses the task's answer extraction to vote: for each problem it extracts and
+    normalizes the answer of every sampled response, takes the majority vote, and
+    returns a representative *full* response whose answer matches the winner.
+    Returning the full text (rather than the bare answer) keeps the downstream
+    ``process_results`` extraction and the ``degeneration`` metric working unchanged.
+    Chain a ``take_first`` after this filter to unwrap the single voted response.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list):
+            normalized = [_normalize_answer(r) for r in resp_list]
+            # Responses with no extractable answer must not win the vote.
+            votable = [a for a in normalized if a] or normalized
+            winner = Counter(votable).most_common(1)[0][0]
+            for resp, norm in zip(resp_list, normalized):
+                if norm == winner:
+                    return resp
+            return resp_list[0]
+
+        return map(lambda r: [select(r)], resps)
+
+
+def _score_response(response: str, target: str) -> int:
+    """1 if the response's extracted answer matches the target, else 0."""
+    answer = extract_answer(response)
+    if not answer:
+        return 0
+    # Compare integers as integers so a zero-padded gold ("016") still matches.
+    return int(is_equiv(answer, _as_int(target) or target))
+
+
+def _doc_target(doc: dict) -> str:
+    """The gold answer as a string, regardless of the answer field's casing."""
     answer_key = next(k for k in doc.keys() if k.lower() == "answer")
-    target = str(doc[answer_key])
-    if is_equiv(answer, target):
-        retval = 1
+    return str(doc[answer_key])
+
+
+class PassAtKFilter:
+    """pass@k filter for AIME.
+
+    A problem counts as solved if *any* of the k sampled responses is correct.
+    Using the gold answer (available via ``docs``), this returns a correct sample
+    when one exists, else the first sample, so the downstream single-response
+    scoring in ``process_results`` yields 1 iff at least one attempt was correct.
+    With n == k samples this equals the standard unbiased pass@k estimator.
+    Chain a ``take_first`` after this filter to unwrap the selected response.
+    """
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            target = _doc_target(doc)
+            for resp in resp_list:
+                if _score_response(resp, target):
+                    return resp
+            return resp_list[0]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
+
+
+def process_results(doc: dict, results: list) -> dict[str, float]:
+    # A filter may collapse the repeats to a single response (e.g. take_first,
+    # maj@k, pass@k) or pass them all through (e.g. take_first_k for mean@k).
+    # Normalize to a list so a single metric path handles both.
+    response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
+
+    target = _doc_target(doc)
+
+    # For a single response this is just 0/1 (per-sample accuracy); for the full
+    # set of k samples it is the mean accuracy over the k attempts (mean@k / avg@k).
+    scores = [_score_response(r, target) for r in responses]
+    degens = [int(is_degenerating_text(r.lower())) for r in responses]
 
     return {
-        "exact_match": retval,
-        "degeneration": int(is_degenerating_text(response.lower())),
+        "exact_match": sum(scores) / len(scores),
+        "degeneration": sum(degens) / len(degens),
     }
 
 
@@ -189,7 +314,7 @@ def fix_a_slash_b(string):
     try:
         a = int(a)
         b = int(b)
-        assert string == "{}/{}".format(a, b)
+        assert string == f"{a}/{b}"
         new_string = "\\frac{" + str(a) + "}{" + str(b) + "}"
         return new_string
     except AssertionError:
@@ -263,9 +388,8 @@ def strip_string(string):
         string = "0" + string
 
     # to consider: get rid of e.g. "k = " or "q = " at beginning
-    if len(string.split("=")) == 2:
-        if len(string.split("=")[0]) <= 2:
-            string = string.split("=")[1]
+    if len(string.split("=")) == 2 and len(string.split("=")[0]) <= 2:
+        string = string.split("=")[1]
 
     # fix sqrt3 --> sqrt{3}
     string = fix_sqrt(string)

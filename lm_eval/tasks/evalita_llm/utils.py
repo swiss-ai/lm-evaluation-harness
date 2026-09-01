@@ -1,8 +1,5 @@
 import logging
 
-from evaluate import load
-from sklearn.metrics import f1_score
-
 
 eval_logger = logging.getLogger("lm-eval")
 
@@ -214,7 +211,7 @@ def ner_process_results(doc, results):
                     matched_gold_idx.append(i)
         # Since we have more results than gold, we artificially set to false positive the remaining labels
         # extend gold label list
-        for i in range(len(results) - len(gold)):
+        for _i in range(len(results) - len(gold)):
             gold_labels.append(3)
             res_labels.append(2)
     elif len(results) == 0 and len(gold) == 0:
@@ -232,12 +229,7 @@ def ner_process_results(doc, results):
         for i in range(len(gold_labels)):
             if i in matched_gold_idx:
                 continue
-            if gold_labels[i] == 1:
-                res_labels[i] = 3
-            elif gold_labels[i] == 0:
-                res_labels[i] = 3
-            else:
-                res_labels[i] = 3
+            res_labels[i] = 3
 
     assert len(gold_labels) == len(res_labels)
     return {"f1": (res_labels, gold_labels)}
@@ -272,7 +264,7 @@ def ner_process_results_v2(doc, results):
                     matched_gold_idx.append(i)
         # Since we have more results than gold, we artificially set to false positive the remaining labels
         # extend gold label list
-        for i in range(len(results) - len(gold)):
+        for _i in range(len(results) - len(gold)):
             # gold_labels.append(3)
             # res_labels.append(2)
             gold_labels.append(4)

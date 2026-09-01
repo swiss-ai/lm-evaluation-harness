@@ -1,0 +1,27 @@
+task: mt_bench
+class: !function task.MTBenchTask
+output_type: multi_turn_generate
+test_split: test
+doc_to_target: ""
+metric_list:
+  - metric: mt_bench_score
+    aggregation: !function metric.mt_bench_score
+    higher_is_better: true
+  - metric: mt_bench_turn_1_score
+    aggregation: !function metric.mt_bench_turn_1_score
+    higher_is_better: true
+  - metric: mt_bench_turn_2_score
+    aggregation: !function metric.mt_bench_turn_2_score
+    higher_is_better: true
+  - metric: mt_bench_judge_success_rate
+    aggregation: !function metric.mt_bench_judge_success_rate
+    higher_is_better: true
+  - metric: avg_word_count
+    aggregation: mean
+    higher_is_better: false
+generation_kwargs:
+  until: []
+  max_gen_toks: 1024
+metadata:
+  version: 1.0
+  use_reference_temperature_config: true

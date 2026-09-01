@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_west_java_processor_yaml
 task: blend_west_java
-process_docs: !function ../utils.process_west_java 

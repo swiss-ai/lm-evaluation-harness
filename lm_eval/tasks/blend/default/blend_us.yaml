@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_us_processor_yaml
 task: blend_us
-process_docs: !function ../utils.process_us 

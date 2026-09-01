@@ -64,11 +64,11 @@ def normalize_answer(s, lang):
                 text,
             )
         elif lang == "ar":
-            return re.sub(r"\sال^|ال", " ", text)
+            return re.sub(r"(?:^|\s)ال", " ", text)
         elif lang == "zh":
             return text  # Chinese does not have formal articles
         else:
-            raise Exception("Unknown Language {}".format(lang))
+            raise Exception(f"Unknown Language {lang}")
 
     def white_space_fix(text, lang):
         if lang in WHITESPACE_LANGS:
@@ -76,7 +76,7 @@ def normalize_answer(s, lang):
         elif lang in MIXED_SEGMENTATION_LANGS:
             tokens = mixed_segmentation(text)
         else:
-            raise Exception("Unknown Language {}".format(lang))
+            raise Exception(f"Unknown Language {lang}")
         return " ".join([t for t in tokens if t.strip() != ""])
 
     def remove_punc(text):

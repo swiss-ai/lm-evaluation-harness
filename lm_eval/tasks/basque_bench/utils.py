@@ -37,6 +37,7 @@ def paws_process_docs(dataset):
         return text[0].lower() + text[1:]
 
     return dataset.filter(
-        lambda doc: doc["sentence1"] not in [None, ""]
-        and doc["sentence2"] not in [None, ""]
+        lambda doc: (
+            doc["sentence1"] not in [None, ""] and doc["sentence2"] not in [None, ""]
+        )
     ).map(_process_doc)

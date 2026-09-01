@@ -1,0 +1,23 @@
+group: bfcl_v3_python
+task:
+  - bfcl_v3_simple
+  - bfcl_v3_irrelevance
+  - bfcl_v3_parallel
+  - bfcl_v3_multiple
+  - bfcl_v3_parallel_multiple
+  - bfcl_v3_live_simple
+  - bfcl_v3_live_multiple
+  - bfcl_v3_live_parallel
+  - bfcl_v3_live_parallel_multiple
+  - bfcl_v3_live_irrelevance
+  - bfcl_v3_live_relevance
+  - bfcl_v3_multi_turn_base
+  - bfcl_v3_multi_turn_miss_func
+  - bfcl_v3_multi_turn_miss_param
+  - bfcl_v3_multi_turn_long_context
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 3

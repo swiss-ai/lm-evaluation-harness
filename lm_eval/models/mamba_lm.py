@@ -1,6 +1,5 @@
 import torch
 
-import lm_eval.models.utils
 import lm_eval.models.utils_hf
 from lm_eval.api.registry import register_model
 from lm_eval.models.huggingface import HFLM

@@ -5,30 +5,29 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
-
-import sqlite3
-import numpy as np
-import pickle as pkl
-from typing import List
 import concurrent.futures
+import os
+import pickle as pkl
+import sqlite3
 import threading
+
+import numpy as np
+from transformers import AutoModelForTokenClassification, AutoTokenizer, pipeline
 
 from lm_eval.tasks.hallulens.cache import Cache
 from lm_eval.tasks.hallulens.retrieval import DocDB
-from transformers import pipeline, AutoTokenizer, AutoModelForTokenClassification
 
 
 class LongWikiDB(DocDB):
     def __init__(self, db_path: str, data_path: str = None):
         # import DocDB from FactScore
-        super(LongWikiDB, self).__init__(db_path, data_path)
+        super().__init__(db_path, data_path)
         self.title_db_path = db_path.replace(".db", "-title.db")
         self._local = threading.local()
         self.SPECIAL_SEPARATOR = "####SPECIAL####SEPARATOR####"
 
     def _get_title_connection(self):
-        if not hasattr(self._local, 'connection'):
+        if not hasattr(self._local, "connection"):
             self._local.connection = sqlite3.connect(self.title_db_path)
         return self._local.connection
 
@@ -58,7 +57,7 @@ class LongWikiDB(DocDB):
         return results
 
 
-class LongWikiRetrieval(object):
+class LongWikiRetrieval:
     def __init__(
         self,
         db,
@@ -123,7 +122,7 @@ class LongWikiRetrieval(object):
         if os.path.exists(self.embed_cache_path):
             try:
                 with open(self.embed_cache_path, "rb") as f:
-                    self.embed_cache = pkl.load(f)
+                    self.embed_cache = pkl.load(f)  # noqa: S301
             except (EOFError, pkl.UnpicklingError):
                 # File is empty or corrupted (e.g. crashed mid-write); start fresh
                 self.embed_cache = {}
@@ -146,7 +145,7 @@ class LongWikiRetrieval(object):
                 if os.path.exists(self.embed_cache_path):
                     try:
                         with open(self.embed_cache_path, "rb") as f:
-                            disk_cache = pkl.load(f)
+                            disk_cache = pkl.load(f)  # noqa: S301
                     except (EOFError, pkl.UnpicklingError):
                         pass  # file empty/corrupted from prior crash; overwrite it
 
@@ -227,7 +226,9 @@ class LongWikiRetrieval(object):
         else:
             with self._encode_lock:
                 query_vectors = self.encoder.encode(
-                    [retrieval_query], batch_size=self.batch_size, device=self.encoder.device
+                    [retrieval_query],
+                    batch_size=self.batch_size,
+                    device=self.encoder.device,
                 )[0]
 
         scores = np.inner(query_vectors, passage_vectors_all)
@@ -240,16 +241,16 @@ class LongWikiRetrieval(object):
         indices = [i for i in indices if i < len(passages_all)]
         return [passages_all[i] for i in indices]
 
-    def make_ner_cache(self, questions: List[str]):
+    def make_ner_cache(self, questions: list[str]):
         # Filter to uncached questions
         uncached = [q for q in questions if self.Q_NER_cache.get_item(q) is None]
         if not uncached:
             return
-        
+
         print(f"Prewarming NER cache for {len(uncached)} questions...", flush=True)
         # Batch NER inference
         all_results = self.ner(uncached, batch_size=64)
-        
+
         for question, ner_results in zip(uncached, all_results):
             ners = [r["word"] for r in ner_results if "#" not in r["word"]]
             self.Q_NER_cache.set_item(question, ners)
@@ -305,9 +306,9 @@ class LongWikiRetrieval(object):
 
         # Phase 1: collect key_passages in parallel (DB/cache I/O, no GPU)
         with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
-            all_key_passages = list(executor.map(
-                lambda args: self._collect_key_passages(*args), uncached
-            ))
+            all_key_passages = list(
+                executor.map(lambda args: self._collect_key_passages(*args), uncached)
+            )
 
         # Phase 2: batch encode ALL passages across ALL topics in one encoder call
         with self._embed_lock:
@@ -325,7 +326,9 @@ class LongWikiRetrieval(object):
             idx = 0
             for t, passages in topics_to_encode.items():
                 inputs = [
-                    psg["title"] + " " + psg["text"].replace("<s>", "").replace("</s>", "")
+                    psg["title"]
+                    + " "
+                    + psg["text"].replace("<s>", "").replace("</s>", "")
                     for psg in passages
                 ]
                 topic_boundaries[t] = (idx, idx + len(inputs))
@@ -345,7 +348,9 @@ class LongWikiRetrieval(object):
             self.add_n_embed = 0
 
         # Phase 3: batch encode all retrieval queries at once
-        retrieval_queries = [topic + " " + claim.strip() for topic, claim, _ in uncached]
+        retrieval_queries = [
+            topic + " " + claim.strip() for topic, claim, _ in uncached
+        ]
         query_vectors = self.encoder.encode(
             retrieval_queries, batch_size=self.batch_size, device=self.encoder.device
         )

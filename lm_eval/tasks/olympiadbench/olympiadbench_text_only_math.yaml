@@ -1,0 +1,11 @@
+group: olympiadbench_text_only_math
+task:
+  - olympiadbench_oe_to_maths_en_comp
+  - olympiadbench_oe_to_maths_zh_cee
+  - olympiadbench_oe_to_maths_zh_comp
+aggregate_metric_list:
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0

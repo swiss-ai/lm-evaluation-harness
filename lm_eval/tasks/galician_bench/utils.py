@@ -1,11 +1,9 @@
 import re
-from itertools import product
 
 import datasets
 import evaluate
 import numpy as np
 import sacrebleu
-import transformers.data.metrics.squad_metrics as squad_metrics
 from rouge_score import rouge_scorer, scoring
 
 from lm_eval.utils import general_detokenize
@@ -48,8 +46,9 @@ def process_docs_paraphrases(dataset):
             f"Found {len_empty_docs} empty documents out of the {len(dataset)} total docs in the dataset: {empty_docs}"
         )
     return dataset.filter(
-        lambda doc: doc["Frase"] not in [None, ""]
-        and doc["Paráfrase"] not in [None, ""]
+        lambda doc: (
+            doc["Frase"] not in [None, ""] and doc["Paráfrase"] not in [None, ""]
+        )
     ).map(_process_doc)
 
 
@@ -76,8 +75,9 @@ def process_docs_paws(dataset):
             f"Found {len_empty_docs} empty documents out of the {len(dataset)} total docs in the dataset: {empty_docs}"
         )
     return dataset.filter(
-        lambda doc: doc["sentence1"] not in [None, ""]
-        and doc["sentence2"] not in [None, ""]
+        lambda doc: (
+            doc["sentence1"] not in [None, ""] and doc["sentence2"] not in [None, ""]
+        )
     ).map(_process_doc)
 
 

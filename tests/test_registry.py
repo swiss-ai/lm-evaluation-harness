@@ -309,6 +309,30 @@ class TestFilterRegistry:
 
         assert get_filter(my_filter) is my_filter
 
+    def test_remove_whitespace_filter_instantiates(self):
+        """Test that the remove_whitespace filter can be built and applied."""
+        from types import SimpleNamespace
+
+        from lm_eval.filters import build_filter_ensemble
+
+        ensemble = build_filter_ensemble(
+            "remove_whitespace",
+            [("remove_whitespace", {})],
+        )
+        instances = [
+            SimpleNamespace(
+                resps=["  answer  ", "\tsecond\n"],
+                doc={},
+                filtered_resps={},
+            )
+        ]
+
+        ensemble.apply(instances)
+
+        assert instances[0].filtered_resps == {
+            "remove_whitespace": ["answer", "second"]
+        }
+
 
 class TestMetricRegistry:
     """Test metric registry integration."""

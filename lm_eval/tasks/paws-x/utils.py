@@ -38,6 +38,7 @@ def process_docs_paraphrases(dataset):
             f"Found {len_empty_docs} empty documents out of the {len(dataset)} total docs in the dataset: {empty_docs}"
         )
     return dataset.filter(
-        lambda doc: doc["sentence1"] not in [None, ""]
-        and doc["sentence2"] not in [None, ""]
+        lambda doc: (
+            doc["sentence1"] not in [None, ""] and doc["sentence2"] not in [None, ""]
+        )
     ).map(_process_doc)

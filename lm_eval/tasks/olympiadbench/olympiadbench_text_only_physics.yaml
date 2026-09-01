@@ -1,0 +1,10 @@
+group: olympiadbench_text_only_physics
+task:
+  - olympiadbench_oe_to_physics_en_comp
+  - olympiadbench_oe_to_physics_zh_cee
+aggregate_metric_list:
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0

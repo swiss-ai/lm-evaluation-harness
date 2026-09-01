@@ -1,0 +1,7 @@
+include: _olympiadbench_template.yaml
+task: olympiadbench_oe_to_physics_zh_cee
+class: !function task.OlympiadBenchTask
+dataset_name: OE_TO_physics_zh_CEE
+metadata:
+  version: 1.0
+  olympiadbench_subset: OE_TO_physics_zh_CEE

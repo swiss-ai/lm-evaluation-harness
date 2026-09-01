@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_algeria_processor_yaml
 task: blend_algeria
-process_docs: !function ../utils.process_algeria 

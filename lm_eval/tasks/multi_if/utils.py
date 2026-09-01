@@ -1,9 +1,9 @@
 import dataclasses
 import json
-from typing import Dict, Optional, Union
+
+from datasets import Dataset
 
 from lm_eval.tasks.multi_if import instructions_registry
-from datasets import Dataset
 
 
 @dataclasses.dataclass
@@ -11,7 +11,7 @@ class InputExample:
     key: int
     instruction_id_list: list[str]
     prompt: str
-    kwargs: list[Dict[str, Optional[Union[str, int]]]]
+    kwargs: list[dict[str, str | int | None]]
 
 
 @dataclasses.dataclass

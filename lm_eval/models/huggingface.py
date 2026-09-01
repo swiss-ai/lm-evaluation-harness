@@ -109,6 +109,8 @@ class HFLM(TemplateLM):
         max_memory_per_gpu: int | str | None = None,
         max_cpu_memory: int | str | None = None,
         offload_folder: str | os.PathLike | None = "./offload",
+        # Tensor Parallelism options
+        tp_plan: str | dict | None = None,
         # PEFT, delta weights and quantization options
         peft: str | None = None,
         delta: str | None = None,
@@ -134,8 +136,107 @@ class HFLM(TemplateLM):
         allow_system_boilerplate: bool = False,
         check_system_prompt_authority: bool = False,
         chat_template_args: dict[str, Any] | None = None,
+        chat_template_path: str | os.PathLike | None = None,
         **kwargs,
     ) -> None:
+        """Initialize an HFLM instance for evaluating HuggingFace models.
+
+        Args:
+            pretrained: The model to evaluate. Either a HuggingFace Hub model ID
+                (e.g. ``"meta-llama/Llama-3.1-8B"``), a local path to a model
+                directory, or a pre-initialized ``transformers.PreTrainedModel``
+                instance. When passing a pre-initialized model, many other
+                arguments (device, parallelize, dtype, etc.) are ignored.
+            backend: Which model backend to use. ``"default"`` auto-detects from
+                the model config. ``"causal"`` forces a decoder-only
+                (AutoModelForCausalLM) backend. ``"seq2seq"`` forces an
+                encoder-decoder (AutoModelForSeq2SeqLM) backend.
+            revision: The specific model revision to use (branch name, tag, or
+                commit hash) on the HuggingFace Hub. Defaults to ``"main"``.
+            subfolder: Subfolder within the model repository on the Hub where
+                model files are stored.
+            tokenizer: Tokenizer to use for encoding inputs. Can be a HuggingFace
+                Hub ID, a local path, or a pre-initialized tokenizer instance. If
+                ``None``, defaults to the tokenizer associated with ``pretrained``.
+            truncation: Whether to truncate input sequences that exceed the
+                model's ``max_length``. If ``False``, inputs longer than
+                ``max_length`` will raise an error.
+            logits_cache: Whether to cache and reuse logits across requests that
+                share the same context. When enabled, requests are grouped by
+                context and only the final differing token is computed per group,
+                which speeds up single-token loglikelihood tasks.
+            max_length: Maximum input sequence length in tokens. If ``None``,
+                auto-detected from the model config (``n_positions``,
+                ``max_position_embeddings``, or ``n_ctx``). Falls back to 2048
+                if the config does not specify a value.
+            device: Device to place the model on (e.g. ``"cuda"``, ``"cpu"``,
+                ``"cuda:0"``, ``"mps"``). Ignored when using ``parallelize=True``
+                or multi-process ``accelerate launch``.
+            dtype: Data type for model weights. Can be a string (``"float16"``,
+                ``"bfloat16"``, ``"float32"``) or a ``torch.dtype``. ``"auto"``
+                uses the dtype specified in the model config.
+            softmax_dtype: Override dtype for softmax computation, which can help
+                with numerical stability. If ``None``, uses the model's default
+                dtype.
+            mixed_precision_dtype: Override dtype for forward pass computation in
+                mixed precision mode. If ``None``, no mixed precision is applied.
+            batch_size: Batch size for evaluation. Can be an integer for a fixed
+                batch size, or ``"auto"`` to enable automatic batch size detection
+                that starts from ``max_batch_size`` and scales down on OOM. Use
+                ``"auto:N"`` to set the scaling factor (default 1).
+            max_batch_size: Upper bound for batch size when using automatic batch
+                size detection (``batch_size="auto"``).
+            trust_remote_code: Whether to allow loading and executing custom model
+                code from the HuggingFace Hub repository.
+            use_fast_tokenizer: Whether to use a fast (Rust-based) tokenizer if
+                available. Fast tokenizers are generally faster but may have
+                slight behavioral differences from the Python-based versions.
+            add_bos_token: Whether to prepend the beginning-of-sequence token to
+                inputs. If ``None``, uses the tokenizer's default behavior.
+            prefix_token_id: Token ID to use as a prefix for loglikelihood
+                computations on empty contexts. If ``None``, defaults to the
+                tokenizer's BOS token ID (or EOS if BOS is unavailable).
+            parallelize: Whether to naively split the model across multiple GPUs
+                using ``device_map="auto"``. For more fine-grained control,
+                use ``accelerate launch`` instead.
+            max_memory_per_gpu: Maximum memory to allocate per GPU when
+                ``parallelize=True``. Can be an integer (bytes) or a string
+                (e.g. ``"10GiB"``).
+            max_cpu_memory: Maximum CPU memory to use for offloading when
+                ``parallelize=True``. Can be an integer (bytes) or a string
+                (e.g. ``"30GiB"``).
+            offload_folder: Directory for disk offloading when the model does
+                not fit in GPU and CPU memory combined. Only used when
+                ``parallelize=True``.
+            tp_plan: Tensor parallelism plan for distributing model weights
+                across multiple GPUs using PyTorch's DTensor. Set to
+                ``"auto"`` to use the model's predefined TP plan. Mutually
+                exclusive with ``parallelize``. Requires launching with
+                ``torchrun`` or ``accelerate launch``. The number of
+                processes (``--nproc-per-node``) determines the TP degree.
+            peft: Path or HuggingFace Hub ID of a PEFT (LoRA, etc.) adapter to
+                load on top of the base model.
+            delta: Path or HuggingFace Hub ID of delta weights to apply to the
+                base model (added to the pretrained weights).
+            autogptq: Whether to load the model using AutoGPTQ quantization.
+                Can be ``True`` to auto-detect, or a string path to a quantized
+                model checkpoint.
+            gptqmodel: Whether to load the model using GPTQModel instead of
+                AutoGPTQ.
+            gguf_file: Path to a GGUF file for loading quantized models in the
+                GGUF format.
+            think_end_token: End-of-thinking delimiter token for models that
+                support reasoning traces. Can be a token string or integer token
+                ID. When set, the model's response is split at this token and
+                only the portion after it is used as the final answer.
+            enable_thinking: Whether to enable thinking/reasoning mode in the
+                chat template. Passed as an argument to the chat template
+                formatter.
+            chat_template_args: Additional keyword arguments to pass to the
+                chat template when formatting inputs.
+            **kwargs: Additional keyword arguments forwarded to the model
+                constructor (e.g. ``transformers.AutoModelForCausalLM.from_pretrained``).
+        """
         super().__init__()
         # optionally: take in an already-initialized transformers.PreTrainedModel
         if not isinstance(pretrained, str):
@@ -144,6 +245,9 @@ class HFLM(TemplateLM):
             )
             assert not parallelize, (
                 "`parallelize=True` is not compatible with passing pre-initialized model to `pretrained`"
+            )
+            assert tp_plan is None, (
+                "`tp_plan` is not compatible with passing pre-initialized model to `pretrained`"
             )
             self._model = pretrained
             self._device = self._model.device
@@ -155,25 +259,46 @@ class HFLM(TemplateLM):
             assert isinstance(pretrained, str)
             assert isinstance(batch_size, (int, str))
 
-            accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
-            accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
-            if accelerator.num_processes > 1:
-                self.accelerator = accelerator
+            if tp_plan is not None:
+                if parallelize:
+                    raise ValueError(
+                        "`tp_plan` and `parallelize=True` are mutually exclusive. Choose either one for parallelization."
+                    )
+                # TP mode: skip Accelerator entirely, let transformers handle
+                # distribution via torchrun + device_mesh.
+                device_type = torch._C._get_accelerator().type
+                local_rank = int(os.environ.get("LOCAL_RANK", 0))
+                self._device = torch.device(f"{device_type}:{local_rank}")
+                gpus = 0  # prevent later model.to(device) calls
 
-            # Detect device count based on accelerator device type
-            device_type = accelerator.device.type
-            if "cuda" in device_type:
-                gpus = torch.cuda.device_count()
-            elif "npu" in device_type:
-                gpus = torch.npu.device_count()
-            elif "xpu" in device_type:
-                gpus = torch.xpu.device_count()
             else:
-                # Fallback to CUDA count for compatibility
-                gpus = torch.cuda.device_count()
+                accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
+                accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
+                if accelerator.num_processes > 1:
+                    self.accelerator = accelerator
 
-            # using one process with no model parallelism
-            if not (parallelize or accelerator.num_processes > 1):
+                # Detect device count based on accelerator device type
+                device_type = accelerator.device.type
+                if "cuda" in device_type:
+                    gpus = torch.cuda.device_count()
+                elif "npu" in device_type:
+                    gpus = torch.npu.device_count()
+                elif "xpu" in device_type:
+                    gpus = torch.xpu.device_count()
+                elif "hpu" in device_type:
+                    gpus = torch.hpu.device_count()
+                else:
+                    # Fallback to CUDA count for compatibility
+                    gpus = torch.cuda.device_count()
+
+            # Determine if we are in single device mode (no model parallelism)
+            single_device = (
+                not parallelize
+                and tp_plan is None
+                and not getattr(self, "accelerator", None)
+            )
+
+            if single_device:
                 # use user-passed device
                 device_list = set(
                     ["cuda", "cpu"]
@@ -181,6 +306,7 @@ class HFLM(TemplateLM):
                     + ["mps", "mps:0"]
                     + [f"npu:{i}" for i in range(gpus)]
                     + [f"xpu:{i}" for i in range(gpus)]
+                    + [f"hpu:{i}" for i in range(gpus)]
                 )
                 if device and device in device_list:
                     self._device = torch.device(device)
@@ -199,6 +325,9 @@ class HFLM(TemplateLM):
                         if torch.cuda.is_available()
                         else torch.device("cpu")
                     )
+            elif tp_plan is not None:
+                # Device already set above during TP init
+                pass
             else:  # Parallelism managed by accelerate
                 if device != "cuda":
                     eval_logger.info(
@@ -220,6 +349,19 @@ class HFLM(TemplateLM):
                 gguf_file=gguf_file,
                 subfolder=subfolder,
             )
+            if tp_plan:
+                world = int(os.environ.get("WORLD_SIZE", "1"))
+                n_kv = getattr(
+                    self._config,
+                    "num_key_value_heads",
+                    getattr(self._config, "num_attention_heads", world),
+                )
+                if n_kv % world != 0:
+                    raise ValueError(
+                        f"tp_plan requires num_key_value_heads ({n_kv}) to be divisible by "
+                        f"WORLD_SIZE ({world}). Re-launch with --nproc-per-node "
+                        f"set to a divisor of {n_kv}."
+                    )
 
             # determine which of 'causal' and 'seq2seq' backends to use for HF models
         self._get_backend(
@@ -253,6 +395,7 @@ class HFLM(TemplateLM):
                 dtype=dtype,
                 trust_remote_code=trust_remote_code,
                 parallelize=parallelize,
+                tp_plan=tp_plan,
                 gpus=gpus,
                 max_memory_per_gpu=max_memory_per_gpu,
                 max_cpu_memory=max_cpu_memory,
@@ -287,6 +430,9 @@ class HFLM(TemplateLM):
             chat_template_source=getattr(self.tokenizer, "chat_template", None),
             chat_template_args=chat_template_args,
             strip=strip_system_boilerplate,
+            chat_template_path=str(chat_template_path)
+            if chat_template_path is not None
+            else None,
         )
 
         self.chat_template_args = chat_template_args
@@ -360,6 +506,7 @@ class HFLM(TemplateLM):
             or strip_system_boilerplate
             or allow_system_boilerplate
         )
+        self.enable_thinking = enable_thinking
 
         self.add_bos_token = add_bos_token
 
@@ -389,7 +536,10 @@ class HFLM(TemplateLM):
 
         if isinstance(pretrained, str):
             if (gpus >= 1 or str(self.device) == "mps") and not (
-                parallelize or autogptq or hasattr(self, "accelerator")
+                parallelize
+                or tp_plan is not None
+                or autogptq
+                or hasattr(self, "accelerator")
             ):
                 # TODO: can remove this whole snippet except in the mps case, perhaps?
                 # place model onto device requested manually,
@@ -401,8 +551,13 @@ class HFLM(TemplateLM):
                     eval_logger.debug(
                         "Failed to place model onto specified device. This may be because the model is quantized via `bitsandbytes` or `device_map` is provided. If the desired GPU is being used, this message is safe to ignore."
                     )
+            # TP mode: all ranks run the same eval loop, no data splitting.
+            # From lm-eval's perspective, this is a single model.
+            if tp_plan is not None:
+                self._rank = 0
+                self._world_size = 1
             # multigpu data-parallel support when launched with accelerate
-            if gpus > 1:
+            elif gpus > 1:
                 if accelerator.num_processes > 1:
                     if parallelize:
                         eval_logger.warning(
@@ -623,6 +778,22 @@ class HFLM(TemplateLM):
     def world_size(self):
         return self._world_size
 
+    def all_gather(self, tensor):
+        if self.world_size <= 1:
+            return tensor
+        return self.accelerator.gather(tensor)
+
+    def gather_object(self, obj, dst=0):
+        if self.world_size <= 1:
+            return [obj]
+        result = [None] * self.world_size if self.rank == dst else None
+        torch.distributed.gather_object(obj=obj, object_gather_list=result, dst=dst)
+        return result
+
+    def barrier(self):
+        if self.world_size > 1:
+            self.accelerator.wait_for_everyone()
+
     @property
     def tokenizer_name(self) -> str:
         return self.tokenizer.name_or_path.replace("/", "__")
@@ -719,6 +890,8 @@ class HFLM(TemplateLM):
         max_memory_per_gpu: int | str | None = None,
         max_cpu_memory: int | str | None = None,
         offload_folder: str | None = "./offload",
+        # Tensor Parallelism options
+        tp_plan: str | dict | None = None,
         # PEFT, delta weights and quantization options
         peft: str | None = None,
         delta: str | None = None,
@@ -742,16 +915,20 @@ class HFLM(TemplateLM):
 
         model_kwargs = kwargs or {}
 
-        model_kwargs.update(
-            self._get_accelerate_args(
-                parallelize=parallelize,
-                device_map=kwargs.get("device_map"),
-                max_memory_per_gpu=max_memory_per_gpu,
-                max_cpu_memory=max_cpu_memory,
-                offload_folder=offload_folder,
-                gpus=gpus,
+        if tp_plan is not None:
+            # TP mode: tp_plan and device_map are mutually exclusive in transformers
+            model_kwargs["tp_plan"] = tp_plan
+        else:
+            model_kwargs.update(
+                self._get_accelerate_args(
+                    parallelize=parallelize,
+                    device_map=kwargs.get("device_map"),
+                    max_memory_per_gpu=max_memory_per_gpu,
+                    max_cpu_memory=max_cpu_memory,
+                    offload_folder=offload_folder,
+                    gpus=gpus,
+                )
             )
-        )
 
         if not autogptq and not gptqmodel:
             if model_kwargs.get("load_in_4bit"):
@@ -760,11 +937,15 @@ class HFLM(TemplateLM):
                 )
                 if compute_dtype := model_kwargs.get("bnb_4bit_compute_dtype"):
                     model_kwargs["bnb_4bit_compute_dtype"] = get_dtype(compute_dtype)
-
+            dtype_arg = (
+                "dtype"
+                if vparse(transformers.__version__) >= vparse("4.56.0")
+                else "torch_dtype"
+            )
             self._model = self.AUTO_MODEL_CLASS.from_pretrained(
                 pretrained,
                 revision=revision,
-                dtype=get_dtype(dtype),
+                **{dtype_arg: get_dtype(dtype)},
                 trust_remote_code=trust_remote_code,
                 gguf_file=gguf_file,
                 quantization_config=quantization_config,
@@ -844,10 +1025,15 @@ class HFLM(TemplateLM):
                 eval_logger.warning(
                     "Delta weights might trigger unexpected behavior when used with AutoGPTQ."
                 )
+                dtype_arg = (
+                    "dtype"
+                    if vparse(transformers.__version__) >= vparse("4.56.0")
+                    else "torch_dtype"
+                )
             _model_delta = self.AUTO_MODEL_CLASS.from_pretrained(
                 delta,
                 revision=revision,
-                dtype=get_dtype(dtype),
+                **{dtype_arg: get_dtype(dtype)},
                 trust_remote_code=trust_remote_code,
                 **model_kwargs,
             )
@@ -977,9 +1163,7 @@ class HFLM(TemplateLM):
         if self.world_size > 1:
             # if multi-GPU, always take minimum over all selected batch sizes
             max_rnk_bs = torch.tensor([batch_size], device=self.device)
-            gathered = (
-                self.accelerator.gather(max_rnk_bs).cpu().detach().numpy().tolist()
-            )
+            gathered = self.all_gather(max_rnk_bs).cpu().detach().numpy().tolist()
             batch_size = min(gathered)
             clear_torch_cache()
             return batch_size
@@ -1164,6 +1348,18 @@ class HFLM(TemplateLM):
 
         return logits
 
+    def loglikelihood(
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[tuple[float, bool]]:
+        if self.enable_thinking:
+            task_names = {req.task_name for req in requests if req.task_name}
+            raise ValueError(
+                f"enable_thinking=True is not compatible with loglikelihood tasks. "
+                f"Please use generative tasks only when using `enable_thinking=True`. "
+                f"Triggered by task(s): {', '.join(sorted(task_names))}"
+            )
+        return super().loglikelihood(requests, disable_tqdm=disable_tqdm)
+
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[float]:
@@ -1208,7 +1404,7 @@ class HFLM(TemplateLM):
         pad_amnt = 0
         if self.world_size > 1:
             mytensor = torch.tensor(len(all_windows), device=self.device)
-            gathered = self.accelerator.gather(mytensor).cpu().detach().numpy().tolist()
+            gathered = self.all_gather(mytensor).cpu().detach().numpy().tolist()
             pad_amnt = max(gathered) - gathered[self.rank]
             if pad_amnt > 0:
                 all_windows += pad_amnt * [all_windows[0]]
@@ -1322,6 +1518,14 @@ class HFLM(TemplateLM):
             and not override_bs
             else None
         )
+
+        if batch_fn is not None:
+            # Reset cached batch sizes so that auto-detection runs against the
+            # current set of requests.  Without this, a batch size detected for
+            # short-sequence requests (e.g. ARC) is silently reused for
+            # long-sequence requests (e.g. MMLU), causing CUDA OOM.
+            # See: https://github.com/EleutherAI/lm-evaluation-harness/issues/1678
+            self.batch_sizes = {}
 
         chunks = re_ord.get_batched(n=batch_size, batch_fn=batch_fn)
         pbar = tqdm(
@@ -1815,7 +2019,10 @@ class HFLM(TemplateLM):
         return res
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         """Method to apply a chat template to a list of chat history between user and model."""
         try:
@@ -1825,6 +2032,7 @@ class HFLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
+                **kwargs,
             )
         except jinja2.exceptions.TemplateError:
             eval_logger.warning(
@@ -1837,6 +2045,7 @@ class HFLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
+                **kwargs,
             )
 
         return chat_templated

@@ -1,0 +1,21 @@
+group: bfcl_v3_single_turn
+task:
+  - bfcl_v3_simple
+  - bfcl_v3_irrelevance
+  - bfcl_v3_parallel
+  - bfcl_v3_multiple
+  - bfcl_v3_parallel_multiple
+  - bfcl_v3_java
+  - bfcl_v3_javascript
+  - bfcl_v3_live_simple
+  - bfcl_v3_live_multiple
+  - bfcl_v3_live_parallel
+  - bfcl_v3_live_parallel_multiple
+  - bfcl_v3_live_irrelevance
+  - bfcl_v3_live_relevance
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 3

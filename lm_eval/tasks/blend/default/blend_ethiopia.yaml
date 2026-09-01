@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_ethiopia_processor_yaml
 task: blend_ethiopia
-process_docs: !function ../utils.process_ethiopia 

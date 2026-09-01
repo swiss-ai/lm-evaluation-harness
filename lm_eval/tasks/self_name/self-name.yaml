@@ -1,0 +1,41 @@
+task: self-name
+tag:
+  - self_name
+custom_dataset: !function utils.create_dataset
+output_type: generate_until
+validation_split: validation
+doc_to_text: prompt
+doc_to_target: ""
+process_results: !function utils.process_results_regex
+metric_list:
+  - metric: correct_naming_rate
+    aggregation: mean
+    higher_is_better: true
+  - metric: incorrect_naming_rate
+    aggregation: mean
+    higher_is_better: false
+  - metric: clean_correct_naming_rate
+    aggregation: mean
+    higher_is_better: true
+  - metric: any_correct_name_or_org_rate
+    aggregation: mean
+    higher_is_better: true
+  - metric: model_prompt_correct_rate
+    aggregation: nanmean
+    higher_is_better: true
+  - metric: developer_prompt_correct_rate
+    aggregation: nanmean
+    higher_is_better: true
+  - metric: name_only_prompt_correct_rate
+    aggregation: nanmean
+    higher_is_better: true
+  - metric: long_context_prompt_correct_rate
+    aggregation: nanmean
+    higher_is_better: true
+generation_kwargs:
+  until: []
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 64
+metadata:
+  version: 0.1

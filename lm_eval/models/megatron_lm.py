@@ -163,10 +163,6 @@ class MegatronLMEval(LM):
         tensor_model_parallel_size: int = 1,
         pipeline_model_parallel_size: int = 1,
         expert_model_parallel_size: int = 1,
-        # Short aliases (override the full names if provided)
-        TP: int | None = None,
-        PP: int | None = None,
-        EP: int | None = None,
         seq_length: int = 4096,
         micro_batch_size: int = 1,
         max_gen_toks: int = 256,
@@ -181,18 +177,6 @@ class MegatronLMEval(LM):
         **kwargs,
     ):
         super().__init__()
-
-        # Apply short aliases (TP/PP/EP override full names)
-        if TP is not None:
-            tensor_model_parallel_size = TP
-        if PP is not None:
-            pipeline_model_parallel_size = PP
-        if EP is not None:
-            expert_model_parallel_size = EP
-        # Auto-set devices to match TP if not explicitly overridden
-        if (TP is not None or tensor_model_parallel_size > 1) and devices == 1:
-            devices = tensor_model_parallel_size
-            eval_logger.info(f"Auto-setting devices={devices} to match TP={tensor_model_parallel_size}")
 
         self._max_length = seq_length
         self._batch_size = micro_batch_size if micro_batch_size is not None else 1
@@ -660,6 +644,23 @@ class MegatronLMEval(LM):
     def accelerator(self):
         """Return accelerator interface for distributed operations (NeMo-style)."""
         return self._Accelerator(self._world_size, self._device)
+
+    def all_gather(self, tensor: torch.Tensor) -> torch.Tensor:
+        """All-gather a tensor across data-parallel ranks."""
+        return self.accelerator.gather(tensor)
+
+    def gather_object(self, obj, dst: int = 0):
+        """Gather Python objects and return list on dst, None on others."""
+        if not torch.distributed.is_initialized() or self.world_size == 1:
+            return [obj]
+
+        gathered_objects = [None] * self.world_size
+        torch.distributed.all_gather_object(gathered_objects, obj)
+        return gathered_objects if self.rank == dst else None
+
+    def barrier(self) -> None:
+        """Synchronize processes."""
+        self.accelerator.wait_for_everyone()
 
     class _Accelerator:
         """

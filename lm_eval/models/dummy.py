@@ -37,7 +37,7 @@ class DummyLM(LM):
             res.append("lol")
             if self.write_out:
                 print(request.arguments[0])
-                print(f"gen_kwargs: {request.arguments[0]}")
+                print(f"gen_kwargs: {request.arguments[1]}")
             assert request.arguments[0].strip() != ""
 
         return res
@@ -57,11 +57,15 @@ class DummyLM(LM):
         return AutoTokenizer.from_pretrained(self.tokenizer_name)
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ) -> str:
         return self.tokenizer.apply_chat_template(
             chat_history,
             tokenize=False,
             add_generation_prompt=add_generation_prompt,
             continue_final_message=not add_generation_prompt,
+            **kwargs,
         )

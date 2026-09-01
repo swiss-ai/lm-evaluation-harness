@@ -1,6 +1,8 @@
 import logging
 import re
 import signal
+from collections import Counter
+from functools import cache
 from importlib.metadata import version
 from importlib.util import find_spec
 
@@ -8,6 +10,8 @@ import datasets
 
 
 eval_logger = logging.getLogger(__name__)
+
+INVALID_ANSWER = "[invalidanswer]"
 
 
 try:
@@ -92,6 +96,125 @@ def process_results(doc: dict, results: list[str]) -> dict[str, int]:
         "math_verify": mathval,
     }
     return res
+
+
+# --- Self-consistency (score-first / mean@k / maj@k / pass@k) -----------------
+# The filters below collapse the k repeats to one representative response; the
+# mean@k filter (take_first_k) instead passes them all through, and
+# process_results_sc averages exact_match / math_verify over the list.
+#
+# Scoring one response is expensive -- `is_equiv` runs sympy `simplify` under a 5s
+# timeout and math_verify has to parse the whole generation -- and the same
+# response is scored many times over: once inside PassAtKFilter, and again for
+# every filter that selects it (score-first / maj@k / pass@k all tend to pick a
+# response that mean@k already scored). So per-response scores and the parsed gold
+# solution are memoized. The cache keys are response/solution strings that the
+# Instances hold onto anyway, so this costs references, not copies.
+
+
+@cache
+def _parse_gold(solution: str):
+    """math_verify's parse of the gold solution -- identical for all k samples of a doc."""
+    return parse(solution)
+
+
+@cache
+def _score(response: str, gold_answer: str, solution: str) -> tuple[int, int]:
+    """``(exact_match, math_verify)`` for a single response against a doc's gold."""
+    answer = _sc_answer(response)
+    em = 1 if answer and is_equiv(answer, gold_answer) else 0
+    try:
+        mv = 1 if verify(gold=_parse_gold(solution), target=parse(response)) else 0
+    except Exception:
+        mv = 0
+    return em, mv
+
+
+def _score_doc(response: str, doc: dict) -> tuple[int, int]:
+    return _score(response, doc["answer"], doc["solution"])
+
+
+def _sc_answer(response: str) -> str:
+    """Normalized final answer extracted from a response (``""`` if it has none).
+
+    Prefers the Minerva few-shot format (``Final Answer: The final answer is ...``)
+    and falls back to the last ``\\boxed{...}``, which is what models actually emit
+    zero-shot. Without the fallback every zero-shot response extracts as
+    ``[invalidanswer]``: exact_match collapses to 0 and the majority vote becomes a
+    tie between non-answers. Returning ``""`` rather than the sentinel is what lets
+    the filters below drop responses with no answer.
+    """
+    answer = get_unnormalized_answer(response)
+    if answer == INVALID_ANSWER:
+        boxed = last_boxed_only_string(response)
+        if boxed is None:
+            return ""
+        try:
+            answer = remove_boxed(boxed)
+        except AssertionError:
+            return ""
+    return normalize_final_answer(answer)
+
+
+class MajorityVoteFilter:
+    """maj@k: majority vote over the normalized answers, returning a representative
+    full response whose answer matches the winner (empty answers ignored unless all
+    are empty). Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list):
+            answers = [_sc_answer(r) for r in resp_list]
+            votable = [a for a in answers if a] or answers
+            winner = Counter(votable).most_common(1)[0][0]
+            for resp, ans in zip(resp_list, answers):
+                if ans == winner:
+                    return resp
+            return resp_list[0]
+
+        return [[select(r)] for r in resps]
+
+
+class PassAtKFilter:
+    """pass@k: returns a correct response if any of the k exists, else the first.
+    With n == k this is the unbiased pass@k. Chain a ``take_first`` after this filter.
+
+    A response correct under *both* exact_match and math_verify is preferred, so
+    that both reported metrics are a true pass@k whenever one response satisfies
+    both; otherwise exact_match wins the tie-break."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            # `max` keeps the first maximal element, so an all-wrong set of samples
+            # falls back to the first response.
+            scored = [(_score_doc(resp, doc), resp) for resp in resp_list]
+            return max(scored, key=lambda item: (sum(item[0]), item[0][0]))[1]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
+
+
+def process_results_sc(doc: dict, results: list) -> dict[str, float]:
+    """Self-consistency-aware variant of ``process_results``.
+
+    Handles a single response (take_first / maj@k / pass@k) or the full set of k
+    samples (take_first_k for mean@k), averaging exact_match and math_verify over
+    the list. For a single response this reduces to the same 0/1 as
+    ``process_results``.
+    """
+    response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
+
+    scores = [_score_doc(cand, doc) for cand in responses]
+
+    return {
+        "exact_match": sum(em for em, _ in scores) / len(scores),
+        "math_verify": sum(mv for _, mv in scores) / len(scores),
+    }
 
 
 def last_boxed_only_string(string: str) -> str | None:
@@ -192,7 +315,6 @@ def is_equiv(x1: str, x2: str) -> bool:
 
 
 def get_unnormalized_answer(text: str) -> str:
-    INVALID_ANSWER = "[invalidanswer]"
     end_seq = "I hope it is correct."
     match = re.search(
         r"Final Answer: The final answer is(.*?). I hope it is correct.",

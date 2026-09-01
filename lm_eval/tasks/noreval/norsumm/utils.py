@@ -1,10 +1,9 @@
-import datasets
 import numpy as np
 from evaluate import load
 
 
 try:
-    import bert_score
+    import bert_score  # noqa: F401
     import sacrebleu
     from rouge_score import rouge_scorer, scoring
 except ModuleNotFoundError as e:

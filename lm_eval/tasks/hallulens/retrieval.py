@@ -13,12 +13,13 @@ You can refer to https://github.com/shmsw25/FActScore/blob/main/factscore/retrie
 """
 
 import json
-import time
 import os
-
-import sqlite3
-import numpy as np
 import pickle as pkl
+import sqlite3
+import time
+
+import numpy as np
+
 
 # from rank_bm25 import BM25Okapi
 
@@ -26,7 +27,7 @@ SPECIAL_SEPARATOR = "####SPECIAL####SEPARATOR####"
 MAX_LENGTH = 256
 
 
-class DocDB(object):
+class DocDB:
     """Sqlite backed document storage.
 
     Implements get_doc_text(doc_id).
@@ -73,7 +74,7 @@ class DocDB(object):
         c = self.connection.cursor()
         c.execute("CREATE TABLE documents (title PRIMARY KEY, text);")
 
-        with open(data_path, "r") as f:
+        with open(data_path) as f:
             for line in f:
                 dp = json.loads(line)
                 title = dp["title"]
@@ -81,10 +82,10 @@ class DocDB(object):
                 if title in titles:
                     continue
                 titles.add(title)
-                if type(text) == str:
+                if type(text) is str:
                     text = [text]
                 passages = [[]]
-                for sent_idx, sent in enumerate(text):
+                for _sent_idx, sent in enumerate(text):
                     assert len(sent.strip()) > 0
                     tokens = tokenizer(sent)["input_ids"]
                     max_length = MAX_LENGTH - len(passages[-1])
@@ -110,15 +111,13 @@ class DocDB(object):
                     c.executemany("INSERT INTO documents VALUES (?,?)", output_lines)
                     output_lines = []
                     print(
-                        "Finish saving %dM documents (%dmin)"
-                        % (tot / 1000000, (time.time() - start_time) / 60)
+                        f"Finish saving {int(tot / 1000000)}M documents ({int((time.time() - start_time) / 60)}min)"
                     )
 
         if len(output_lines) > 0:
             c.executemany("INSERT INTO documents VALUES (?,?)", output_lines)
             print(
-                "Finish saving %dM documents (%dmin)"
-                % (tot / 1000000, (time.time() - start_time) / 60)
+                f"Finish saving {int(tot / 1000000)}M documents ({int((time.time() - start_time) / 60)}min)"
             )
 
         self.connection.commit()
@@ -144,7 +143,7 @@ class DocDB(object):
         return results
 
 
-class Retrieval(object):
+class Retrieval:
     def __init__(
         self,
         db,
@@ -176,20 +175,20 @@ class Retrieval(object):
 
     def load_cache(self):
         if os.path.exists(self.cache_path):
-            with open(self.cache_path, "r") as f:
+            with open(self.cache_path) as f:
                 self.cache = json.load(f)
         else:
             self.cache = {}
         if os.path.exists(self.embed_cache_path):
             with open(self.embed_cache_path, "rb") as f:
-                self.embed_cache = pkl.load(f)
+                self.embed_cache = pkl.load(f)  # noqa: S301
         else:
             self.embed_cache = {}
 
     def save_cache(self):
         if self.add_n > 0:
             if os.path.exists(self.cache_path):
-                with open(self.cache_path, "r") as f:
+                with open(self.cache_path) as f:
                     new_cache = json.load(f)
                 self.cache.update(new_cache)
 
@@ -199,7 +198,7 @@ class Retrieval(object):
         if self.add_n_embed > 0:
             if os.path.exists(self.embed_cache_path):
                 with open(self.embed_cache_path, "rb") as f:
-                    new_cache = pkl.load(f)
+                    new_cache = pkl.load(f)  # noqa: S301
                 self.embed_cache.update(new_cache)
 
             with open(self.embed_cache_path, "wb") as f:

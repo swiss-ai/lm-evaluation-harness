@@ -1,0 +1,9 @@
+group: olympiadbench
+task:
+  - olympiadbench_text_only
+aggregate_metric_list:
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0

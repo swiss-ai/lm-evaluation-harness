@@ -20,8 +20,13 @@ import logging
 import os
 import re
 import tempfile
+from contextlib import ExitStack, contextmanager
+from functools import wraps
 
 import yaml
+
+from lm_eval.api.model_resolver import get_judge_model
+from lm_eval.api.rate_limiter import get_judge_rate_limiter
 
 
 logger = logging.getLogger(__name__)
@@ -30,38 +35,80 @@ logger = logging.getLogger(__name__)
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 
 # Judge model served at the CSCS endpoint
-JUDGE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
+DEFAULT_JUDGE_MODEL = "meta-llama/Llama-3.3-70B-Instruct"
 
 # Name for the annotator config (written into alpaca_eval's evaluators_configs/)
 ANNOTATOR_NAME = "cscs_llama3_70b"
 
+
+def _judge_model(api_key: str) -> str:
+    return get_judge_model(
+        DEFAULT_JUDGE_MODEL,
+        env_var="ALPACA_EVAL_JUDGE_MODEL",
+        api_base=API_URL,
+        api_key=api_key,
+    )
+
+
+@contextmanager
+def _rate_limited_openai_resources(judge_model: str):
+    """Rate limit every OpenAI SDK call made inside AlpacaEval, including retries."""
+
+    limiter = get_judge_rate_limiter(f"{API_URL}:{judge_model}")
+    if limiter is None:
+        yield
+        return
+
+    from unittest.mock import patch
+
+    from openai.resources.chat.completions import Completions as ChatCompletions
+    from openai.resources.completions import Completions
+
+    with ExitStack() as stack:
+        for resource_class in (ChatCompletions, Completions):
+            original_create = resource_class.create
+
+            @wraps(original_create)
+            def rate_limited_create(
+                self, *args, _original_create=original_create, **kwargs
+            ):
+                limiter.acquire()
+                return _original_create(self, *args, **kwargs)
+
+            stack.enter_context(
+                patch.object(resource_class, "create", rate_limited_create)
+            )
+        yield
+
+
 # Annotator configuration matching the weighted AlpacaEval protocol:
 # logprob-based classification with a single-token output (m or M).
-ANNOTATOR_CONFIG = {
-    ANNOTATOR_NAME: {
-        "prompt_template": "alpaca_eval_clf_gpt4_turbo/alpaca_eval_clf.txt",
-        "fn_completions": "openai_completions",
-        "completions_kwargs": {
-            "model_name": JUDGE_MODEL,
-            "max_tokens": 1,
-            "temperature": 1,
-            "logprobs": True,
-            "top_logprobs": 5,
-            "requires_chatml": True,
-        },
-        "fn_completion_parser": "logprob_parser",
-        "completion_parser_kwargs": {
-            "numerator_token": "m",
-            "denominator_tokens": ["m", "M"],
-            "is_binarize": False,
-        },
-        "completion_key": "completions_all",
-        "batch_size": 1,
+def _annotator_config(judge_model: str) -> dict:
+    return {
+        ANNOTATOR_NAME: {
+            "prompt_template": "alpaca_eval_clf_gpt4_turbo/alpaca_eval_clf.txt",
+            "fn_completions": "openai_completions",
+            "completions_kwargs": {
+                "model_name": judge_model,
+                "max_tokens": 1,
+                "temperature": 1,
+                "logprobs": True,
+                "top_logprobs": 5,
+                "requires_chatml": True,
+            },
+            "fn_completion_parser": "logprob_parser",
+            "completion_parser_kwargs": {
+                "numerator_token": "m",
+                "denominator_tokens": ["m", "M"],
+                "is_binarize": False,
+            },
+            "completion_key": "completions_all",
+            "batch_size": 1,
+        }
     }
-}
 
 
-def _ensure_annotator_config():
+def _ensure_annotator_config(judge_model: str):
     """Write the annotator config into alpaca_eval's evaluators_configs directory.
 
     The config is placed inside alpaca_eval's own evaluators_configs/ so that
@@ -80,7 +127,7 @@ def _ensure_annotator_config():
     config_file = config_dir / "configs.yaml"
 
     with open(config_file, "w") as f:
-        yaml.dump(ANNOTATOR_CONFIG, f, default_flow_style=False)
+        yaml.dump(_annotator_config(judge_model), f, default_flow_style=False)
 
     logger.info(f"Annotator config written to: {config_file}")
     return ANNOTATOR_NAME
@@ -175,13 +222,15 @@ def alpaca_eval_agg(items):
             "annotation. Get your key from the CSCS SwissAI platform."
         )
 
+    judge_model = _judge_model(api_key)
+
     # Route alpaca_eval's OpenAI client to the CSCS serving endpoint
     os.environ["OPENAI_API_BASE"] = API_URL
     os.environ["OPENAI_API_KEY"] = api_key
     os.environ["IS_ALPACA_EVAL_2"] = "True"
 
     # Write annotator config into alpaca_eval's config directory
-    annotator_name = _ensure_annotator_config()
+    annotator_name = _ensure_annotator_config(judge_model)
 
     # Build model outputs in alpaca_eval's expected format
     model_outputs = [
@@ -216,18 +265,21 @@ def alpaca_eval_agg(items):
 
     logger.info(
         f"Running AlpacaEval annotation on {len(model_outputs)} examples "
-        f"using {JUDGE_MODEL} as judge via CSCS serving API..."
+        f"using {judge_model} as judge via CSCS serving API..."
     )
 
     from alpaca_eval import evaluate
-     
-    annotation_kwargs={
-    "n_retries": 10,
-    "client_kwargs": {"max_retries": 15},
+
+    annotation_kwargs = {
+        "n_retries": 10,
+        "client_kwargs": {"max_retries": 15},
     }
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        df_leaderboard, annotations = evaluate(
+    with (
+        tempfile.TemporaryDirectory() as tmpdir,
+        _rate_limited_openai_resources(judge_model),
+    ):
+        df_leaderboard, _annotations = evaluate(
             model_outputs=model_outputs,
             reference_outputs=reference_outputs,
             annotators_config=annotator_name,

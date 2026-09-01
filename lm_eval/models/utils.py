@@ -8,13 +8,13 @@ import logging
 import re
 import time
 from functools import wraps
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
     TypeVar,
 )
-
 from typing_extensions import TypedDict
 
 from lm_eval.utils import maybe_warn, warning_once
@@ -41,13 +41,11 @@ class GenKwargs(TypedDict, total=False):
     __extra_items__: Any
 
 
-def chunks(iter, n: int = 0, fn=None):
-    """
-    Divides an iterable into chunks of specified size or based on a given function.
-    Useful for batching
+def chunks(_iter, n: int = 0, fn=None):
+    """Divides an iterable into chunks of specified size or based on a given function. Useful for batching.
 
-    Parameters:
-    - iter: The input iterable to be divided into chunks.
+    Args:
+    - _iter: The input iterable to be divided into chunks.
     - n: An integer representing the size of each chunk. Default is 0.
     - fn: A function that takes the current index and the iterable as arguments and returns the size of the chunk. Default is None.
 
@@ -69,9 +67,9 @@ def chunks(iter, n: int = 0, fn=None):
     ```
     """
     arr = []
-    for i, x in enumerate(iter):
+    for i, x in enumerate(_iter):
         arr.append(x)
-        if len(arr) == (fn(i, iter) if fn else n):
+        if len(arr) == (fn(i, _iter) if fn else n):
             yield arr
             arr = []
 
@@ -89,7 +87,7 @@ class MultiChoice:
             if len(fnmatch.filter(self.choices, value)) == 0:
                 eval_logger.info("Available tasks to choose:")
                 for choice in self.choices:
-                    eval_logger.info(f"  - {choice}")
+                    eval_logger.info("  - %s", choice)
                 raise ValueError(f"'{value}' is not in task list")
         return True
 
@@ -98,9 +96,9 @@ class MultiChoice:
 
 
 class Grouper:
-    """
-    takes an array `arr` and function `fn` and returns a dictionary
-    with keys fn(ob) for each ob in `arr` and with values `self.arr[key]` a list of all
+    """Takes an array `arr` and function `fn` and returns a dictionary with keys fn(ob).
+
+    For each ob in `arr` and with values `self.arr[key]` a list of all
     objects in `arr` satisfying `key == fn(ob)`.
     """
 
@@ -127,7 +125,7 @@ class Grouper:
         if self._grouped:
             return self._grouped
         grouped = {}
-        for key in self.arr.keys():
+        for key in self.arr:
             # drop the index from each element of self.arr
             grouped[key] = [y[1] for y in self.arr[key]]
         self._grouped = grouped
@@ -143,7 +141,7 @@ class Grouper:
 
         assert grouped_dict.keys() == self.arr.keys()
 
-        for key in grouped_dict.keys():
+        for key in grouped_dict:
             for (ind, _), v in zip(self.arr[key], grouped_dict[key], strict=True):
                 res[ind] = v
                 cov[ind] = True
@@ -156,8 +154,7 @@ class Grouper:
 
 
 def undistribute(iterable):
-    """
-    Undoes https://more-itertools.readthedocs.io/en/stable/api.html#more_itertools.distribute .
+    """Undoes https://more-itertools.readthedocs.io/en/stable/api.html#more_itertools.distribute .
 
     Re-interleaves results that have been split using more_itertools.distribute:
         >>> group_1, group_2 = distribute(2, [1, 2, 3, 4, 5, 6])
@@ -185,7 +182,6 @@ def undistribute(iterable):
         [1, 2, 3]
 
     """
-
     return [
         x
         for x in itertools.chain.from_iterable(
@@ -202,7 +198,8 @@ def retry_on_specific_exceptions(
     backoff_multiplier: float = 1.5,
     on_exception_callback: Callable[[Exception, float], Any] | None = None,
 ):
-    """Retry on an LLM Provider's rate limit error with exponential backoff
+    """Retry on an LLM Provider's rate limit error with exponential backoff.
+
     For example, to use for OpenAI, do the following:
     ```
     from openai import RateLimitError
@@ -236,8 +233,7 @@ def retry_on_specific_exceptions(
 
 
 class Collator:
-    """
-    A class for reordering and batching elements of an array.
+    """A class for reordering and batching elements of an array.
 
     This class allows for sorting an array based on a provided sorting function, grouping elements based on a grouping function, and generating batches from the sorted and grouped data.
 
@@ -284,15 +280,15 @@ class Collator:
     def get_batched(
         self, n: int = 1, batch_fn: Callable[[int, Iterable[T]], int] | None = None
     ) -> Iterator[T]:
-        """
-        Generates and yields batches from the reordered array. The method of grouping and batching
-        depends on the parameter `group_by`.
+        """Generates and yields batches from the reordered array.
+
+        The method of grouping and batching depends on the parameter `group_by`.
         If `group_by` is set to "gen_kwargs", it will batch the
         re-ordered values with same gen_kwargs for each batch.
         If `group_by` is "contexts", it caches the requests by context before batching.
-        If `group_by` is neither "gen_kwargs" nor "contexts", it yields the reordered array
+        If `group_by` is neither "gen_kwargs" nor "contexts", it yields the reordered array.
 
-        Parameters:
+        Args:
         - n (int): The size of each batch. Defaults to 1.
         - batch_fn ([Callable[[int, Iterable], int]] | None): A function to determine the size of
           each batch. Defaults to None.
@@ -305,10 +301,7 @@ class Collator:
         List of batched elements according to the `group_by` attribute.
         """
         if self._group_by == "gen_kwargs":
-            for (
-                _,
-                values,
-            ) in self._arr_with_indices.items():  # type: ignore
+            for values in self._arr_with_indices.values():  # type: ignore
                 values = self._reorder(values)
                 batch = self.get_chunks(values, n=n, fn=batch_fn)
                 yield from batch
@@ -335,8 +328,7 @@ class Collator:
         cont_toks: list[int],
         logits: torch.Tensor,
     ) -> Iterator[tuple[tuple[str, str], list[int], torch.Tensor]]:
-        """
-        Retrieves cached single-token continuations and their associated arguments, updating indices as necessary.
+        """Retrieves cached single-token continuations and their associated arguments, updating indices as necessary.
 
         The behavior of this function varies depending on how the `group_by` attribute is set:
 
@@ -390,10 +382,9 @@ class Collator:
             yield req_str, cont_toks, logits
 
     def _reorder(self, arr: list | tuple[tuple[int, Any], ...]) -> Iterator:
-        """
-        Reorders the elements in the array based on the sorting function.
+        """Reorders the elements in the array based on the sorting function.
 
-        Parameters:
+        Args:
         - arr (list | tuple[tuple[int, Any], ...]]): The array or iterable to be reordered.
 
         Yields:
@@ -406,10 +397,9 @@ class Collator:
         yield from [x[1] for x in arr]
 
     def get_original(self, newarr: list) -> list:
-        """
-        Restores the original order of elements from the reordered list.
+        """Restores the original order of elements from the reordered list.
 
-        Parameters:
+        Args:
         - newarr (list): The reordered array.
 
         Returns:
@@ -435,9 +425,7 @@ class Collator:
         fn: Callable[[T], Sequence[T] | dict],
         group_by: Literal["gen_kwargs", "contexts"] = "gen_kwargs",
     ) -> dict:
-        """
-        Groups elements of an iterable based on a provided function.
-
+        """Groups elements of an iterable based on a provided function.
 
         The `group_by` parameter determines the method of grouping.
         If `group_by` is "contexts", the elements are grouped by [context + cont][:-1].
@@ -476,12 +464,10 @@ class Collator:
     def get_chunks(
         _iter, n: int = 0, fn: Callable[[int, Iterable[T]], int] | None = None
     ) -> Iterator[T]:
-        """
-        Divides an iterable into chunks of specified size or based on a given function.
-        Useful for batching
+        """Divides an iterable into chunks of specified size or based on a given function. Useful for batching.
 
-        Parameters:
-        - iter: The input iterable to be divided into chunks.
+        Args:
+        - _iter: The input iterable to be divided into chunks.
         - n: An integer representing the size of each chunk. Default is 0.
         - fn: A function that takes the current index and the iterable as arguments and returns the size of the chunk. Default is None.
 
@@ -518,9 +504,7 @@ def configure_pad_token(
     tokenizer: PreTrainedTokenizerBase,
     model_config: PretrainedConfig | None = None,
 ) -> PreTrainedTokenizerBase:
-    """
-    This function checks if the (Hugging Face) tokenizer has a padding token and sets it if not present.
-    Some tokenizers require special handling.
+    """This function checks if the (Hugging Face) tokenizer has a padding token and sets it if not present. Some tokenizers require special handling.
 
     Args:
         tokenizer: The tokenizer for which the padding token is to be handled.
@@ -532,11 +516,13 @@ def configure_pad_token(
     Raises:
         AssertionError: If the tokenizer is of type RWKVWorldTokenizer or Rwkv5Tokenizer and the padding token id is not 0.
     """
-    if tokenizer.pad_token:
+    if getattr(tokenizer, "pad_token_id", None) is not None or getattr(
+        tokenizer, "pad_token", None
+    ):
         pass
-    elif tokenizer.unk_token:
+    elif getattr(tokenizer, "unk_token", None):
         tokenizer.pad_token_id = tokenizer.unk_token_id
-    elif tokenizer.eos_token:
+    elif getattr(tokenizer, "eos_token", None):
         tokenizer.pad_token_id = tokenizer.eos_token_id
     else:
         # handle special cases
@@ -639,23 +625,53 @@ def maybe_strip_system_boilerplate(
     chat_template_source: str | None,
     chat_template_args: dict | None,
     strip: bool,
+    chat_template_path: str | None = None,
 ) -> dict:
-    """Apply system boilerplate stripping if requested.
+    """Prepare chat-template kwargs and optionally strip system boilerplate.
 
-    If *strip* is true and `chat_template_args` does not already contain a
-    ``chat_template`` key, the tokenizer's template source is run through
-    :func:`strip_system_boilerplate_from_template` and the cleaned version
-    is injected into the returned dict.
+    If ``chat_template_path`` is provided, or ``chat_template_args`` contains a
+    ``chat_template_path`` key, the file is read and injected as
+    ``chat_template``. If *strip* is true and `chat_template_args` does not
+    already contain a ``chat_template`` key, the tokenizer's template source is
+    run through :func:`strip_system_boilerplate_from_template` and the cleaned
+    version is injected into the returned dict.
 
     Args:
         chat_template_source: The raw Jinja template string from the tokenizer.
         chat_template_args: Existing chat-template keyword arguments (may be None).
         strip: Whether stripping was requested.
+        chat_template_path: Optional path to a raw Jinja chat-template file.
 
     Returns:
         The (possibly updated) ``chat_template_args`` dict — never ``None``.
     """
-    chat_template_args = chat_template_args or {}
+    chat_template_args = dict(chat_template_args or {})
+    nested_path = chat_template_args.pop("chat_template_path", None)
+    if chat_template_path == "":
+        chat_template_path = None
+    if nested_path == "":
+        nested_path = None
+    if chat_template_path is not None and nested_path is not None:
+        raise ValueError(
+            "Specify chat_template_path either as a top-level model arg or inside "
+            "chat_template_args, not both."
+        )
+
+    resolved_path = (
+        chat_template_path if chat_template_path is not None else nested_path
+    )
+    if resolved_path is not None:
+        if "chat_template" in chat_template_args:
+            raise ValueError(
+                "Specify either chat_template_args.chat_template or "
+                "chat_template_path, not both."
+            )
+        path = Path(str(resolved_path)).expanduser()
+        try:
+            chat_template_args["chat_template"] = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"Could not read chat template from {path!s}") from exc
+
     if not strip:
         return chat_template_args
 
@@ -780,7 +796,8 @@ def check_system_boilerplate(
 def replace_placeholders(
     string: str, default_placeholder: str, image_token: str, max_images: int
 ):
-    """
+    """Utility to replace <image> placeholder tags by model-specific image tokens like <|image_pad|>.
+
     A utility function used for local multimodal models. It locates all `placeholder` string
     occurrences in the given input `string_` and replaces the first `max_count` instances with
     `replacement`, and all subsequent occurrences with the empty string.
@@ -812,8 +829,8 @@ def replace_placeholders(
 
 
 def flatten_image_list(images: list[list]):
-    """
-    Takes in a list of lists of images, and returns a single list of all images in order.
+    """Takes in a list of lists of images, and returns a single list of all images in order.
+
     Used for some multimodal models like Llava-1.5 which expects this flattened-list format for its image processor.
 
     :param images: A list of lists of PIL images.
@@ -873,7 +890,6 @@ def normalize_gen_kwargs(
         - Model backends may further modify the returned dict as needed (e.g., vLLM
           removes `do_sample` since it uses temperature directly).
     """
-
     import copy
 
     kwargs = copy.deepcopy(gen_kwargs)
@@ -944,8 +960,7 @@ def resize_image(
     min_width: int = 1,
     min_height: int = 1,
 ) -> Image.Image:
-    """
-    Resizes a PIL Image object with flexible options.
+    """Resizes a PIL Image object with flexible options.
 
     Args:
         image: The PIL Image object to resize.
@@ -1062,8 +1077,7 @@ def maybe_truncate(
     shrink_gen_toks=False,
     verbose=True,
 ) -> tuple[list[int], int]:
-    """
-    Truncates input tokens and/or reduces max_gen_toks to fit within max_model_len.
+    """Truncates input tokens and/or reduces max_gen_toks to fit within max_model_len.
 
     Strategy:
         1. No truncation needed: If len(tokens) + max_gen_toks <= max_model_len, return as-is.
@@ -1151,8 +1165,7 @@ def truncate_before_stops(generation: str, stop: list[str] | str | None) -> str:
 def postprocess_generated_text(
     generation: str, stop: list[str] | str | None, think_end_token: str | None
 ) -> str:
-    """
-    Post-processes the generated text by stripping stop sequences and optional thinking markers.
+    """Post-processes the generated text by stripping stop sequences and optional thinking markers.
 
     Args:
         generation (str): The generated text to be processed.

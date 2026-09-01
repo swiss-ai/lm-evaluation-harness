@@ -40,9 +40,9 @@ class FilterEnsemble:
     """
 
     name: str
-    filters: List[Callable[[], Filter]]
+    filters: list[Callable[[], Filter]]
 
-    def apply(self, instances: List[Instance]) -> None:
+    def apply(self, instances: list[Instance]) -> None:
         resps, docs = zip(*((inst.resps, inst.doc) for inst in instances))
         resps, docs = list(resps), list(docs)
 

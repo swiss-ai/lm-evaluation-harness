@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import json
 import logging
@@ -7,27 +8,28 @@ import os
 import random
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING
+from copy import deepcopy
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
 import lm_eval.api.model
 import lm_eval.api.registry
+from lm_eval.api.instance import Instance
 from lm_eval.caching.cache import delete_cache
-from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED
+from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED, LMEVAL_HASHMM
 from lm_eval.evaluator_utils import (
-    consolidate_group_results,
-    consolidate_results,
+    ResultAcc,
+    _handle_back_comp,
+    _log_selected_tasks,
+    _process_results,
     get_sample_size,
-    get_subtask_list,
-    get_task_list,
-    prepare_print_tasks,
     print_writeout,
     promote_generation_info_metrics,
     run_task_tests,
 )
 from lm_eval.loggers.utils import add_env_info, add_tokenizer_info, get_git_commit_hash
-from lm_eval.tasks import TaskManager, get_task_dict
+from lm_eval.tasks import TaskManager
 from lm_eval.utils import (
     handle_non_serializable,
     hash_dict_images,
@@ -41,14 +43,137 @@ from lm_eval.utils import (
 
 
 if TYPE_CHECKING:
+    from lm_eval.api.group import Group
     from lm_eval.api.model import LM
     from lm_eval.api.task import Task
     from lm_eval.loggers import EvaluationTracker
+    from lm_eval.result_schema import EvalResults
+    from lm_eval.tasks.manager import TaskDict
+
+    _NestedDict = dict[Group, dict[str, Task] | Group] | dict[str, Task]
 
 eval_logger = logging.getLogger(__name__)
 
 
-def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
+def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
+    parameters = inspect.signature(task.init_multiturn_state).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or any(key in parameters for key in multiturn_kwargs):
+        return task.init_multiturn_state(doc, ctx, gen_kwargs, **multiturn_kwargs)
+    return task.init_multiturn_state(doc, ctx, gen_kwargs)
+
+
+def run_multi_turn_rollout(
+    lm: LM,
+    eval_tasks: dict[str, Task],
+    requests: list,
+    apply_chat_template: bool = False,
+    chat_template=None,
+) -> None:
+    """Run interactive multi-turn generation episodes in batched waves.
+
+    A ``multi_turn_generate`` task still uses the model's regular
+    ``generate_until`` method. The task owns episode state and decides which prompt
+    to issue next after each response. Turn ``t+1``'s prompt contains turn ``t``'s
+    response, so each wave is a synchronization barrier; within a wave all pending
+    episodes across all multi-turn tasks share a single batched ``generate_until``
+    call.
+    """
+    if lm.world_size > 1:
+        raise NotImplementedError(
+            "multi_turn_generate does not currently support distributed "
+            "evaluation. Please run with world_size=1."
+        )
+
+    multiturn_kwargs = {
+        "apply_chat_template": apply_chat_template,
+        "chat_template": chat_template,
+    }
+    episodes = []
+    for instance in requests:
+        task = eval_tasks[instance.task_name]
+        ctx, gen_kwargs = instance.arguments
+        for _ in range(instance.repeats):
+            episodes.append(
+                {
+                    "task": task,
+                    "instance": instance,
+                    "state": _init_multiturn_state(
+                        task,
+                        instance.doc,
+                        ctx,
+                        deepcopy(gen_kwargs),
+                        multiturn_kwargs,
+                    ),
+                    "step": 0,
+                }
+            )
+
+    max_steps = (
+        max(getattr(episode["task"], "MAX_MULTITURN_STEPS", 64) for episode in episodes)
+        if episodes
+        else 0
+    )
+
+    for _ in range(max_steps):
+        active = []
+        wave_requests = []
+        for episode in episodes:
+            task = episode["task"]
+            if task.multiturn_is_done(episode["state"]):
+                continue
+            next_args = task.multiturn_next_request(episode["state"])
+            if next_args is None:
+                continue
+            request = Instance(
+                request_type="generate_until",
+                doc=episode["instance"].doc,
+                arguments=next_args,
+                idx=episode["step"],
+                metadata=(
+                    episode["instance"].task_name,
+                    episode["instance"].doc_id,
+                    1,
+                ),
+            )
+            active.append((episode, request))
+            wave_requests.append(request)
+
+        if not wave_requests:
+            break
+
+        eval_logger.info(
+            f"Running multi_turn_generate wave with {len(wave_requests)} requests"
+        )
+        responses = lm.generate_until(wave_requests)
+        for response, (episode, request) in zip(responses, active, strict=True):
+            request.resps.append(response)
+            episode["instance"].length_info.extend(request.length_info)
+            episode["task"].multiturn_consume_response(episode["state"], response)
+            episode["step"] += 1
+    else:
+        unfinished = sum(
+            not episode["task"].multiturn_is_done(episode["state"])
+            for episode in episodes
+        )
+        if unfinished:
+            eval_logger.warning(
+                f"{unfinished} multi_turn_generate episodes reached the "
+                f"maximum step limit ({max_steps})."
+            )
+
+    for episode in episodes:
+        episode["instance"].resps.append(
+            episode["task"].multiturn_result(episode["state"])
+        )
+
+
+def _warn_if_system_prompt_authority_inactive(
+    lm: LM, eval_tasks: dict[str, Task]
+) -> list[str]:
     """Warn when a task needs an authoritative system prompt but the model's
     system-prompt authority check was not activated (it is OFF by default).
 
@@ -62,14 +187,13 @@ def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
     if getattr(lm, "system_prompt_authority_handled", True):
         return []
     needy = []
-    for to in get_task_list(task_dict):
-        # Group placeholders can carry a falsy/None task; read defensively.
-        cfg = getattr(getattr(to, "task", None), "config", None)
+    for task_name, task in eval_tasks.items():
+        cfg = getattr(task, "config", None)
         metadata = getattr(cfg, "metadata", None)
         if isinstance(metadata, dict) and metadata.get(
             "requires_system_prompt_authority"
         ):
-            needy.append(to.task_name)
+            needy.append(task_name)
     if needy:
         eval_logger.warning(
             "Task(s) %s expect an authoritative system prompt, but the "
@@ -88,7 +212,7 @@ def _warn_if_system_prompt_authority_inactive(lm, task_dict) -> list[str]:
 def simple_evaluate(
     model: str | LM,
     model_args: str | dict[str, str | int | float] | None = None,
-    tasks: list[str | dict | Task] | None = None,
+    tasks: list[str | dict[str, Any] | Task] | None = None,
     num_fewshot: int | None = None,
     batch_size: int | str | None = None,
     max_batch_size: int | None = None,
@@ -98,7 +222,7 @@ def simple_evaluate(
     rewrite_requests_cache: bool = False,
     delete_requests_cache: bool = False,
     limit: int | float | None = None,
-    samples: dict | None = None,
+    samples: dict[str, list[int]] | None = None,
     bootstrap_iters: int = 100000,
     check_integrity: bool = False,
     write_out: bool = False,
@@ -107,7 +231,7 @@ def simple_evaluate(
     system_instruction: str | None = None,
     apply_chat_template: bool | str = False,
     fewshot_as_multiturn: bool = True,
-    gen_kwargs: str | dict | None = None,
+    gen_kwargs: str | dict[str, str | float | int] | None = None,
     task_manager: TaskManager | None = None,
     verbosity=None,
     predict_only: bool = False,
@@ -117,16 +241,16 @@ def simple_evaluate(
     fewshot_random_seed: int = DEFAULT_OTHER_SEED,
     confirm_run_unsafe_code: bool = False,
     log_length_metrics: bool = False,
-    metadata: dict | None = None,
-):
+    metadata: dict[str, Any] | None = None,
+) -> EvalResults | None:
     """Instantiate and evaluate a model on a list of tasks.
 
     Args:
         model (str | LM): Name of model or LM object. See
             lm_eval.models.__init__.py for available aliases.
-        model_args (str | dict | None): String or dict arguments for each model
-            class, see LM.create_from_arg_string and LM.create_from_arg_object.
-            Ignored if `model` argument is a LM object.
+        model_args: String or dict arguments for each model class, e.g.,
+            "pretrained=EleutherAI/pythia-1.3B,revision=main" or {"pretrained": "EleutherAI/pythia-1.3B"}.
+            Ignored if ``model`` argument is a LM object.
         tasks (list[str | dict | Task]): List of task names or Task objects.
             Task objects will be taken to have name task.EVAL_HARNESS_NAME if defined
             and type(task).__name__ otherwise.
@@ -139,7 +263,7 @@ def simple_evaluate(
         use_cache (str | None): A path to a sqlite db file for caching model
             responses. `None` if not caching.
         cache_requests (bool): Speed up evaluation by caching the building of
-            dataset requests. `None` if not caching.
+            dataset requests (inputs). `None` if not caching.
         rewrite_requests_cache (bool): Rewrites all the request cache if set to
             `True`. `None` if not desired.
         delete_requests_cache (bool): Deletes all the request cache if set to
@@ -150,6 +274,7 @@ def simple_evaluate(
         samples (dict | None): Dictionary indicating which examples should be
             tested in each task, e.g.,
             {"mmlu_astronomy": [0, 3, 6], "mmlu_anatomy": [1, 4, 7, 10]}.
+            Incompatible with `limit`.
         bootstrap_iters (int): Number of iterations for bootstrap statistics, used
             when calculating stderrs. Set to 0 for no stderr calculations to be
             performed.
@@ -196,7 +321,7 @@ def simple_evaluate(
         dict | None: Dictionary of results, or None if not on rank 0.
     """
     if verbosity is not None:
-        setup_logging(verbosity=verbosity)
+        eval_logger.info("Setting verbosity through simple_evaluate is deprecated.")
     start_date = time.time()
 
     if limit is not None and samples is not None:
@@ -307,15 +432,21 @@ def simple_evaluate(
         eval_logger.info("Using pre-initialized model")
         lm = model
 
+    # Under TP launchers (torchrun) every rank reports lm.rank==0; fall back to
+    # LOCAL_RANK so each process gets its own cache db and only LOCAL_RANK==0
+    # performs final result aggregation / I/O.
+    cache_rank = lm.rank or int(os.environ.get("LOCAL_RANK", "0"))
     if use_cache is not None:
-        eval_logger.info(f"Using cache at {use_cache + '_rank' + str(lm.rank) + '.db'}")
+        eval_logger.info(
+            f"Using cache at {use_cache + '_rank' + str(cache_rank) + '.db'}"
+        )
         lm = lm_eval.api.model.CachingLM(
             lm,
             use_cache
             # each rank receives a different cache db.
             # necessary to avoid multiple writes to cache at once
             + "_rank"
-            + str(lm.rank)
+            + str(cache_rank)
             + ".db",
         )
 
@@ -329,77 +460,56 @@ def simple_evaluate(
         ) | (metadata or {})
         task_manager = TaskManager(metadata=metadata)
 
-    task_dict = get_task_dict(
-        tasks,
-        task_manager,
-    )
+    # Load tasks - returns {"tasks":.., "groups":..}
+    loaded = task_manager.load(tasks)
 
-    # helper function to recursively apply config overrides to leaf subtasks, skipping their constituent groups.
-    # (setting of num_fewshot ; bypassing metric calculation ; setting fewshot seed)
-    def _adjust_config(task_dict):
-        adjusted_task_dict = {}
-        for task_name, task_obj in task_dict.items():
-            if isinstance(task_obj, dict):
-                adjusted_task_dict = {
-                    **adjusted_task_dict,
-                    **{task_name: _adjust_config(task_obj)},
-                }
+    # Log selected tasks with hierarchy
+    _log_selected_tasks(loaded["tasks"], loaded["groups"], task_manager)
 
+    # Apply config overrides to the flat task mapping returned by TaskManager.load().
+    for task_name, task_obj in loaded["tasks"].items():
+        if task_obj.get_config("output_type") in (
+            "generate_until",
+            "multi_turn_generate",
+        ):
+            if gen_kwargs is not None:
+                task_obj.set_config(
+                    key="generation_kwargs", value=gen_kwargs, update=True
+                )
+            eval_logger.info(
+                f"{task_obj.config.task}: Using gen_kwargs: {task_obj.config.generation_kwargs}"
+            )
+
+        if predict_only:
+            eval_logger.info(
+                f"Processing {task_name} in output-only mode. Metrics will not be calculated!"
+            )
+            # we have to change the class properties post-hoc. This is pretty hacky.
+            task_obj.override_metric(metric_name="bypass")
+
+        # override tasks' fewshot values to the provided num_fewshot arg value
+        # except if tasks have it set to 0 manually in their configs--then we should never overwrite that
+        if num_fewshot is not None:
+            if (default_num_fewshot := task_obj.get_config("num_fewshot")) == 0:
+                eval_logger.info(
+                    f"num_fewshot has been set to 0 for {task_name} in its config. Manual configuration will be ignored."
+                )
             else:
-                if task_obj.get_config("output_type") in (
-                    "generate_until",
-                    "multi_turn_generate",
-                ):
-                    # multi_turn_generate also issues generate_until calls per
-                    # turn (see run_multi_turn_rollout), reading the task's
-                    # generation_kwargs — so the CLI override must reach it too,
-                    # e.g. `--gen_kwargs until=<|im_end|>` to add a stop token.
-                    if gen_kwargs is not None:
-                        task_obj.set_config(
-                            key="generation_kwargs", value=gen_kwargs, update=True
-                        )
-                    eval_logger.info(
-                        f"{task_obj.config.task}: Using gen_kwargs: {task_obj.config.generation_kwargs}"
-                    )
-
-                if predict_only:
-                    eval_logger.info(
-                        f"Processing {task_name} in output-only mode. Metrics will not be calculated!"
-                    )
-                    # we have to change the class properties post-hoc. This is pretty hacky.
-                    task_obj.override_metric(metric_name="bypass")
-
-                # override tasks' fewshot values to the provided num_fewshot arg value
-                # except if tasks have it set to 0 manually in their configs--then we should never overwrite that
-                if num_fewshot is not None:
-                    if (default_num_fewshot := task_obj.get_config("num_fewshot")) == 0:
-                        eval_logger.info(
-                            f"num_fewshot has been set to 0 for {task_name} in its config. Manual configuration will be ignored."
-                        )
-                    else:
-                        eval_logger.warning(
-                            f"Overwriting default num_fewshot of {task_name} from {default_num_fewshot} to {num_fewshot}"
-                        )
-                        task_obj.set_config(key="num_fewshot", value=num_fewshot)
-                else:
-                    # if num_fewshot not provided, and the task does not define a default one, default to 0
-                    if (
-                        default_num_fewshot := task_obj.get_config("num_fewshot")
-                    ) is None:
-                        task_obj.set_config(key="num_fewshot", value=0)
-                # fewshot_random_seed set for tasks, even with a default num_fewshot (e.g. in the YAML file)
-                task_obj.set_fewshot_seed(seed=fewshot_random_seed)
-
-                adjusted_task_dict[task_name] = task_obj
-
-        return adjusted_task_dict
-
-    task_dict = _adjust_config(task_dict)
+                eval_logger.warning(
+                    f"Overwriting default num_fewshot of {task_name} from {default_num_fewshot} to {num_fewshot}"
+                )
+                task_obj.set_config(key="num_fewshot", value=num_fewshot)
+        else:
+            # if num_fewshot not provided, and the task does not define a default one, default to 0
+            if (default_num_fewshot := task_obj.get_config("num_fewshot")) is None:
+                task_obj.set_config(key="num_fewshot", value=0)
+        # fewshot_random_seed set for tasks, even with a default num_fewshot (e.g. in the YAML file)
+        task_obj.set_fewshot_seed(seed=fewshot_random_seed)
 
     # Rank 0 only — `simple_evaluate` runs on every rank under accelerate/DDP,
     # so guard to avoid one identical warning per process.
     if getattr(lm, "rank", 0) == 0:
-        _warn_if_system_prompt_authority_inactive(lm, task_dict)
+        _warn_if_system_prompt_authority_inactive(lm, loaded["tasks"])
 
     if check_integrity:
         run_task_tests(task_list=tasks)
@@ -417,7 +527,7 @@ def simple_evaluate(
 
     results = evaluate(
         lm=lm,
-        task_dict=task_dict,
+        task_dict=loaded,
         limit=limit,
         samples=samples,
         cache_requests=cache_requests,
@@ -435,7 +545,10 @@ def simple_evaluate(
     if verbosity is not None:
         setup_logging(verbosity=verbosity)
 
-    if lm.rank == 0:
+    # `lm.rank == 0` covers DP / single-process; `LOCAL_RANK == 0` covers TP
+    # (torchrun), where every rank reports rank==0 but only one process should
+    # build/return results so callers don't duplicate file writes.
+    if lm.rank == 0 and int(os.environ.get("LOCAL_RANK", "0")) == 0:
         if isinstance(model, str):
             model_name = model
         elif hasattr(model, "config") and hasattr(model.config, "_name_or_path"):
@@ -481,9 +594,9 @@ def simple_evaluate(
 @positional_deprecated
 def evaluate(
     lm: LM,
-    task_dict,
+    task_dict: TaskDict | _NestedDict,
     limit: int | None = None,
-    samples: dict | None = None,
+    samples: dict[str, list[int]] | None = None,
     cache_requests: bool = False,
     rewrite_requests_cache: bool = False,
     bootstrap_iters: int | None = 100000,
@@ -495,13 +608,13 @@ def evaluate(
     verbosity: str = "INFO",
     confirm_run_unsafe_code: bool = False,
     log_length_metrics: bool = False,
-):
+) -> EvalResults | None:
     """Instantiate and evaluate a model on a list of tasks.
 
     Args:
         lm (LM): Language Model.
-        task_dict (dict[str, Task]): Dictionary of tasks. Tasks will be taken to
-            have name type(task).config.task.
+        task_dict (TaskDict): Dictionary returned by TaskManager.load() containing
+            'tasks', 'groups', and 'group_map' entries.
         limit (int | None): Limit the number of examples per task (only use this
             for testing).
         samples (dict | None): Dictionary indicating which examples should be
@@ -543,37 +656,47 @@ def evaluate(
         )
     if samples is not None:
         eval_logger.info(f"Evaluating examples for tasks {list(samples.keys())}")
-    if apply_chat_template:
-        eval_logger.warning(
-            "Chat template formatting change affects loglikelihood and multiple-choice tasks. See docs/chat-template-readme.md for details."
-        )
     # tracks all Instances/requests a model must generate output on.
     requests = defaultdict(list)
     # stores the amount to pad out reqs per req. type so that
     # number of fwd passes per distributed rank is equal
     padding_requests = defaultdict(int)
 
-    # get lists of group hierarchy and each type of request
-    eval_tasks = get_task_list(task_dict)
+    # Initialize groups and tasks
+    # handle back_comp. Assume if "tasks" not present, then using old nested.
+    if "tasks" not in task_dict:
+        groups, eval_tasks = _handle_back_comp(cast("_NestedDict", task_dict))
+    else:
+        task_dict = cast("TaskDict", task_dict)
+        groups, eval_tasks = task_dict.get("groups", {}), task_dict.get("tasks", {})
+
+    # Initialize accumulators for per-sample metrics and logged samples
+    eval_results_acc: dict[str, ResultAcc] = {
+        task_name: {
+            "task": task_obj,
+            "raw_metrics": defaultdict(list),
+            "logged_samples": [],
+        }
+        for task_name, task_obj in eval_tasks.items()
+    }
     if not log_samples and not all(
-        "bypass" not in getattr(task_output.task, "_metric_fn_list", {})
-        for task_output in eval_tasks
+        "bypass" not in getattr(task_obj, "_metric_fn_list", {})
+        for task_obj in eval_tasks.values()
     ):
         raise ValueError("log_samples must be True for 'bypass' metric-only tasks")
 
     # validation checks:
-    # 1.are we running multimodal task <-> non-multimodal model class, or vice-versa.
-    # 2.are we running code that is marked as unsafe.
+    # 1.are we running code that is marked as unsafe.
+    # 2.are we running multimodal task <-> non-multimodal model class, or vice-versa.
     incompatible_tasks = []
-    for task_output in eval_tasks:
-        task: Task = task_output.task
+    for task_name, task in eval_tasks.items():
+        if getattr(task, "UNSAFE_CODE", False) and not confirm_run_unsafe_code:
+            raise ValueError(
+                f"Attempted to run task: {task_name} which is marked as unsafe. Set confirm_run_unsafe_code=True to run this task."
+            )
 
         if getattr(task, "MULTIMODAL", False) and not getattr(lm, "MULTIMODAL", False):
-            incompatible_tasks.append(task_output.task_name)
-        elif getattr(task, "UNSAFE_CODE", False) and not confirm_run_unsafe_code:
-            raise ValueError(
-                f"Attempted to run task: {task_output.task_name} which is marked as unsafe. Set confirm_run_unsafe_code=True to run this task."
-            )
+            incompatible_tasks.append(task_name)
     if len(incompatible_tasks) > 0 and not getattr(lm, "MULTIMODAL", False):
         raise ValueError(
             f"Attempted to run tasks: {incompatible_tasks} which require multimodal input, but the selected model type does not currently implement this. Multimodal support is currently restricted to the ['hf-multimodal', 'vllm-vlm'] model type."
@@ -583,16 +706,12 @@ def evaluate(
     # Cache the limit arg.
     limit_arg = limit
     limits = []
-    for task_output in eval_tasks:
-        task: Task = task_output.task
-
+    for task_name, task in eval_tasks.items():
         limit = get_sample_size(task, limit_arg)
         limits.append(limit)
         task.build_all_requests(
             limit=limit,
-            samples=samples.get(task_output.task_name, None)
-            if samples is not None
-            else samples,
+            samples=samples.get(task_name, None) if samples is not None else samples,
             rank=lm.rank,
             world_size=lm.world_size,
             cache_requests=cache_requests,
@@ -608,7 +727,7 @@ def evaluate(
             else "",
         )
         eval_logger.debug(
-            f"Task: {task_output.task_name}; number of requests on this rank: {len(task.instances)}"
+            f"Task: {task_name}; number of requests on this rank: {len(task.instances)}"
         )
         if write_out:
             print_writeout(task)
@@ -620,10 +739,10 @@ def evaluate(
         if lm.world_size > 1:
             import torch
 
-            instances_rnk = torch.tensor(len(task._instances), device=lm.device)
-            gathered_item = (
-                lm.accelerator.gather(instances_rnk).cpu().detach().numpy().tolist()
+            instances_rnk = torch.tensor(
+                len(task._instances) if task._instances else 0, device=lm.device
             )
+            gathered_item = lm.all_gather(instances_rnk).cpu().detach().numpy().tolist()
             # "multiple_choice" task types dispatch (several) "loglikelihood" request types
             reqtype = (
                 "loglikelihood"
@@ -635,19 +754,26 @@ def evaluate(
             # todo: may not account for padding in cases like SquadV2 which has multiple req types
             padding_requests[reqtype] += numpad
 
-    ### Iterative multi-turn rollout (output_type: multi_turn_generate) ###
-    # Runs BEFORE the standard one-shot dispatch so the turn-indexed
-    # `Instance` objects it builds end up on each task's `_instances` list
-    # and flow through the existing filter + process_results + sample-log
-    # path unchanged. Tasks without multi_turn_generate are unaffected.
-    _mt_task_outputs = [
-        to for to in eval_tasks if to.task.OUTPUT_TYPE == "multi_turn_generate"
-    ]
-    if _mt_task_outputs:
-        run_multi_turn_rollout(lm, _mt_task_outputs)
-
     ### Run LM on inputs, get all outputs ###
     # execute each type of request
+    # Iterative multi-turn rollout (output_type: multi_turn_generate): turn
+    # t+1's prompt contains turn t's response, so the task owns episode state
+    # and the driver issues regular `generate_until` calls one wave at a time.
+    # Pulled out of the standard dispatch loop below so the per-turn barrier
+    # is handled explicitly.
+    multiturn_requests = requests.pop("multi_turn_generate", [])
+    if multiturn_requests:
+        eval_logger.info("Running multi_turn_generate requests")
+        run_multi_turn_rollout(
+            lm,
+            eval_tasks,
+            multiturn_requests,
+            apply_chat_template=bool(apply_chat_template),
+            chat_template=getattr(lm, "apply_chat_template", None)
+            if apply_chat_template
+            else None,
+        )
+
     for reqtype, reqs in requests.items():
         eval_logger.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
@@ -667,14 +793,14 @@ def evaluate(
             req.resps.append(x)
 
         if lm.world_size > 1:
-            lm.accelerator.wait_for_everyone()
+            lm.barrier()
 
     RANK = lm.rank
     WORLD_SIZE = lm.world_size
     ### Postprocess outputs ###
     # TODO: del model here, maybe (idea: allow user to specify device of e.g. reward model separately)
-    for task_output, limit in zip(eval_tasks, limits, strict=True):
-        task = task_output.task
+    for (task_name, acc), limit in zip(eval_results_acc.items(), limits, strict=True):
+        task = acc["task"]
 
         # Skip post-processing for ranks with no instances (data parallel with
         # small datasets, or multi_turn_generate when world_size > docs-for-task,
@@ -699,11 +825,7 @@ def evaluate(
             instances.sort(key=lambda x: x.idx)
         # iterate over different filters used
         for filter_key in task.instances[0].filtered_resps:
-            indices = (
-                samples.get(task_output.task_name, None)
-                if samples is not None
-                else None
-            )
+            indices = samples.get(task_name, None) if samples is not None else None
             doc_iterator = task.doc_iterator(
                 rank=RANK,
                 limit=limit,
@@ -743,366 +865,61 @@ def evaluate(
                         "target_hash": hash_string(str(target)),
                     }
                     example.update(metrics)
-                    task_output.logged_samples.append(example)
+                    acc["logged_samples"].append(example)
                 for metric, value in metrics.items():
-                    task_output.sample_metrics[(metric, filter_key)].append(value)
+                    acc["raw_metrics"][(metric, filter_key)].append(value)
 
-    # Promote per-response generation-info into sample_metrics (per rank, before the
-    # gather below; independent of log_samples). See promote_generation_info_metrics.
-    for task_output in eval_tasks:
-        promote_generation_info_metrics(task_output, include_length=log_length_metrics)
+    # Promote per-response generation info into the upstream ResultAcc before the
+    # distributed gather. This is independent of sample logging.
+    for acc in eval_results_acc.values():
+        promote_generation_info_metrics(acc, include_length=log_length_metrics)
 
     if WORLD_SIZE > 1:
-        import torch
-
-        # if multigpu, then gather data across all ranks to rank 0
-        # first gather logged samples across all ranks
-        for task_output in eval_tasks:
-            if log_samples:
-                # for task_name, task_samples in list(samples.items()):
-                full_samples = [None] * WORLD_SIZE if RANK == 0 else None
-                torch.distributed.gather_object(
-                    obj=task_output.logged_samples,
-                    object_gather_list=full_samples,
-                    dst=0,
-                )
-
-                if RANK == 0:
-                    task_output.logged_samples = list(
-                        itertools.chain.from_iterable(full_samples)
+        # Gather all sample metrics across ranks, keyed by task name.
+        if log_samples:
+            rank_samples = {
+                task_name: acc["logged_samples"]
+                for task_name, acc in eval_results_acc.items()
+            }
+            all_samples = lm.gather_object(rank_samples, dst=0)
+            if RANK == 0:
+                for task_name, acc in eval_results_acc.items():
+                    acc["logged_samples"] = list(
+                        itertools.chain.from_iterable(
+                            rank_data[task_name]
+                            for rank_data in all_samples  # type: ignore
+                        )
                     )
 
-            # then collect metrics across all ranks. Agree on a consistent key
-            # set first: a rank with an empty shard (world_size > docs-for-task,
-            # reachable for multi_turn_generate on small/limited tasks, or any DP
-            # run with fewer docs than ranks) has no `sample_metrics` keys and
-            # would otherwise issue fewer `gather_object` collectives than its
-            # peers — desyncing the gather and deadlocking the job.
-            local_keys = list(task_output.sample_metrics.keys())
-            gathered_keys = [None] * WORLD_SIZE
-            torch.distributed.all_gather_object(gathered_keys, local_keys)
-            all_keys = sorted({k for keys in gathered_keys for k in keys})
-            for metrics in all_keys:
-                metric_list = [None] * WORLD_SIZE if RANK == 0 else None
-                torch.distributed.gather_object(
-                    obj=task_output.sample_metrics.get(metrics, []),
-                    object_gather_list=metric_list,
-                    dst=0,
-                )
-                if RANK == 0:
-                    task_output.sample_metrics[metrics] = list(
-                        itertools.chain.from_iterable(metric_list)
+        rank_metrics = {
+            task_name: dict(acc["raw_metrics"])
+            for task_name, acc in eval_results_acc.items()
+        }
+        all_metrics = lm.gather_object(rank_metrics, dst=0)
+        if RANK == 0:
+            for task_name, acc in eval_results_acc.items():
+                metric_keys = {
+                    metric_key
+                    for rank_data in all_metrics  # type: ignore[union-attr]
+                    for metric_key in rank_data[task_name]
+                }
+                for metric_key in metric_keys:
+                    acc["raw_metrics"][metric_key] = list(
+                        itertools.chain.from_iterable(
+                            rank_data[task_name].get(metric_key, [])
+                            for rank_data in all_metrics  # type: ignore
+                        )
                     )
 
     if RANK == 0:
-        ### Aggregate results over all datapoints ###
-        # aggregate results ; run bootstrap CIs
-        for task_output in eval_tasks:
-            task_output.calculate_aggregate_metric(bootstrap_iters=bootstrap_iters)
-        (
-            results,
-            samples,
-            configs,
-            versions,
-            num_fewshot,
-            higher_is_better,
-        ) = consolidate_results(eval_tasks)
+        res = _process_results(eval_results_acc, groups, bootstrap_iters)
 
-        ### Calculate group metrics ###
-        if bool(results):
-            results, versions, show_group_table, *_ = consolidate_group_results(
-                results, versions, task_dict
-            )
-
-        results_agg, group_agg = prepare_print_tasks(task_dict, results)
-        subtask_list = get_subtask_list(task_dict)
-
-        # collect all higher_is_better values for metrics
-        # in the group's subtasks.
-        # TODO: clean this up ; unify with the below metric_list loop?
-        _higher_is_better = {}
-        for group, task_list in subtask_list.items():
-            if (
-                len(task_list) != 0
-            ):  # subtask list will list "task_name": [] for solo tasks
-                for task in task_list:
-                    for m, h in higher_is_better[task].items():
-                        if m not in _higher_is_better:
-                            _higher_is_better[m] = h
-
-                        if (
-                            m in _higher_is_better
-                            and _higher_is_better[m] is not None
-                            and _higher_is_better[m] != h
-                        ):
-                            eval_logger.warning(
-                                f"Higher_is_better values for metric {m} in group {group} are not consistent. Defaulting to None."
-                            )
-                            _higher_is_better[m] = None
-                higher_is_better[group] = _higher_is_better
-
-        results_dict = {
-            "results": dict(results_agg.items()),
-            **(
-                {"groups": dict(group_agg.items())}
-                if (bool(group_agg) & show_group_table)
-                else {}
-            ),
-            "group_subtasks": dict(reversed(subtask_list.items())),
-            "configs": dict(sorted(configs.items())),
-            "versions": dict(sorted(versions.items())),
-            "n-shot": dict(sorted(num_fewshot.items())),
-            "higher_is_better": dict(sorted(higher_is_better.items())),
-            "n-samples": {
-                task_output.task_name: {
-                    "original": len(task_output.task.eval_docs),
-                    "effective": min(
-                        limit if limit else len(task_output.task.eval_docs),
-                        len(task_output.task.eval_docs),
-                    ),
-                }
-                for task_output, limit in zip(eval_tasks, limits, strict=True)
-            },
-        }
+        samples = None
         if log_samples:
-            # default: hash images
-            samples = (
-                hash_dict_images(samples)
-                if os.environ.get("LMEVAL_HASHMM", "1") != "0"
-                and (hasattr(lm, "MULTIMODAL"))
-                else samples
-            )
-            results_dict["samples"] = dict(samples)
+            samples = res.samples
+            if LMEVAL_HASHMM and hasattr(lm, "MULTIMODAL"):
+                samples = hash_dict_images(samples)
 
-        return results_dict
-
+        return res._to_eval_results(samples=samples)
     else:
         return None
-
-
-# Defensive cap on multi-turn rollout depth against a task whose
-# ``next_user_turn`` never returns ``None``. No real benchmark exceeds ~10
-# turns; 64 is comfortable headroom. Expose via task config if ever needed.
-MAX_SAFETY_TURNS = 64
-
-
-def _gather_ints(lm, value: int) -> list[int]:
-    """Collective ``accelerator.gather`` of one per-rank integer, returned as
-    a plain list (length == world_size). All ranks must call together. The
-    caller applies the reduction (``any`` / ``max``).
-    """
-    import torch
-
-    t = torch.tensor(int(value), device=lm.device)
-    return lm.accelerator.gather(t).cpu().detach().numpy().tolist()
-
-
-def _any_rank_has_pending(lm, pending) -> bool:
-    """Collective entry guard. True iff any rank has docs."""
-    return any(_gather_ints(lm, bool(pending)))
-
-
-def _gather_max_live(lm, local_n: int) -> int:
-    """Collective per-turn gather. Returns ``max(live_n across ranks)``,
-    used both for global termination (``== 0``) and pad-to-global-max.
-    """
-    return max(_gather_ints(lm, local_n))
-
-
-def run_multi_turn_rollout(lm, mt_task_outputs) -> None:
-    """Iterative multi-turn rollout driver for ``output_type: multi_turn_generate``.
-
-    Per turn, for each pending doc: ask the task for the next user turn
-    via ``task.next_user_turn`` (None → mark done), render the growing
-    history through ``lm.apply_chat_template``, build one
-    ``Instance(idx=turn_idx)``, and batch all pending instances across
-    all multi-turn tasks into a single ``lm.generate_until`` call. The
-    response is appended to history and ``task._instances``, then
-    ``task.should_stop`` decides early-exit. Loop stops when no docs
-    are pending; the standard post-process loop in ``evaluate()`` then
-    consumes the variable-length per-doc instance lists the same way
-    it handles ``multiple_choice``'s N-instances-per-doc.
-
-    Distributed (``accelerate launch``) is supported when the LM
-    exposes ``lm.accelerator``. Three coordination points keep
-    collectives even-batched: a collective entry guard, a per-turn
-    ``gather`` of live counts (drives termination and pad size), and
-    sentinel-dummy padding for ranks with fewer live docs than the
-    global max. Backends with internal DP (vLLM ``data_parallel_size``,
-    SGLang / openai ``num_concurrent``) expose ``world_size == 1`` and
-    take the non-distributed branch.
-
-    Full architecture, hook contract, backend matrix, and limits:
-    ``docs/multi_turn_rollout.md``.
-    """
-    from copy import deepcopy
-
-    from lm_eval.api.instance import Instance
-    from lm_eval.api.utils import Message
-
-    if not mt_task_outputs:
-        return
-
-    # Docs are already sharded across ranks by
-    # `task.doc_iterator(rank, world_size)` in
-    # `_build_initial_multi_turn_states`; the coordination rules live in
-    # the docstring above.
-    is_distributed = lm.world_size > 1
-    if is_distributed and not hasattr(lm, "accelerator"):
-        raise NotImplementedError(
-            "multi_turn_generate with world_size > 1 requires an "
-            "`accelerator` attribute on the LM (HuggingFace + `accelerate "
-            "launch`). Backends that do their own data parallelism "
-            "internally should expose world_size=1."
-        )
-
-    # Each (task_output, doc_id, state) so the response routes back to
-    # the right task.
-    pending: list[tuple] = []
-    for to in mt_task_outputs:
-        for doc_id, state in to.task._multi_turn_states.items():
-            pending.append((to, doc_id, state))
-
-    # `build_all_requests` already errored if --apply_chat_template was
-    # forgotten; this catches backends that don't implement it at all.
-    if not hasattr(lm, "apply_chat_template"):
-        raise RuntimeError(
-            "multi_turn_generate requires `lm.apply_chat_template`; "
-            "backend does not provide it."
-        )
-
-    # Entry guard — collective so ranks with empty shards don't strand
-    # peers at the next gather. Both early-return sites must clear
-    # `_multi_turn_states` (otherwise the histories built by
-    # `_build_initial_multi_turn_states` leak past short-circuit).
-    if is_distributed:
-        if not _any_rank_has_pending(lm, pending):
-            _clear_multi_turn_states(mt_task_outputs)
-            return
-    elif not pending:
-        _clear_multi_turn_states(mt_task_outputs)
-        return
-
-    # Pad sentinel: 1-token throwaway request used by ranks whose live
-    # batch is below the global max. Response is discarded.
-    dummy_instance = Instance(
-        request_type="generate_until",
-        doc={},
-        arguments=("<pad>", {"max_gen_toks": 1, "until": []}),
-        idx=-1,
-        metadata=("__multi_turn_dp_pad__", -1, 1),
-    )
-
-    turn_idx = 0
-    while True:
-        live: list[tuple] = []
-        this_turn_batch: list[tuple] = []  # (task_output, state, Instance)
-
-        for to, doc_id, state in pending:
-            user_text = to.task.next_user_turn(state.doc, state.history, turn_idx)
-            if user_text is None:
-                state.done = True
-                continue
-
-            state.history.append(Message("user", user_text))
-
-            prompt = lm.apply_chat_template(
-                [m.to_dict() for m in state.history],
-                add_generation_prompt=True,
-            )
-            gen_kwargs = deepcopy(to.task.config.generation_kwargs or {})
-
-            inst = Instance(
-                request_type="generate_until",
-                doc=state.doc,
-                arguments=(prompt, gen_kwargs),
-                idx=turn_idx,
-                metadata=(
-                    to.task.config.task,
-                    doc_id,
-                    to.task.config.repeats or 1,
-                ),
-            )
-            this_turn_batch.append((to, state, inst))
-            live.append((to, doc_id, state))
-
-        # Termination: distributed requires EVERY rank's batch to be
-        # empty before breaking (else the next gather deadlocks).
-        local_n = len(this_turn_batch)
-        if is_distributed:
-            global_max = _gather_max_live(lm, local_n)
-            if global_max == 0:
-                break
-        else:
-            if local_n == 0:
-                break
-            global_max = local_n
-
-        # Safety cap deliberately checked AFTER the per-turn gather so a
-        # future refactor that diverges `turn_idx` across ranks cannot
-        # cause an asymmetric break that deadlocks the next gather.
-        # Today `turn_idx` is identical on every rank — all ranks break
-        # together — but the order matters for that invariant.
-        if turn_idx >= MAX_SAFETY_TURNS:
-            eval_logger.warning(
-                "multi_turn_generate driver hit safety cap of %d turns; "
-                "%d docs still pending — stopping.",
-                MAX_SAFETY_TURNS,
-                len(pending),
-            )
-            break
-
-        cloned = [inst for _, _, inst in this_turn_batch]
-        numpad = global_max - local_n
-        if numpad > 0:
-            cloned.extend([dummy_instance] * numpad)
-
-        responses = lm.generate_until(cloned)
-
-        if is_distributed:
-            lm.accelerator.wait_for_everyone()
-
-        for (to, state, inst), resp in zip(
-            this_turn_batch, responses[:local_n], strict=True
-        ):
-            inst.resps.append(resp)
-            state.history.append(Message("assistant", resp))
-            to.task._instances.append(inst)
-
-            if to.task.should_stop(state.doc, state.history, turn_idx):
-                state.done = True
-
-        pending = [(to, did, st) for to, did, st in live if not st.done]
-        turn_idx += 1
-
-    eval_logger.info(
-        "multi_turn_generate driver completed: %d task(s), %d total turns "
-        "across %d initial docs",
-        len(mt_task_outputs),
-        turn_idx,
-        sum(len(to.task._multi_turn_states) for to in mt_task_outputs),
-    )
-
-    _clear_multi_turn_states(mt_task_outputs)
-
-
-def _clear_multi_turn_states(mt_task_outputs) -> None:
-    """Release per-doc conversation histories. Called at end-of-loop
-    AND each early-return in :func:`run_multi_turn_rollout`; task
-    objects can persist across ``simple_evaluate`` calls (notebook /
-    test flows) and would otherwise retain full N-turn histories
-    indefinitely.
-    """
-    for to in mt_task_outputs:
-        if hasattr(to.task, "_multi_turn_states"):
-            del to.task._multi_turn_states
-
-
-def request_caching_arg_to_dict(cache_requests: str) -> dict:
-    request_caching_args = {
-        "cache_requests": cache_requests in {"true", "refresh"},
-        "rewrite_requests_cache": cache_requests == "refresh",
-        "delete_requests_cache": cache_requests == "delete",
-    }
-
-    return request_caching_args

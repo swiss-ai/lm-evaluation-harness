@@ -8,8 +8,9 @@ re-evaluates after each, early-exiting on first scenario failure.
 
 This task uses the harness's ``output_type: multi_turn_generate`` to
 get exactly that behavior. The evaluator's per-turn driver
-(``run_multi_turn_rollout`` in ``lm_eval/evaluator.py``) calls the
-three hooks we expose:
+(``run_multi_turn_rollout`` in ``lm_eval/evaluator.py``) drives the core
+``multiturn_*`` hooks; ``ConfigurableTask``'s default implementations of
+those hooks delegate to the three scripted hooks we expose here:
 
 * :meth:`build_initial_messages` — system + any prefilled context up to
   but not including the first trailing user turn.

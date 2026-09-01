@@ -1,4 +1,3 @@
-include: ../_base_template_yaml
+include: ../_insurance_template_yaml
 dataset_name: Romansh
-process_docs: !function ../utils.process_insurance
 task: switzerland_qa_rm_insurance_0shot_cot

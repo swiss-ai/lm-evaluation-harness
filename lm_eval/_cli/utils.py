@@ -67,18 +67,15 @@ def request_caching_arg_to_dict(cache_requests: str | None) -> dict[str, bool]:
     """Convert a request caching argument to a dictionary."""
     if cache_requests is None:
         return {}
-    valid_choices = {"true", "refresh", "delete"}
-    if cache_requests not in valid_choices:
+    if cache_requests not in {"true", "refresh", "delete"}:
         raise argparse.ArgumentTypeError(
-            f"invalid choice: {cache_requests!r} (choose from {', '.join(repr(c) for c in valid_choices)})"
+            f"invalid value '{cache_requests}' (choose from true, refresh, delete)"
         )
-    request_caching_args = {
+    return {
         "cache_requests": cache_requests in {"true", "refresh"},
         "rewrite_requests_cache": cache_requests == "refresh",
         "delete_requests_cache": cache_requests == "delete",
     }
-
-    return request_caching_args
 
 
 def check_argument_types(parser: argparse.ArgumentParser) -> None:

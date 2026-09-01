@@ -1,3 +1,4 @@
-include: _template_yaml
+include:
+  - _template_yaml
+  - ../_northern_nigeria_processor_yaml
 task: blend_northern_nigeria
-process_docs: !function ../utils.process_northern_nigeria 

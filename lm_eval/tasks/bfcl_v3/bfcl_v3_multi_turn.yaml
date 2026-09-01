@@ -1,0 +1,12 @@
+group: bfcl_v3_multi_turn
+task:
+  - bfcl_v3_multi_turn_base
+  - bfcl_v3_multi_turn_miss_func
+  - bfcl_v3_multi_turn_miss_param
+  - bfcl_v3_multi_turn_long_context
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 3

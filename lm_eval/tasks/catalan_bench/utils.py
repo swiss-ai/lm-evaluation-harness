@@ -41,7 +41,7 @@ def process_results_coqcat(doc, results):
     answers = [doc["answers"]["input_text"][turn_id - 1]]
     additional_answers_list = doc.get("additional_answers")
     if additional_answers_list:
-        for key, additional_answers in additional_answers_list.items():
+        for _key, additional_answers in additional_answers_list.items():
             if additional_answers["input_text"][turn_id - 1].lower() not in map(
                 str.lower, answers
             ):
@@ -111,8 +111,9 @@ def process_docs_paraphrases(dataset):
             return doc
 
     return dataset.filter(
-        lambda doc: doc["sentence1"] not in [None, ""]
-        and doc["sentence2"] not in [None, ""]
+        lambda doc: (
+            doc["sentence1"] not in [None, ""] and doc["sentence2"] not in [None, ""]
+        )
     ).map(_process_doc)
 
 

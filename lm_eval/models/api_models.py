@@ -4,20 +4,14 @@ import copy
 import itertools
 import json
 import logging
+import os
+from collections.abc import Awaitable, Callable, Iterable
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
-    Callable,
-    Dict,
-    Iterable,
-    List,
     Literal,
     NamedTuple,
-    Optional,
-    Tuple,
-    Union,
 )
 
 
@@ -37,16 +31,24 @@ from io import BytesIO
 from lm_eval import utils
 from lm_eval.api.instance import Instance
 from lm_eval.api.model import TemplateLM
+from lm_eval.api.rate_limiter import get_rate_limiter
 from lm_eval.models.utils import Collator, chunks, configure_pad_token
 
 
 if TYPE_CHECKING:
     from PIL import Image
 
+# Set a placeholder to use as model output when the returned answer is "None"
+# This commonly occurs when the model runs out of tokens during the thinking
+# process and returns an empty answer but no error.
+# Default value is an empty string, but it can be edited if this is problematic.
+LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = os.environ.get(
+    "LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER", ""
+)
 
 eval_logger = logging.getLogger(__name__)
 
-LogLikelihoodInputs = Tuple[Tuple[str, str], List[int], List[int]]
+LogLikelihoodInputs = tuple[tuple[str, str], list[int], list[int]]
 
 
 # utility class to keep track of json encoded chats
@@ -86,8 +88,8 @@ def create_image_prompt(
         }
         images.append(img_dict)
 
-    # chat is in format of list[dict["role": "user"/"system", "content": str, "type": "text"],...]
-    # with images, we need "content" to be a list of dicts with "type" and "text"/"image_url"
+    # With images, we need "content" to be a list of dicts with
+    # "type" and "text"/"image_url".
     # currently we do not support few-shots so only one user message
     # text content also has <image> placeholders, which apparently is not necessary for API class (confirm)
 
@@ -96,7 +98,7 @@ def create_image_prompt(
     else:
         text_content = {"type": "text", "text": chat[-1]["content"]}
         chat[-1]["content"] = images + [text_content]
-    chat[-1].pop("type")
+    chat[-1].pop("type", None)
     return chat
 
 
@@ -105,38 +107,40 @@ class TemplateAPI(TemplateLM):
 
     def __init__(
         self,
-        model: str = None,
-        pretrained: str = None,  # `model` takes precedence over `pretrained` when passed.
-        base_url: str = None,
-        tokenizer: Optional[str] = None,
+        model: str | None = None,
+        pretrained: str
+        | None = None,  # `model` takes precedence over `pretrained` when passed.
+        base_url: str | None = None,
+        tokenizer: str | None = None,
         # Loglikelihood tasks require a tokenizer to calculate context lengths,
         # however the requests can be sent as a string if the API doesn't support token inputs.
         # use tokenized_requests=False
-        tokenizer_backend: Optional[
-            Literal["tiktoken", "huggingface", "remote", "None", "none"]
-        ] = "huggingface",
+        tokenizer_backend: Literal["tiktoken", "huggingface", "remote", "None", "none"]
+        | None = "huggingface",
         truncate: bool = False,
         # number of concurrent requests. More useful if not batching
         num_concurrent: int = 1,
+        # maximum HTTP request starts per minute; unset disables rate limiting
+        requests_per_minute: float | None = None,
         max_retries: int = 3,
         max_gen_toks: int = 256,
-        batch_size: Union[str, int] = 1,
+        batch_size: str | int = 1,
         seed: int = 1234,
-        max_length: Optional[int] = 2048,
+        max_length: int | None = 2048,
         add_bos_token: bool = False,
-        custom_prefix_token_id: int = None,
+        custom_prefix_token_id: int | None = None,
         # send the requests as tokens or strings
         tokenized_requests: bool = True,
         trust_remote_code: bool = False,
-        revision: Optional[str] = "main",
+        revision: str | None = "main",
         use_fast_tokenizer: bool = True,
         verify_certificate: bool = True,
-        ca_cert_path: Optional[str] = None,
-        auth_token: Optional[str] = None,
-        eos_string: str = None,
+        ca_cert_path: str | None = None,
+        auth_token: str | None = None,
+        eos_string: str | None = None,
         # timeout in seconds
         timeout: int = 300,
-        header: Optional[Dict[str, str]] = None,
+        header: dict[str, str] | None = None,
         max_images: int = 1,
         **kwargs,
     ) -> None:
@@ -159,11 +163,14 @@ class TemplateAPI(TemplateLM):
             eval_logger.warning(
                 "Automatic batch size is not supported for API models. Defaulting to batch size 1."
             )
+            self._batch_size = 1
         elif int(batch_size) > 1:
             eval_logger.warning(
                 "Batch size > 1 detected. Ensure your API supports batched requests with varying total sequence lengths."
             )
-        self._batch_size = int(batch_size) if batch_size != "auto" else 1
+            self._batch_size = int(batch_size)
+        else:
+            self._batch_size = int(batch_size)
         self._truncate = truncate
         self._max_gen_toks = int(max_gen_toks)
         self._seed = int(seed)
@@ -175,6 +182,15 @@ class TemplateAPI(TemplateLM):
                 "Concurrent requests are disabled. To enable concurrent requests, set `num_concurrent` > 1."
             )
         self._concurrent = int(num_concurrent)
+        self._rate_limiter = get_rate_limiter(
+            requests_per_minute,
+            scope=f"model:{self.base_url}:{self.model}",
+        )
+        if self._rate_limiter is not None:
+            eval_logger.info(
+                "Rate limiting API requests to %s requests/minute",
+                self._rate_limiter.requests_per_minute,
+            )
         self.tokenizer_backend = (
             None if tokenizer_backend in ("None", "none") else tokenizer_backend
         )
@@ -199,7 +215,7 @@ class TemplateAPI(TemplateLM):
                     import transformers
 
                     self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-                        self.tokenizer if self.tokenizer else self.model,
+                        self.tokenizer or self.model,
                         trust_remote_code=trust_remote_code,
                         revision=revision,
                         use_fast=use_fast_tokenizer,
@@ -250,12 +266,12 @@ class TemplateAPI(TemplateLM):
     @abc.abstractmethod
     def _create_payload(
         self,
-        messages: Union[List[List[int]], List[dict], List[str], str],
+        messages: list[list[int]] | list[dict] | list[str] | str,
         *,
         generate: bool = True,
-        gen_kwargs: Optional[dict] = None,
+        gen_kwargs: dict | None = None,
         seed: int = 1234,
-        eos: str = None,
+        eos: str | None = None,
         **kwargs,
     ) -> dict:
         """This method is responsible for creating the json payload that will be sent to the API."""
@@ -263,9 +279,9 @@ class TemplateAPI(TemplateLM):
 
     def create_message(
         self,
-        messages: Union[List[List[int]], List[str], List[JsonChatStr]],
+        messages: list[list[int]] | list[str] | list[JsonChatStr],
         generate=False,
-    ) -> Union[List[List[int]], List[dict], List[str], str]:
+    ) -> list[list[int]] | list[dict] | list[str] | str:
         """Helper method to transform the prompt into the expected API input format. messages consist of batched requests"""
         if isinstance(messages[0], JsonChatStr):
             # for chat completions we need to decode the json string to list[dict,...]
@@ -294,17 +310,17 @@ class TemplateAPI(TemplateLM):
     @staticmethod
     @abc.abstractmethod
     def parse_logprobs(
-        outputs: Union[Any, List[Any]],
-        tokens: List[List[int]] = None,
-        ctxlen: List[int] = None,
+        outputs: Any | list[Any],
+        tokens: list[list[int]] | None = None,
+        ctxlen: list[int] | None = None,
         **kwargs,
-    ) -> List[Tuple[float, bool]]:
+    ) -> list[tuple[float, bool]]:
         """Method used to parse the logprobs from the (batched) API response. This method should return a list of tuples"""
         raise NotImplementedError
 
     @staticmethod
     @abc.abstractmethod
-    def parse_generations(outputs: Union[Any, List[Any]], **kwargs) -> List[str]:
+    def parse_generations(outputs: Any | list[Any], **kwargs) -> list[str]:
         """Method used to parse the generations from the (batched) API response. This method should return a list of str"""
         raise NotImplementedError
 
@@ -327,8 +343,11 @@ class TemplateAPI(TemplateLM):
         return ""
 
     def apply_chat_template(
-        self, chat_history: List[Dict[str, str]], add_generation_prompt: bool = True
-    ) -> Union[str, JsonChatStr, List[Dict]]:
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
+    ) -> str | JsonChatStr | list[dict]:
         """Applies a chat template to a list of chat history between user and model."""
         if self.tokenizer_backend == "huggingface" and self.tokenized_requests:
             return self.tokenizer.apply_chat_template(
@@ -336,20 +355,16 @@ class TemplateAPI(TemplateLM):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **kwargs,
             )
         elif self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history
         else:
             # bit of a hack. We'll load back before sending to the API
-            return JsonChatStr(
-                json.dumps(
-                    [{**item, "type": "text"} for item in chat_history],
-                    ensure_ascii=False,
-                )
-            )
+            return JsonChatStr(json.dumps(chat_history, ensure_ascii=False))
 
     @cached_property
-    def eot_token_id(self) -> Optional[int]:
+    def eot_token_id(self) -> int | None:
         if self.tokenizer is None:
             return None
         else:
@@ -361,7 +376,7 @@ class TemplateAPI(TemplateLM):
                 return self.tokenizer.eos_token_id
 
     @cached_property
-    def eos_string(self) -> Optional[str]:
+    def eos_string(self) -> str | None:
         if self._eos_string:
             return self._eos_string
         elif self.tokenizer is not None:
@@ -378,7 +393,7 @@ class TemplateAPI(TemplateLM):
             return None
 
     @cached_property
-    def prefix_token_id(self) -> Optional[int]:
+    def prefix_token_id(self) -> int | None:
         if self.tokenizer is None:
             return None
         else:
@@ -396,18 +411,18 @@ class TemplateAPI(TemplateLM):
     def tok_encode(
         self,
         string: str,
-        left_truncate_len: int = None,
+        left_truncate_len: int | None = None,
         add_special_tokens: bool = False,
         truncation: bool = False,
         **kwargs,
-    ) -> Union[List[List[int]], List[int], List[str]]:
+    ) -> list[list[int]] | list[int] | list[str]:
         if self.tokenizer_backend is None:
             return [string]
         elif self.tokenizer_backend == "huggingface":
             # by default for CausalLM - false or self.add_bos_token is set
             if not add_special_tokens:
                 add_special_tokens = False or self.add_bos_token
-            encoding: Union[List[List[int]], List[int]] = self.tokenizer(
+            encoding: list[list[int]] | list[int] = self.tokenizer(
                 string,
                 add_special_tokens=add_special_tokens,
                 truncation=truncation,
@@ -438,11 +453,11 @@ class TemplateAPI(TemplateLM):
         else:
             try:
                 encoding = self.tokenizer.encode(string)
-            except Exception:
+            except (TypeError, ValueError):
                 encoding = self.tokenizer.encode_batch(string)
             return encoding
 
-    def decode_batch(self, tokens: List[List[int]]) -> List[str]:
+    def decode_batch(self, tokens: list[list[int]]) -> list[str]:
         if self.tokenizer_backend == "huggingface":
             return self.tokenizer.batch_decode(tokens)
         elif self.tokenizer_backend == "tiktoken":
@@ -452,15 +467,17 @@ class TemplateAPI(TemplateLM):
 
     def model_call(
         self,
-        messages: Union[List[List[int]], List[str], List[JsonChatStr]],
+        messages: list[list[int]] | list[str] | list[JsonChatStr],
         *,
         generate: bool = True,
-        gen_kwargs: Optional[Dict] = None,
+        gen_kwargs: dict | None = None,
         **kwargs,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         try:
+            if self._rate_limiter is not None:
+                self._rate_limiter.acquire()
             response = requests.post(
                 self.base_url,
                 json=self._create_payload(
@@ -473,6 +490,7 @@ class TemplateAPI(TemplateLM):
                 ),
                 headers=self.header,
                 verify=self.verify_certificate,
+                timeout=self.timeout,
             )
             if not response.ok:
                 eval_logger.warning(
@@ -490,14 +508,14 @@ class TemplateAPI(TemplateLM):
         self,
         session: ClientSession,
         sem: asyncio.Semaphore,
-        messages: Union[List[List[int]], List[str], List[JsonChatStr]],
+        messages: list[list[int]] | list[str] | list[JsonChatStr],
         *,
         generate: bool = True,
-        cache_keys: list = None,
-        ctxlens: Optional[List[int]] = None,
-        gen_kwargs: Optional[Dict] = None,
+        cache_keys: list | None = None,
+        ctxlens: list[int] | None = None,
+        gen_kwargs: dict | None = None,
         **kwargs,
-    ) -> Union[List[str], List[Tuple[float, bool]], None]:
+    ) -> list[str] | list[tuple[float, bool]] | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         payload = self._create_payload(
@@ -511,6 +529,8 @@ class TemplateAPI(TemplateLM):
         acquired = await sem.acquire()
         outputs = None
         try:
+            if self._rate_limiter is not None:
+                await self._rate_limiter.acquire_async()
             async with session.post(
                 self.base_url,
                 json=payload,
@@ -525,7 +545,7 @@ class TemplateAPI(TemplateLM):
                 # raising exception will retry the request
                 response.raise_for_status()
                 outputs = await response.json()
-            answers = (
+            tmp_answers = (
                 self.parse_generations(
                     outputs=outputs,
                 )
@@ -536,21 +556,35 @@ class TemplateAPI(TemplateLM):
                     ctxlens=ctxlens,
                 )
             )
+
+            # Convert `None`` values to `LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER` string to maintain consistency
+            answers = []
+            for a in tmp_answers:
+                if a is None:
+                    eval_logger.warning(
+                        f"API returned null content. Content filled with `LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = {LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER}`. Check reasoning_content field or generation limits."
+                    )
+                    answers.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
+                else:
+                    answers.append(a)
+
             if cache_keys:
                 for res, cache in zip(answers, cache_keys):
                     self.cache_hook.add_partial(cache_method, cache, res)
             return answers
         # If the retries also fail
         except BaseException as e:
-            eval_logger.error(f"Exception:{repr(e)}, {outputs}, retrying.")
-            raise e
+            eval_logger.error(
+                f"Exception:{e!r}, {locals().get('outputs', '(no outputs)')}, retrying."
+            )
+            raise
         finally:
             if acquired:
                 sem.release()
 
     def batch_loglikelihood_requests(
-        self, chunks: Iterable[List[LogLikelihoodInputs]]
-    ) -> Tuple[List[List[int]], List[int], List[Tuple[str, str]]]:
+        self, chunks: Iterable[list[LogLikelihoodInputs]]
+    ) -> tuple[list[list[int]], list[int], list[tuple[str, str]]]:
         inputs = []
         ctxlens = []
         cache_keys = []
@@ -577,10 +611,10 @@ class TemplateAPI(TemplateLM):
         cache_keys: list,
         *,
         generate: bool = True,
-        ctxlens: List[int] = None,
+        ctxlens: list[int] | None = None,
         **kwargs,
-    ) -> Union[List[List[str]], List[List[Tuple[float, bool]]]]:
-        ctxlens = ctxlens if ctxlens else [None] * len(requests)
+    ) -> list[list[str]] | list[list[tuple[float, bool]]]:
+        ctxlens = ctxlens or [None] * len(requests)
         conn = TCPConnector(limit=self._concurrent, ssl=self.verify_certificate)
         sem = asyncio.Semaphore(self._concurrent)
         async with ClientSession(
@@ -625,7 +659,7 @@ class TemplateAPI(TemplateLM):
                     raise result
             return results
 
-    def _loglikelihood_tokens(self, requests, **kwargs) -> List[Tuple[float, bool]]:
+    def _loglikelihood_tokens(self, requests, **kwargs) -> list[tuple[float, bool]]:
         assert self.tokenizer is not None, (
             "Tokenizer is required for loglikelihood tasks to compute context lengths."
         )
@@ -689,8 +723,8 @@ class TemplateAPI(TemplateLM):
         return re_ord.get_original(res)
 
     def generate_until(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[str]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[str]:
         res = []
 
         def _collate_gen(_requests):
@@ -782,9 +816,10 @@ class TemplateAPI(TemplateLM):
                     # even if generation failed (generated_text is None)
                     if generated_text is None:
                         eval_logger.warning(
-                            "API returned null content. Check reasoning_content field or generation limits..."
+                            f"API returned null content. Content filled with `LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = {LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER}`. Check reasoning_content field or generation limits."
                         )
-                        res.append("")
+                        # Patch "None" answer with consistent value (async and sync calls)
+                        res.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
                     else:
                         res.append(generated_text)
 
@@ -825,21 +860,14 @@ class TemplateAPI(TemplateLM):
                         )
                     )
                 )
-                # Convert None values to empty strings to maintain consistency
-                for r in results:
-                    if r is None:
-                        eval_logger.warning(
-                            "API returned null content. Check reasoning_content field or generation limits."
-                        )
-                        res.append("")
-                    else:
-                        res.append(r)
+                # Append results to res list
+                res.extend(results)
 
         return re_ord.get_original(res)
 
     def loglikelihood_rolling(
-        self, requests: List[Instance], disable_tqdm: bool = False
-    ) -> List[float]:
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[float]:
         loglikelihoods = []
 
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):

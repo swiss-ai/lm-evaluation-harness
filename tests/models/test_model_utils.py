@@ -876,8 +876,8 @@ class TestResolveThinkTokens:
 
     def test_autodetect_off_suppresses_fail_loud(self):
         # the new escape hatch: autodetect=False never scans the template, so an
-        # unparseable close cannot raise (works on every backend, incl. sglang).
-        tpl = "{% set inner_token = x %}{% set outer_token = y %}"  # unparseable values
+        # unparsable close cannot raise (works on every backend, incl. sglang).
+        tpl = "{% set inner_token = x %}{% set outer_token = y %}"  # unparsable values
         assert resolve_think_tokens(tpl, False, None, None) == (None, None)
 
     def test_fail_loud_when_close_undetectable(self):

@@ -1,16 +1,14 @@
 import ast
+import contextlib
 import os
 import random
 import re
-from typing import List
 
 import numpy as np
 
 
-try:
+with contextlib.suppress(ImportError):
     from openai import OpenAI
-except ImportError:
-    pass
 
 API_TYPE = os.getenv("API_TYPE", "openai")
 MODEL_VERSION = os.getenv("MODEL_VERSION", "gpt-4.1-mini")
@@ -87,11 +85,6 @@ def pisa_process_results_llm_judged(doc, results, **kwargs):
     assert os.getenv("OPENAI_API_KEY") is not None, (
         "OPENAI_API_KEY environment variable is not set."
     )
-    try:
-        from openai import OpenAI
-    except ImportError:
-        raise ImportError("Please install openai package to use LLM judging.")
-
     index2ans, all_choices = get_multi_choice_info(
         ast.literal_eval(f"{doc['choices']}")
     )
@@ -288,7 +281,7 @@ def get_multi_choice_info(options):
 
 
 # LLM as a judge utils
-def build_user_prompt(student_answer: str, options: List[str], correct: str) -> str:
+def build_user_prompt(student_answer: str, options: list[str], correct: str) -> str:
     """
     options: like ["A) red", "B) blue", "C) green", "D) yellow"]
     correct: either a letter like "B" or the full option text. Both are provided to help you.
@@ -309,7 +302,7 @@ Instructions:
 """
 
 
-def judge_mcq(pred: str, options: List[str], correct: str) -> int:
+def judge_mcq(pred: str, options: list[str], correct: str) -> int:
     client = OpenAI(
         api_key=os.getenv("OPENAI_API_KEY"),
     )

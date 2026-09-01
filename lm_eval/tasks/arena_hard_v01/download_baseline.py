@@ -7,10 +7,10 @@ This saves the baseline JSONL into the task directory so that metric.py
 can load it locally instead of downloading from HuggingFace at runtime.
 """
 
-import json
 import os
 
 from huggingface_hub import hf_hub_download
+
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_PATH = os.path.join(SCRIPT_DIR, "gpt-4-0314_baseline.jsonl")

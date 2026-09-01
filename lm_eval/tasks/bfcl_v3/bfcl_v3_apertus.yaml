@@ -1,0 +1,4 @@
+group: bfcl_v3_apertus
+task:
+  - bfcl_v3_apertus_single_turn
+  - bfcl_v3_apertus_multi_turn

@@ -1,4 +1,3 @@
-include: ../_base_template_yaml
+include: ../_political_life_template_yaml
 dataset_name: English
-process_docs: !function ../utils.process_political_life
 task: switzerland_qa_en_political_life_0shot_cot
