@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_us_processor_yaml
+task: blend_us_sample

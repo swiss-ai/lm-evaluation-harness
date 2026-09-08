@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_china_processor_yaml
+task: blend_china_sample

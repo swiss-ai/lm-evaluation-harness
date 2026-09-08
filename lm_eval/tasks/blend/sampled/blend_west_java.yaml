@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_west_java_processor_yaml
+task: blend_west_java_sample

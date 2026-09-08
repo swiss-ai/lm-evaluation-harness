@@ -1,0 +1,3 @@
+include: ../_history_template_yaml
+dataset_name: French
+task: switzerland_qa_fr_history_0shot

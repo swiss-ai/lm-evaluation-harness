@@ -1,0 +1,5 @@
+include: ../_base_template_yaml
+dataset_name: Croatian
+description: Slijede pitanja s višestrukim izborom (s odgovorima) o Social Science.
+process_docs: !function 'lm_eval.tasks.include.gen_0shot.utils.process_social_science'
+task: include_base_44_croatian_gen_0shot_social_science

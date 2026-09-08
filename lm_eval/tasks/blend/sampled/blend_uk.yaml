@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_uk_processor_yaml
+task: blend_uk_sample

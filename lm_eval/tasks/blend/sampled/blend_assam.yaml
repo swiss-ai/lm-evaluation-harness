@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_assam_processor_yaml
+task: blend_assam_sample

@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_algeria_processor_yaml
+task: blend_algeria_sample

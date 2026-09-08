@@ -1,0 +1,4 @@
+include:
+  - _template_yaml
+  - ../_indonesia_processor_yaml
+task: blend_indonesia_sample
