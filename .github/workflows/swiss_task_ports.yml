@@ -1,0 +1,41 @@
+name: Swiss task ports
+
+on:
+  push:
+    branches: [yxu/dev]
+  pull_request:
+    branches: [yxu/dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  task-ports:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+      - name: Install task dependencies
+        run: uv pip install -e '.[ifeval,alpaca_eval]' pytest
+      - name: Prepare sentence tokenizer
+        run: python -m nltk.downloader punkt_tab
+      - name: Test task ports without network or inference
+        env:
+          HF_HUB_OFFLINE: '1'
+          HF_DATASETS_OFFLINE: '1'
+        run: >-
+          python -m pytest -q
+          tests/test_ordered_regex.py tests/test_swiss_task_ports.py
+          tests/test_mmlu_flan_cot_group.py tests/test_alpaca_eval_task.py
+          tests/test_filters.py tests/test_group.py
+          tests/test_task_manager.py::TestConfigLoader
+          tests/test_task_manager.py::TestTaskIndex
