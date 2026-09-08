@@ -30,18 +30,13 @@ def pass_at_1(
 
 
 def extract_code_blocks(text: str) -> str:
-    # Pattern to match ```...``` blocks
-    pattern = r"```(?:\w+)?\n?(.*?)\n?```"
-    # (+ ```) as we add the opening "```python" to the gen_prefix
-    matches = re.findall(pattern, r"```" + text, re.DOTALL)
-    # if no matches, try to match ```...``` blocks (after removing the language)
-    if not matches:
-        text_without_lang = re.sub(r"```python", "```", text)
-        matches = re.findall(pattern, text_without_lang, re.DOTALL)
-    if not matches:
-        return ""
-    else:
-        return matches[0]
+    # gen_prefix already opens a Python block, so a bare completion starts
+    # with code, not a language label. Only strip an actual opening fence.
+    opening = re.match(r"\s*```(?:python|py)?[ \t]*\r?\n", text, re.IGNORECASE)
+    if opening:
+        text = text[opening.end() :]
+    # Keep valid truncated completions too; do not remove prose or repair code.
+    return text.split("```", 1)[0].rstrip("\r\n")
 
 
 def build_predictions(resps: list[list[str]], docs: list[dict]) -> list[list[str]]:

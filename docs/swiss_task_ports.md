@@ -38,6 +38,16 @@ with the imported files.
 - Fix upstream `mmlu_flan_cot_zeroshot` group aggregation: its generated-answer
   tasks emit `exact_match`, but the group requested `acc`. Both extraction
   filters now produce weighted group scores.
+- Fix upstream MBPP extraction after the 8B evaluation exposed lost initial
+  Python keywords. The task's `gen_prefix` already opens a Python fence; the
+  old extractor prepended another bare fence and misread `def`, `import`,
+  `async`, or `class` as its language label. Preserve bare completion text up
+  to the closing fence, including valid code without a closing fence, and
+  strip a leading opening fence only when it is actually present. This does
+  not remove explanatory prose or repair malformed Python. Task prompts,
+  generation settings, and the pass-at-one metric remain unchanged. Saved
+  completions from the affected runs can be rescored without new inference;
+  their original scores and filtered samples describe the old extractor.
 - Apply repository formatting to imported code and YAML. No alternative Swiss
   prompt variants or task generators are needed for these ports.
 
@@ -75,3 +85,5 @@ selection, Multi-IF's first-turn scoring, recursive task/function resolution,
 MMLU group aggregation and AlpacaEval's scoring boundary. Upstream filter,
 group and task-manager regression tests cover the integration. Validation
 does not require a GPU, running generated code, or making paid judge calls.
+MBPP extraction tests replace only the external code-evaluation scorer during
+module import and check literal extracted strings and response nesting.
