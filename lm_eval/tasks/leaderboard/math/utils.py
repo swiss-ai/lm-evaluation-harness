@@ -321,7 +321,7 @@ def normalize_final_answer(final_answer: str) -> str:
     final_answer = final_answer.replace("$", "")
 
     # Normalize 100,000 -> 100000
-    if final_answer.replace(",", "").isdigit():
+    if re.fullmatch(r"-?\d{1,3}(,\d{3})+", final_answer):
         final_answer = final_answer.replace(",", "")
 
     return final_answer

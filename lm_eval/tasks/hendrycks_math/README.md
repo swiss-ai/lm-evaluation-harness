@@ -6,7 +6,11 @@ https://arxiv.org/abs/2103.03874
 
 Many intellectual endeavors require mathematical problem solving, but this skill remains beyond the capabilities of computers. To measure this ability in machine learning models, we introduce MATH, a new dataset of 12,500 challenging competition mathematics problems. Each problem in MATH has a full step-by-step solution which can be used to teach models to generate answer derivations and explanations.
 
-NOTE: This task corresponds to the MATH (`hendrycks_math`) implementation at https://github.com/EleutherAI/lm-evaluation-harness/tree/master . For the variant which uses the custom 4-shot prompt in the Minerva paper (https://arxiv.org/abs/2206.14858), and SymPy answer checking as done by Minerva, see `lm_eval/tasks/minerva_math`.
+NOTE: On `yxu/dev`, this task uses the Swiss six-shot instruction-model protocol
+with a 2048-token generation budget. It shares upstream Minerva's maintained
+answer extraction, equivalence checks and Math Verify scorer. Install
+`lm-eval[math]`. The four-shot variant is in `lm_eval/tasks/minerva_math`.
+See `docs/swiss_task_ports.md` for provenance and retained upstream fixes.
 
 Homepage: https://github.com/hendrycks/math
 
@@ -25,7 +29,7 @@ Homepage: https://github.com/hendrycks/math
 
 #### Groups
 
-- `hendrycks_math`: the MATH benchmark from Hendrycks et al. 0- or few-shot.
+- `hendrycks_math`: the MATH benchmark with six fixed demonstrations.
 
 #### Tasks
 
@@ -46,7 +50,7 @@ For adding novel benchmarks/datasets to the library:
 * [x] Is the task an existing benchmark in the literature?
   * [x] Have you referenced the original paper that introduced the task?
   * [x] If yes, does the original paper provide a reference implementation? If so, have you checked against the reference implementation and documented how to run such a test?
-    * Answer extraction code is taken from the original MATH benchmark paper's repository.
+    * Answer extraction and scoring use the maintained Minerva helper, with the Swiss boxed-answer fallback.
 
 
 If other tasks on this dataset are already supported:

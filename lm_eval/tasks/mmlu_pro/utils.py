@@ -14,7 +14,7 @@ def format_cot_example(example, including_answer=True):
     for i, opt in enumerate(options):
         if i >= len(choices):
             break
-        prompt += f"{choices[i]}. {opt.strip()}\n"
+        prompt += f"({choices[i]}) {opt.strip()}\n"
 
     if including_answer:
         cot_content = example["cot_content"].replace(

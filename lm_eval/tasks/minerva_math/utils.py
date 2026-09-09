@@ -209,15 +209,27 @@ def is_equiv(x1: str, x2: str) -> bool:
 def get_unnormalized_answer(text: str) -> str:
     INVALID_ANSWER = "[invalidanswer]"
     end_seq = "I hope it is correct."
-    text += end_seq
     match = re.search(
-        r"Final Answer: The final answer is(.*?). I hope it is correct.",
-        text,
+        r"Final Answer: The final answer is\s*(.*?)\.?\s*I hope it is correct\.",
+        # NB: end_seq is appended with a separating space. Concatenating it directly
+        # produces "...is 7.I hope it is correct.". The optional period is literal:
+        # a wildcard would consume the last digit of an unpunctuated answer.
+        text + " " + end_seq,
     )
     if match:
         return match.group(1).strip()
-    else:
-        return INVALID_ANSWER
+
+    # Fall back to the model's own \boxed{...} (as used for the gold solution
+    # above): some completions never emit the "I hope it is correct." phrase at
+    # all, so the regex above never matches even when $X$ is correct.
+    boxed = last_boxed_only_string(text)
+    if boxed is not None:
+        try:
+            return remove_boxed(boxed)
+        except (AssertionError, IndexError):
+            pass
+
+    return INVALID_ANSWER
 
 
 SUBSTITUTIONS = [

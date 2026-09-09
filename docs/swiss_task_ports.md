@@ -36,7 +36,7 @@ with the imported files.
   and Swiss-only resolver/rate-limiter imports. The scorer's percentage is
   converted to the harness's fraction metric. See its task README for details.
 - Fix upstream `mmlu_flan_cot_zeroshot` group aggregation: its generated-answer
-  tasks emit `exact_match`, but the group requested `acc`. Both extraction
+  tasks emit `exact_match`, but the group requested `acc`. All extraction
   filters now produce weighted group scores.
 - Fix upstream MBPP extraction after the 8B evaluation exposed lost initial
   Python keywords. The task's `gen_prefix` already opens a Python fence; the
@@ -51,13 +51,57 @@ with the imported files.
 - Apply repository formatting to imported code and YAML. No alternative Swiss
   prompt variants or task generators are needed for these ports.
 
+## Instruction-model protocol corrections
+
+The six task families below incorporate the audited Swiss report configuration
+at `4ac31dae8f4070be2cd85b92c8497f81b4f86c87`, including the narrow math
+extraction fix from [Swiss PR #88](https://github.com/swiss-ai/lm-evaluation-harness/pull/88).
+Upstream's evaluator, backends and newer correctness fixes remain in place.
+
+| Task | Protocol on this branch | Comparison metric |
+| --- | --- | --- |
+| `mmlu_flan_cot_zeroshot` | All 57 subjects request concise reasoning and a final option; ordered extraction prioritizes explicit answers | `exact_match,ordered-extract` |
+| `mmlu_pro` | Bracketed choices and ordered extraction; five demonstrations, 2048 generated tokens | `exact_match,ordered-extract` |
+| `hendrycks_math` | Six fixed demonstrations, 2048 generated tokens; shared upstream Minerva scorer | `math_verify,none` |
+| `minerva_math` | Four corrected upstream demonstrations, explicit 1024 generated tokens | `math_verify,none` |
+| `drop` | Three training demonstrations, answer-only instruction, assistant answer prefix and prompt-boundary stops | `f1,none` |
+| `mathqa` | Assistant answer prefix; retain upstream's `regisss/math_qa` data mirror | `acc,none` |
+
+MMLU-Flan retains the backend's default generation budget (256 in the suite's
+vLLM backend). MMLU-Pro retains upstream's separation of demonstration questions
+and assistant answers; the older Swiss helper put the answer inside the user
+message. Existing alternative extraction metrics remain available in raw results.
+
+Both MATH families accept the final-answer phrase without its optional suffix,
+then fall back to the last boxed answer. They share upstream's corrected LaTeX
+demonstrations. Unlike the Swiss regex, the phrase matcher treats its final
+period as optional literal punctuation, so an unpunctuated `42` stays `42`
+instead of losing its final digit. The shared scorer retains upstream's
+tuple/thousands normalization, exact-string equality and
+full-solution Math Verify scoring. The two additional Hendrycks demonstrations
+come from Swiss, with accidental backspace escapes repaired. The same narrow
+thousands-separator check is applied to the leaderboard math helper, whose
+existing tests exposed that it still fused bare tuples such as `0,1` into `01`.
+
+The DROP scorer is unchanged; its demonstration targets now contain the actual
+answers instead of dictionary keys. It still expects separate spans when scoring
+multi-span predictions. Task versions are incremented where semantics change;
+included MATH-500 variants inherit their parent protocol changes as well.
+
+Upstream BBQ answer remapping is deliberately retained and regression-tested.
+The audited Swiss mapping incorrectly credited concrete answers when the gold
+was unknown in the first two original answer positions. Matching that score
+would reproduce a scoring bug. These task changes improve protocol fidelity;
+they do not establish that a model reproduces a published score. Comparisons
+must identify the model, chat template, task version, selected metric and cohort.
+
 ## Install and run
 
 Install the backend appropriate to your environment separately. For Multi-IF
-and AlpacaEval task dependencies:
+and AlpacaEval task dependencies, plus the MATH scorers:
 
 ```bash
-pip install -e '.[ifeval,alpaca_eval]'
+pip install -e '.[ifeval,alpaca_eval,math]'
 python -m nltk.downloader punkt_tab
 lm-eval ls tasks
 ```
@@ -87,3 +131,7 @@ group and task-manager regression tests cover the integration. Validation
 does not require a GPU, running generated code, or making paid judge calls.
 MBPP extraction tests replace only the external code-evaluation scorer during
 module import and check literal extracted strings and response nesting.
+
+Instruction-protocol tests also cover boxed-answer scoring, all MMLU subject
+prompts, assistant prefixes, MMLU-Pro demonstration roles and BBQ answer
+remapping. The existing upstream math regressions run with the math extra.

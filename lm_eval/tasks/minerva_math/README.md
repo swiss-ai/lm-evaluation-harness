@@ -13,7 +13,8 @@ competition mathematics problems. Each problem in MATH has a full step-by-step s
 models to generate answer derivations and explanations.
 
 NOTE: The few-shot and the generated answer extraction is based on the [Minerva](https://arxiv.org/abs/2206.14858) and
-exact match equivalence is calculated using the `sympy` library. This requires additional dependencies, which can be
+exact-match equivalence uses string equality and the `sympy` library; the separate
+`math_verify` metric parses the complete gold solution and model response. This requires additional dependencies, which can be
 installed via the `lm-eval[math]` extra.
 
 Homepage: https://github.com/hendrycks/math
@@ -101,3 +102,6 @@ If other tasks on this dataset are already supported:
     `01` (#4039)
   - unit-word stripping no longer corrupts LaTeX command names (`\left` -> `\le`, `\infty` -> `\iny`), and
     `\sqrt[n]{...}` survives the sqrt shorthand rule (#4037)
+
+- version 3.2 (`yxu/dev`); port Swiss PR #88 final-answer separator and last-boxed
+  fallback, retain the upstream 3.1 fixes, and set an explicit 1024-token budget.

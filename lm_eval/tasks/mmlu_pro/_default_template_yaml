@@ -9,6 +9,19 @@ output_type: generate_until
 doc_to_text: !function utils.doc_to_text
 doc_to_target: answer
 filter_list:
+  - name: "ordered-extract"
+    filter:
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Tt]he answer is\s+\(?([ABCDEFGHIJ])\)?\b'
+          - '[Tt]he answer is:\s+\(?([ABCDEFGHIJ])\)?\b'
+          - '[Tt]he final answer is\s+\(?([ABCDEFGHIJ])\)?\b'
+          - 'answer is\s+\(?([ABCDEFGHIJ])\)?\b'
+          - '[Tt]he final answer:\s+\(?([ABCDEFGHIJ])\)?\b'
+          - '\(([ABCDEFGHIJ])\)'
+          - "([ABCDEFGHIJ])"
+        group_select: -1
+      - function: "take_first"
   - name: "custom-extract"
     filter:
       - function: "regex"
@@ -17,6 +30,8 @@ filter_list:
       - function: "take_first"
 generation_kwargs:
   until:
+    - "</s>"
+    - "<|im_end|>"
     - "Question:"
   max_gen_toks: 2048
   do_sample: false
@@ -29,4 +44,4 @@ metric_list:
     ignore_case: true
     ignore_punctuation: true
 metadata:
-  version: 3.1
+  version: 3.2

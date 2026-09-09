@@ -1,231 +1,96 @@
-from typing import Dict, List
+"""Swiss six-shot MATH protocol using upstream's maintained math scorer.
 
-import datasets
+Additional demonstrations originate from Swiss commit 4ac31da. The first four
+retain upstream's corrected LaTeX and the shared scorer retains its normalization
+and full-solution Math Verify fixes.
+"""
 
-
-def process_docs(dataset: datasets.Dataset) -> datasets.Dataset:
-    def _process_doc(doc: dict) -> dict:
-        out_doc = {
-            "problem": doc["problem"],
-            "solution": doc["solution"],
-            "answer": remove_boxed(last_boxed_only_string(doc["solution"])),
-        }
-        return out_doc
-
-    return dataset.map(_process_doc)
-
-
-def process_results(doc: dict, results: List[str]) -> Dict[str, int]:
-    retval = 0
-    indices = [pos for pos, char in enumerate(results[0]) if char == "$"]
-    if len(indices) <= 1:
-        answer = results[0]
-    else:
-        answer = results[0][indices[0] + 1 : indices[-1]]
-
-    if is_equiv(answer, remove_boxed(last_boxed_only_string(doc["solution"]))):
-        retval = 1
-
-    results = {
-        "exact_match": retval,
-    }
-    return results
+from lm_eval.tasks.minerva_math.utils import (
+    doc_to_text as doc_to_text,
+    get_unnormalized_answer as get_unnormalized_answer,
+    list_fewshot_samples as _minerva_examples,
+    process_docs as process_docs,
+    process_results as process_results,
+)
 
 
-# string normalization from https://github.com/EleutherAI/lm-evaluation-harness/blob/master/lm_eval/tasks/hendrycks_math.py
-def is_equiv(str1, str2, verbose=False):
-    if str1 is None and str2 is None:
-        print("WARNING: Both None")
-        return True
-    if str1 is None or str2 is None:
-        return False
-
-    try:
-        ss1 = strip_string(str1)
-        ss2 = strip_string(str2)
-        if verbose:
-            print(ss1, ss2)
-        return ss1 == ss2
-    except Exception:
-        return str1 == str2
-
-
-def remove_boxed(s):
-    if "\\boxed " in s:
-        left = "\\boxed "
-        assert s[: len(left)] == left
-        return s[len(left) :]
-
-    left = "\\boxed{"
-
-    assert s[: len(left)] == left
-    assert s[-1] == "}"
-
-    return s[len(left) : -1]
-
-
-def last_boxed_only_string(string):
-    idx = string.rfind("\\boxed")
-    if "\\boxed " in string:
-        return "\\boxed " + string.split("\\boxed ")[-1].split("$")[0]
-    if idx < 0:
-        idx = string.rfind("\\fbox")
-        if idx < 0:
-            return None
-
-    i = idx
-    right_brace_idx = None
-    num_left_braces_open = 0
-    while i < len(string):
-        if string[i] == "{":
-            num_left_braces_open += 1
-        if string[i] == "}":
-            num_left_braces_open -= 1
-            if num_left_braces_open == 0:
-                right_brace_idx = i
-                break
-        i += 1
-
-    if right_brace_idx is None:
-        retval = None
-    else:
-        retval = string[idx : right_brace_idx + 1]
-
-    return retval
-
-
-def fix_fracs(string):
-    substrs = string.split("\\frac")
-    new_str = substrs[0]
-    if len(substrs) > 1:
-        substrs = substrs[1:]
-        for substr in substrs:
-            new_str += "\\frac"
-            if substr[0] == "{":
-                new_str += substr
-            else:
-                try:
-                    assert len(substr) >= 2
-                except AssertionError:
-                    return string
-                a = substr[0]
-                b = substr[1]
-                if b != "{":
-                    if len(substr) > 2:
-                        post_substr = substr[2:]
-                        new_str += "{" + a + "}{" + b + "}" + post_substr
-                    else:
-                        new_str += "{" + a + "}{" + b + "}"
-                else:
-                    if len(substr) > 2:
-                        post_substr = substr[2:]
-                        new_str += "{" + a + "}" + b + post_substr
-                    else:
-                        new_str += "{" + a + "}" + b
-    string = new_str
-    return string
-
-
-def fix_a_slash_b(string):
-    if len(string.split("/")) != 2:
-        return string
-    a = string.split("/")[0]
-    b = string.split("/")[1]
-    try:
-        a = int(a)
-        b = int(b)
-        assert string == "{}/{}".format(a, b)
-        new_string = "\\frac{" + str(a) + "}{" + str(b) + "}"
-        return new_string
-    except AssertionError:
-        return string
-
-
-def remove_right_units(string):
-    # "\\text{ " only ever occurs (at least in the val set) when describing units
-    if "\\text{ " in string:
-        splits = string.split("\\text{ ")
-        assert len(splits) == 2
-        return splits[0]
-    else:
-        return string
-
-
-def fix_sqrt(string):
-    if "\\sqrt" not in string:
-        return string
-    splits = string.split("\\sqrt")
-    new_string = splits[0]
-    for split in splits[1:]:
-        if split[0] != "{":
-            a = split[0]
-            new_substr = "\\sqrt{" + a + "}" + split[1:]
-        else:
-            new_substr = "\\sqrt" + split
-        new_string += new_substr
-    return new_string
-
-
-def strip_string(string):
-    # linebreaks
-    string = string.replace("\n", "")
-
-    # remove inverse spaces
-    string = string.replace("\\!", "")
-
-    # replace \\ with \
-    string = string.replace("\\\\", "\\")
-
-    # replace tfrac and dfrac with frac
-    string = string.replace("tfrac", "frac")
-    string = string.replace("dfrac", "frac")
-
-    # remove \left and \right
-    string = string.replace("\\left", "")
-    string = string.replace("\\right", "")
-
-    # Remove circ (degrees)
-    string = string.replace("^{\\circ}", "")
-    string = string.replace("^\\circ", "")
-
-    # remove dollar signs
-    string = string.replace("\\$", "")
-
-    # remove units (on the right)
-    string = remove_right_units(string)
-
-    # remove percentage
-    string = string.replace("\\%", "")
-    string = string.replace("\%", "")  # noqa: W605
-
-    # " 0." equivalent to " ." and "{0." equivalent to "{." Alternatively, add "0" if "." is the start of the string
-    string = string.replace(" .", " 0.")
-    string = string.replace("{.", "{0.")
-    # if empty, return empty string
-    if len(string) == 0:
-        return string
-    if string[0] == ".":
-        string = "0" + string
-
-    # to consider: get rid of e.g. "k = " or "q = " at beginning
-    if len(string.split("=")) == 2:
-        if len(string.split("=")[0]) <= 2:
-            string = string.split("=")[1]
-
-    # fix sqrt3 --> sqrt{3}
-    string = fix_sqrt(string)
-
-    # remove spaces
-    string = string.replace(" ", "")
-
-    # \frac1b or \frac12 --> \frac{1}{b} and \frac{1}{2}, etc. Even works with \frac1{72} (but not \frac{72}1). Also does a/b --> \\frac{a}{b}
-    string = fix_fracs(string)
-
-    # manually change 0.5 --> \frac{1}{2}
-    if string == "0.5":
-        string = "\\frac{1}{2}"
-
-    # NOTE: X/Y changed to \frac{X}{Y} in dataset, but in simple cases fix in case the model output is X/Y
-    string = fix_a_slash_b(string)
-
-    return string
+def list_fewshot_samples() -> list[dict]:
+    return _minerva_examples() + [
+        {
+            "problem": "One sphere is centered at $(3,-5,7)$ with radius $5 \\sqrt{5}.$ A second sphere "
+            "is centered at $(0,1,1)$ with radius $2 \\sqrt{17}.$ The two spheres intersect "
+            "in a circle. Find the radius of this circle.",
+            "solution": "Let $A = (3,-5,7),$ the center of the first sphere, and let $B = (0,1,1),$ the "
+            "center of the second sphere. We can compute that $AB = 9.$ Let $C$ be a point "
+            "on the intersection of both spheres, so $AC = 5 \\sqrt{5}$ and $BC = 2 "
+            "\\sqrt{17}.$ [asy] unitsize(0.3 cm);\n"
+            "\n"
+            "pair A, B, C;\n"
+            "\n"
+            "A = (0,0);\n"
+            "B = (9,0);\n"
+            "C = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\n"
+            "\n"
+            "draw(A--B--C--cycle);\n"
+            "draw(Circle(A,5*sqrt(5)));\n"
+            "draw(Circle(B,2*sqrt(17)));\n"
+            "\n"
+            'label("$A$", A, W);\n'
+            'label("$B$", B, S);\n'
+            'label("$C$", C, N);\n'
+            'label("$9$", (A + B)/2, S, red);\n'
+            'label("$5 \\sqrt{5}$", (A + C)/2, NW, red, UnFill);\n'
+            'label("$2 \\sqrt{17}$", (B + C)/2, E, red, UnFill);\n'
+            "[/asy]\n"
+            "\n"
+            "By Heron's formula, we can compute that $[ABC] = 3 \\sqrt{149}.$\n"
+            "\n"
+            "Let $D$ be the foot of the perpendicular from $C$ to $\\overline{AB}.$\n"
+            "\n"
+            "[asy]\n"
+            "unitsize(0.3 cm);\n"
+            "\n"
+            "pair A, B, C, D;\n"
+            "\n"
+            "A = (0,0);\n"
+            "B = (9,0);\n"
+            "C = intersectionpoint(arc(A,5*sqrt(5),0,180),arc(B,2*sqrt(17),0,180));\n"
+            "D = (C.x,0);\n"
+            "\n"
+            "draw(A--B--C--cycle);\n"
+            "draw(C--D);\n"
+            "\n"
+            'label("$A$", A, W);\n'
+            'label("$B$", B, S);\n'
+            'label("$C$", C, N);\n'
+            'label("$D$", D, S);\n'
+            "[/asy]\n"
+            "\n"
+            "Then the intersection of both spheres is the circle centered at $D$ with "
+            "radius $CD.$ Thus,\n"
+            "\\[CD = \\frac{2 [ABC]}{AB} = \\frac{6 \\sqrt{149}}{9} = \\boxed{\\frac{2 "
+            "\\sqrt{149}}{3}}.\\] \n"
+            "Final Answer: The final answer is $\\frac{2 \\sqrt{149}}{3}$.",
+            "few_shot": "1",
+        },
+        {
+            "problem": "Ryan has 3 red lava lamps and 3 blue lava lamps. He arranges them in a row on a "
+            "shelf randomly, then turns 3 random lamps on. What is the probability that the "
+            "leftmost lamp on the shelf is red, and the leftmost lamp which is turned on is "
+            "also red?",
+            "solution": "There are $\\binom{6}{3}=20$ ways for Ryan to arrange the lamps, and "
+            "$\\binom{6}{3}=20$ ways for him to choose which lamps are on, giving "
+            "$20\\cdot20=400$ total possible outcomes. There are two cases for the desired "
+            "outcomes: either the left lamp is on, or it isn't. If the left lamp is on, "
+            "there are $\\binom{5}{2}=10$ ways to choose which other lamps are on, and "
+            "$\\binom{5}{2}=10$ ways to choose which other lamps are red. This gives "
+            "$10\\cdot10=100$ possibilities. If the first lamp isn't on, there are "
+            "$\\binom{5}{3}=10$ ways to choose which lamps are on, and since both the "
+            "leftmost lamp and the leftmost lit lamp must be red, there are "
+            "$\\binom{4}{1}=4$ ways to choose which other lamp is red. This case gives 40 "
+            "valid possibilities, for a total of 140 valid arrangements out of 400. "
+            "Therefore, the probability is $\\dfrac{140}{400}=\\boxed{\\dfrac{7}{20}}$. \n"
+            "Final Answer: The final answer is $\\dfrac{7}{20}$.",
+            "few_shot": "1",
+        },
+    ]
