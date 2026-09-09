@@ -2,9 +2,9 @@ name: Swiss task ports
 
 on:
   push:
-    branches: [yxu/dev]
+    branches: [yxu/main, yxu/dev]
   pull_request:
-    branches: [yxu/dev]
+    branches: [yxu/main, yxu/dev]
   workflow_dispatch:
 
 permissions:

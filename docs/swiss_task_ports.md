@@ -1,11 +1,25 @@
 # Swiss AI task ports on upstream v0.4.13
 
-Branch `yxu/dev` starts at EleutherAI v0.4.13, commit
+The personal baseline `yxu/main`, developed on `yxu/dev`, starts at EleutherAI v0.4.13, commit
 `ddd67220430a2470529f25fd5c05a576ca1057a0`. Task source is
 [swiss-ai/lm-evaluation-harness at 51d6f4b](https://github.com/swiss-ai/lm-evaluation-harness/tree/51d6f4b62bf20e9a29dffa694b163d4f19889927).
 This branch selectively ports the definitions below without merging the Swiss
 fork's engine, backends, or judge service APIs. Source copyright notices remain
 with the imported files.
+
+## Personal baseline workflow
+
+`yxu/main` is the tested personal baseline in the Swiss AI fork. Its initial
+runtime source is `7531829395b0cf333311e8e35fae469894df2f4b`, validated by the
+six-task Apertus 8B protocol rerun. The branch setup adds only CI triggers and
+this documentation; task and evaluator source remain identical to that commit.
+
+Create short-lived topic branches from `yxu/main` and target PRs back to it.
+The Swiss task-port checks run on pushes and PRs for both `yxu/main` and
+`yxu/dev`, covering Python 3.11, 3.12 and 3.13. Import EleutherAI upstream
+updates or selected Swiss changes through those PRs, with validation appropriate
+to the affected tasks. Consumers should pin exact tested commits; the branch
+name identifies the integration line and is not a reproducible runtime pin.
 
 | Task | Imported source directory | Scope |
 | --- | --- | --- |
