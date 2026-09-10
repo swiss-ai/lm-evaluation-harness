@@ -111,11 +111,20 @@ def _parse_extra_args(extra_args: str | None) -> list[str]:
     Examples:
         "--no-rope-fusion --trust-remote-code" -> ["--no-rope-fusion", "--trust-remote-code"]
         "--expert-tensor-parallel-size 1 --no-rope-fusion" -> ["--expert-tensor-parallel-size", "1", "--no-rope-fusion"]
+
+    A literal ';' is unescaped back to ',' before splitting: lm_eval's own --model_args
+    parser (simple_parse_args_string) naively splits the whole model_args string on every
+    top-level comma before extra_args ever reaches this function, so a value containing a
+    real comma (e.g. Megatron's list-expression args like --linear-attention-freq
+    "([1,1,1,0]*10+[1,0])") would already be corrupted by the time it gets here. Callers
+    that need a literal comma inside an extra_args value must pre-encode it as ';'.
     """
     import shlex
 
     if not extra_args:
         return []
+
+    extra_args = extra_args.replace(";", ",")
 
     try:
         return shlex.split(extra_args)
