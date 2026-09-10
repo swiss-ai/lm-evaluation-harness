@@ -78,7 +78,11 @@ def process_results(doc, results):
     """Defer judging until aggregation so translations can be scored in parallel."""
     translation = results[0]
     response_format = os.environ.get("LTB_RESPONSE_FORMAT", "text")
-    if response_format == "harmony":
+    if response_format not in ("text", "harmony"):
+        raise ValueError(f"Unsupported LTB_RESPONSE_FORMAT: {response_format}")
+    if not isinstance(translation, str):
+        translation = None
+    elif response_format == "harmony":
         # vLLM preserves special tokens. Keep the raw response in harness samples,
         # but score/export only the final channel, never unfinished reasoning.
         for boundary in ("<|channel|>final<|message|>", "<|meta_sep|>final<|im_sep|>"):
@@ -97,8 +101,6 @@ def process_results(doc, results):
                 break
         else:
             translation = None
-    elif response_format != "text":
-        raise ValueError(f"Unsupported LTB_RESPONSE_FORMAT: {response_format}")
     return {
         "ltb_pass_rate": {
             "id": doc["id"],

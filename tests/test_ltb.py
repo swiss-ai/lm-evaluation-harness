@@ -72,6 +72,34 @@ def test_plain_ltb_preserves_translation(monkeypatch, doc):
     assert utils.process_results(doc, [raw])["ltb_pass_rate"]["translation"] == raw
 
 
+@pytest.mark.parametrize("response_format", ["text", "harmony"])
+@pytest.mark.parametrize(
+    "raw", [None, 42, {"error": "failed"}, ["translation"], b"text"]
+)
+def test_non_string_generations_fail_and_export_null(
+    monkeypatch, doc, response_format, raw
+):
+    monkeypatch.setenv("LTB_RESPONSE_FORMAT", response_format)
+    results = [raw]
+    item = utils.process_results(doc, results)["ltb_pass_rate"]
+    assert item["translation"] is None
+    assert results[0] is raw
+    client = MagicMock()
+    with utils.JudgeLog([item]) as audit:
+        assert utils._score_example(client, "judge", item, audit) == 0
+        assert json.loads((audit.directory / "ltb_submission.json").read_text()) == [
+            {"id": doc["id"], "translation": None}
+        ]
+    client.chat.completions.create.assert_not_called()
+
+
+@pytest.mark.parametrize("raw", [None, "translation"])
+def test_invalid_response_format_rejected(monkeypatch, doc, raw):
+    monkeypatch.setenv("LTB_RESPONSE_FORMAT", "invalid")
+    with pytest.raises(ValueError, match="Unsupported LTB_RESPONSE_FORMAT"):
+        utils.process_results(doc, [raw])
+
+
 def test_official_subset_only(doc):
     data = utils.process_docs(
         Dataset.from_list(
