@@ -82,6 +82,9 @@ Empty translations fail. Verdict parsing follows the official leaderboard's
 permissive pass/fail parsing, including treating unrecognized responses as fail.
 API exceptions after retries and truncated judge responses abort scoring so that
 service failures do not silently alter the score or denominator.
+On failure, scheduling stops, pending examples are cancelled, and workers skip
+remaining rules. Requests already in flight finish (including SDK retries) and
+are logged before the judge client and logs close; aborting is not instantaneous.
 
 Changing the judge changes the evaluation protocol; report the judge model and
 endpoint with results. These locally computed scores are not leaderboard

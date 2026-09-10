@@ -1,6 +1,8 @@
 """Offline regression tests for the Last Translation Benchmark integration."""
 
 import json
+import sys
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -207,12 +209,10 @@ def test_judge_errors_propagate(doc):
 
 
 def test_aggregation_uses_example_denominator(monkeypatch, doc):
-    import openai
-
     monkeypatch.setenv("LTB_JUDGE_API_KEY", "test-key")
     monkeypatch.setenv("LTB_JUDGE_WORKERS", "1")
     constructor = MagicMock()
-    monkeypatch.setattr(openai, "OpenAI", constructor)
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=constructor))
     client = constructor.return_value.__enter__.return_value
     client.chat.completions.create.side_effect = [
         response("pass"),
@@ -233,6 +233,97 @@ def test_missing_credentials_fail_explicitly(monkeypatch):
     monkeypatch.delenv("LTB_JUDGE_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="LTB_JUDGE_API_KEY"):
         utils.aggregate_pass_rate([{}])
+
+
+def test_missing_judge_dependency_explained(monkeypatch):
+    monkeypatch.setenv("LTB_JUDGE_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", None)
+    with pytest.raises(ImportError, match="Install the LTB judge dependency"):
+        utils.aggregate_pass_rate([{}])
+
+
+def test_aggregation_completes_multiple_batches(monkeypatch, doc):
+    monkeypatch.setenv("LTB_JUDGE_API_KEY", "test-key")
+    monkeypatch.setenv("LTB_JUDGE_WORKERS", "3")
+    constructor = MagicMock()
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=constructor))
+    client = constructor.return_value.__enter__.return_value
+    client.chat.completions.create.return_value = response("pass")
+    items = [
+        utils.process_results({**doc, "id": i}, ["translation"])["ltb_pass_rate"]
+        for i in range(20)
+    ]
+    assert utils.aggregate_pass_rate(items) == 1
+    assert client.chat.completions.create.call_count == 40
+
+
+@pytest.mark.parametrize("failure", ["api", "truncation"])
+def test_aggregation_stops_after_failure_with_earlier_request_running(
+    monkeypatch, doc, tmp_path, failure
+):
+    monkeypatch.setenv("LTB_JUDGE_API_KEY", "test-key")
+    monkeypatch.setenv("LTB_JUDGE_WORKERS", "2")
+    constructor = MagicMock()
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=constructor))
+    client = constructor.return_value.__enter__.return_value
+    first_started = threading.Event()
+    context = threading.local()
+    workers = set()
+    audits = []
+    submitted = []
+    original_score = utils._score_example
+
+    def score(client, model, item, audit, stop=None):
+        context.stop = stop
+        workers.add(threading.current_thread())
+        audits.append(audit)
+        return original_score(client, model, item, audit, stop=stop)
+
+    class CountingExecutor(utils.ThreadPoolExecutor):
+        def submit(self, fn, item):
+            submitted.append(item["id"])
+            return super().submit(fn, item)
+
+    def create(**request):
+        prompt = request["messages"][0]["content"]
+        if "Input: source-0\n" in prompt:
+            first_started.set()
+            # The first request remains in flight until the second fails.
+            assert context.stop.wait(5), "Failure was not signalled to workers"
+            constructor.return_value.__exit__.assert_not_called()
+            assert all(not audit.handle.closed for audit in audits)
+            return response("pass")
+        assert "Input: source-1\n" in prompt, "Unexpected later judge request"
+        assert first_started.wait(5)
+        if failure == "api":
+            raise RuntimeError("API unavailable")
+        return response("unfinished", "length")
+
+    monkeypatch.setattr(utils, "_score_example", score)
+    monkeypatch.setattr(utils, "ThreadPoolExecutor", CountingExecutor)
+    client.chat.completions.create.side_effect = create
+    items = [
+        utils.process_results(
+            {**doc, "id": i, "source_text": f"source-{i}"}, ["translation"]
+        )["ltb_pass_rate"]
+        for i in range(20)
+    ]
+    with pytest.raises(RuntimeError, match="API unavailable|truncated"):
+        utils.aggregate_pass_rate(items)
+    assert submitted == [0, 1]
+    assert client.chat.completions.create.call_count == 2
+    assert all(not worker.is_alive() for worker in workers)
+    assert all(audit.handle.closed for audit in audits)
+    constructor.return_value.__exit__.assert_called_once()
+    output = tmp_path / "audit"
+    assert len(json.loads((output / "ltb_submission.json").read_text())) == 20
+    records = [
+        json.loads(line)
+        for line in (output / "judge_responses.jsonl").read_text().splitlines()
+    ]
+    assert len(records) == 2
+    assert {record["id"] for record in records} == {0, 1}
+    assert all(record["event"] == "rule" for record in records)
 
 
 @pytest.mark.parametrize("failure", ["api", "truncation"])

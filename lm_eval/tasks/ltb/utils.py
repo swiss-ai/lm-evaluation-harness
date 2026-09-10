@@ -10,8 +10,9 @@ import logging
 import os
 import tempfile
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
+from itertools import islice
 from pathlib import Path
 
 
@@ -170,7 +171,7 @@ class JudgeLog:
         self.handle.close()
 
 
-def _score_example(client, model, item, audit=None):
+def _score_example(client, model, item, audit=None, stop=None):
     rules = item["verification_rules"]
     if not rules:
         raise ValueError(f"No verification rules for LTB example {item['id']}")
@@ -189,6 +190,8 @@ def _score_example(client, model, item, audit=None):
         return 0
     verdicts = []
     for rule_index, rule in enumerate(rules):
+        if stop is not None and stop.is_set():
+            return None
         request = dict(
             model=model,
             messages=[
@@ -279,7 +282,33 @@ def aggregate_pass_rate(items):
         ) as client,
         ThreadPoolExecutor(max_workers=workers) as executor,
     ):
-        scores = list(
-            executor.map(lambda item: _score_example(client, model, item, audit), items)
-        )
+        stop = threading.Event()
+
+        def score(item):
+            try:
+                return _score_example(client, model, item, audit, stop=stop)
+            except BaseException:
+                # Signal other workers immediately, even if an earlier example
+                # is still waiting for its judge response.
+                stop.set()
+                raise
+
+        remaining = iter(items)
+        pending = set()
+        scores = []
+        try:
+            for item in islice(remaining, workers):
+                pending.add(executor.submit(score, item))
+            while pending:
+                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                scores.extend(future.result() for future in done)
+                if not stop.is_set():
+                    for item in islice(remaining, len(done)):
+                        pending.add(executor.submit(score, item))
+        finally:
+            stop.set()
+            for future in pending:
+                future.cancel()
+            # The executor joins running requests before the client and audit
+            # log close. Workers skip any remaining rules after a failure.
     return sum(scores) / len(scores)
