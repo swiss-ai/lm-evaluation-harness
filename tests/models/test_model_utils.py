@@ -1,6 +1,30 @@
 import pytest
 
-from lm_eval.models.utils import maybe_truncate, normalize_gen_kwargs, truncate_tokens
+from lm_eval.models.utils import (
+    maybe_truncate,
+    normalize_gen_kwargs,
+    postprocess_generated_text,
+    truncate_tokens,
+)
+
+
+@pytest.mark.parametrize(
+    "separator",
+    ["", "\n", "\n\n", " \n\t\n"],
+)
+def test_postprocess_generated_text_preserves_final_answer_indentation(separator):
+    end_marker = "<|inner_suffix|>"
+    generation = (
+        f"<|inner_prefix|>reasoning{end_marker}{separator}    return value\nSTOP"
+    )
+
+    result = postprocess_generated_text(
+        generation,
+        stop=["\nSTOP"],
+        think_end_token=end_marker,
+    )
+
+    assert result == "    return value"
 
 
 class TestTruncateTokens:
