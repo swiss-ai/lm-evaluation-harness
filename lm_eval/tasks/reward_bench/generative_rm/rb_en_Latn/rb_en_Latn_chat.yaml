@@ -1,0 +1,6 @@
+dataset_name: null
+dataset_path: allenai/reward-bench
+include: ../_rb_base_yaml
+process_docs: !function ../../utils.process_docs_chat
+task: reward_bench_en_Latn_chat
+test_split: filtered
