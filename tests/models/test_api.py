@@ -480,3 +480,16 @@ def test_chat_template_args_refused_when_server_renders_template():
 
     with pytest.raises(ValueError, match="chat_template_args"):
         model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+
+@pytest.mark.parametrize("enable_thinking", [True, False])
+def test_local_completions_folds_enable_thinking_into_template_args(enable_thinking):
+    model = _completions_with_tokenizer(
+        enable_thinking=enable_thinking,
+        chat_template_args={"reasoning_effort": "low"},
+    )
+
+    model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+    assert model.tokenizer.calls[0]["enable_thinking"] is enable_thinking
+    assert model.tokenizer.calls[0]["reasoning_effort"] == "low"

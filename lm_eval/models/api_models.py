@@ -145,6 +145,9 @@ class TemplateAPI(TemplateLM):
         # extra keyword arguments for the chat template, e.g. {"reasoning_effort": "high"};
         # only used where the template is rendered client-side with an HF tokenizer
         chat_template_args: dict[str, Any] | None = None,
+        # chat-template switch, folded into chat_template_args as for hf; None keeps the
+        # template default
+        enable_thinking: bool | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -208,6 +211,8 @@ class TemplateAPI(TemplateLM):
         self.timeout = int(timeout)
         self.max_images = int(max_images)
         self.chat_template_args = dict(chat_template_args or {})
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
 
         eval_logger.info(f"Using tokenizer {self.tokenizer_backend}")
         if self.tokenizer_backend is None:
