@@ -142,6 +142,9 @@ class TemplateAPI(TemplateLM):
         timeout: int = 300,
         header: dict[str, str] | None = None,
         max_images: int = 1,
+        # extra keyword arguments for the chat template, e.g. {"reasoning_effort": "high"};
+        # only used where the template is rendered client-side with an HF tokenizer
+        chat_template_args: dict[str, Any] | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -204,6 +207,7 @@ class TemplateAPI(TemplateLM):
         self._eos_string = eos_string
         self.timeout = int(timeout)
         self.max_images = int(max_images)
+        self.chat_template_args = dict(chat_template_args or {})
 
         eval_logger.info(f"Using tokenizer {self.tokenizer_backend}")
         if self.tokenizer_backend is None:
@@ -355,9 +359,17 @@ class TemplateAPI(TemplateLM):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **self.chat_template_args,
                 **kwargs,
             )
-        elif self.tokenizer_backend == "remote" and self.tokenized_requests:
+        # Past this point the server renders the template, so the arguments would be
+        # dropped silently; refuse instead of scoring a different prompt than asked for.
+        if self.chat_template_args:
+            raise ValueError(
+                "chat_template_args needs the template rendered client-side "
+                "(tokenizer_backend=huggingface); this configuration leaves it to the server."
+            )
+        if self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history
         else:
             # bit of a hack. We'll load back before sending to the API
