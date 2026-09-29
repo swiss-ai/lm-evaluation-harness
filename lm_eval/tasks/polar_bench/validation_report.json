@@ -22,7 +22,7 @@
   ],
   "intentional_changes_tested_separately": [
     "A budget 1200 -> 8192",
-    "final-answer-only reasoning isolation"
+    "non-reasoning scope; inline marked reasoning cleanup only"
   ],
   "sample_ids": [
     "medical_000000",
@@ -76,13 +76,20 @@
     "cybersecurity_001515",
     "cybersecurity_001545"
   ],
-  "full_harness_offline_smoke": {
-    "samples": 50,
-    "model_a_requests": 160,
-    "model_b_requests": 51,
-    "thinking_isolation": "passed",
+  "baseline_commit": "51d6f4b62bf20e9a29dffa694b163d4f19889927",
+  "supported_mode": "non-reasoning only",
+  "related_tests_passed": 40,
+  "core_files_unchanged": true,
+  "full_driver_offline_test": {
+    "samples": 2,
+    "attack_protocols": [
+      1,
+      5
+    ],
+    "model_a_requests": 4,
+    "model_b_requests": 2,
+    "generation_metadata": "absent, as in original task callback",
     "real_inference": false
   },
-  "related_tests_passed": 48,
-  "gpu_validation": "Deferred to the cluster as requested; no real vLLM inference performed."
+  "gpu_validation": "Deferred to the cluster; no real vLLM inference performed."
 }

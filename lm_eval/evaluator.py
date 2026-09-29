@@ -152,17 +152,7 @@ def run_multi_turn_rollout(
         for response, (episode, request) in zip(responses, active, strict=True):
             request.resps.append(response)
             episode["instance"].length_info.extend(request.length_info)
-            # Optional metadata-aware hook: lets tasks detect unfinished reasoning
-            # even when the backend has already stripped the visible markers.
-            consume_with_info = getattr(
-                episode["task"], "multiturn_consume_response_with_info", None
-            )
-            if consume_with_info is not None:
-                consume_with_info(
-                    episode["state"], response, deepcopy(request.length_info)
-                )
-            else:
-                episode["task"].multiturn_consume_response(episode["state"], response)
+            episode["task"].multiturn_consume_response(episode["state"], response)
             episode["step"] += 1
     else:
         unfinished = sum(

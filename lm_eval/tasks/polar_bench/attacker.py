@@ -34,9 +34,7 @@ class Attacker:
             raise RuntimeError(
                 "Attacker reached its 500-token limit; attack was not silently accepted"
             )
-        text, status = final_answer(
-            choice.message.content, {}, "final_only", "<think>", "</think>"
-        )
+        text, status = final_answer(choice.message.content)
         if status != "final":
             raise RuntimeError("Attacker produced no complete visible attack")
         return text

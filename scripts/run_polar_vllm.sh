@@ -5,16 +5,14 @@ model=${1:?Usage: bash scripts/run_polar_vllm.sh MODEL [additional lm-eval argum
 shift
 : "${POLAR_ATTACKER_BASE_URL:?Set the fixed B endpoint for protocol 5}"
 export POLAR_MODEL_A_NAME="$model"
-export POLAR_THINKING_MODE=required
+export POLAR_THINKING_MODE=${POLAR_THINKING_MODE:-final_only}
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-# Explicit token overrides are useful for templates without discoverable markers.
-model_args="pretrained=$model,enable_thinking=true,autodetect_think_tokens=true,track_thinking_metrics=true,check_system_prompt_authority=true"
-if [[ -n "${POLAR_THINK_END_TOKEN:-}" ]]; then
-    model_args+=",think_end_token=$POLAR_THINK_END_TOKEN"
+# Only non-reasoning models are supported in this integration.
+if [[ "$POLAR_THINKING_MODE" != final_only ]]; then
+    echo "Only POLAR_THINKING_MODE=final_only is supported" >&2
+    exit 2
 fi
-if [[ -n "${POLAR_THINK_START_TOKEN:-}" ]]; then
-    model_args+=",think_start_token=$POLAR_THINK_START_TOKEN"
-fi
+model_args="pretrained=$model,enable_thinking=false,autodetect_think_tokens=false,track_thinking_metrics=false,check_system_prompt_authority=true"
 if [[ -n "${POLAR_VLLM_ARGS:-}" ]]; then
     model_args+=",$POLAR_VLLM_ARGS"
 fi

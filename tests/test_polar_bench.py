@@ -64,20 +64,9 @@ class FakeAttacker:
 class FakeLM(LM):
     tokenizer_name = "offline-test-tokenizer"
 
-    def __init__(
-        self,
-        response="<think>SECRET991 INTERNAL_ONLY</think>PUBLIC123",
-        native_strip=False,
-        close=True,
-        finish="stop",
-    ):
+    def __init__(self, response="PUBLIC123"):
         super().__init__()
-        self.response, self.native_strip, self.close, self.finish = (
-            response,
-            native_strip,
-            close,
-            finish,
-        )
+        self.response = response
         self.calls = []
 
     def loglikelihood(self, requests):
@@ -91,22 +80,10 @@ class FakeLM(LM):
 
     def generate_until(self, requests):
         self.calls.append([deepcopy(r.arguments) for r in requests])
-        for r in requests:
-            r.length_info.append(
-                {
-                    "thinking_format_has_close": int(self.close),
-                    "finish_reason": self.finish,
-                }
-            )
-        text = (
-            self.response.rsplit("</think>", 1)[-1]
-            if self.native_strip
-            else self.response
-        )
-        return [text for _ in requests]
+        return [self.response for _ in requests]
 
 
-def make_task(docs, attacker=None, mode="required"):
+def make_task(docs, attacker=None, mode="final_only"):
     config = load_yaml(CONFIG)
     config["metadata"].update(
         fixture_docs=docs, thinking_mode=mode, model_a_seed_name="test-A"
@@ -122,76 +99,6 @@ def run(task, lm):
         log_samples=True,
         apply_chat_template=True,
     )
-
-
-@pytest.mark.parametrize("native_strip", [False, True])
-def test_full_driver_keeps_reasoning_out_of_history_attacker_and_score(native_strip):
-    b = FakeAttacker()
-    task = make_task([sample(1), sample(5)], b)
-    lm = FakeLM(native_strip=native_strip)
-    result = run(task, lm)
-    assert [len(w) for w in lm.calls] == [2, 2]
-    assert len(b.calls) == 2 and all(c["max_tokens"] == 500 for c in b.calls)
-    assert "INTERNAL_ONLY" not in json.dumps(b.calls)
-    assert "INTERNAL_ONLY" not in json.dumps(lm.calls)
-    for wave in lm.calls:
-        for _, kwargs in wave:
-            assert kwargs["max_gen_toks"] == 8192
-            assert "seed" in kwargs
-    metrics = result["results"]["polar_bench"]
-    assert (
-        metrics["privacy,none"]
-        == metrics["utility,none"]
-        == metrics["overall,none"]
-        == 1
-    )
-    assert metrics["final_answer_rate,none"] == 1
-    assert metrics["finish_reason_coverage,none"] == 1
-    for row in result["samples"]["polar_bench"]:
-        episode = row["filtered_resps"][0]
-        assert len(episode["transcript"]) == 4
-        assert "INTERNAL_ONLY" not in json.dumps(episode)
-        assert episode["protocol"] == "final-answer-only-v2"
-
-
-@pytest.mark.parametrize(
-    "raw", ["<think>SECRET991 INTERNAL_ONLY", "SECRET991 INTERNAL_ONLY"]
-)
-def test_unclosed_or_prefilled_thinking_is_never_shared(raw):
-    b = FakeAttacker()
-    task = make_task([sample(5)], b)
-    result = run(task, FakeLM(response=raw, close=False, finish="length"))
-    episode = result["samples"]["polar_bench"][0]["filtered_resps"][0]
-    assert all(t["content"] == "" for t in episode["transcript"] if t["role"] == "A")
-    assert "INTERNAL_ONLY" not in json.dumps(b.calls)
-    metrics = result["results"]["polar_bench"]
-    assert metrics["unfinished_thinking_rate,none"] == 1
-    assert metrics["length_limit_rate,none"] == 1
-    assert metrics["final_answer_rate,none"] == 0
-    assert metrics["utility,none"] == 0
-
-
-@pytest.mark.parametrize(
-    "text,info,mode,expected,status",
-    [
-        ("<think>x</think>answer", {}, "required", "answer", "final"),
-        ("x</think>answer", {}, "required", "answer", "final"),
-        ("answer", {"thinking_format_has_close": 1}, "required", "answer", "final"),
-        ("<think>x</think>", {}, "required", "", "empty_final"),
-        (
-            "<think>x</think>answer<think>more",
-            {},
-            "required",
-            "",
-            "unfinished_thinking",
-        ),
-        ("answer", {}, "required", "", "unfinished_or_unverified_thinking"),
-        ("answer", {}, "final_only", "answer", "final"),
-        ("<think>x", {}, "final_only", "", "unfinished_thinking"),
-    ],
-)
-def test_final_answer_boundaries(text, info, mode, expected, status):
-    assert final_answer(text, info, mode, "<think>", "</think>") == (expected, status)
 
 
 def test_attacker_stop_before_first_generation():
@@ -268,16 +175,6 @@ def test_fixed_and_adaptive_seeds_match_original_formula():
             task.multiturn_consume_response(state, "<think>reason</think>PUBLIC123")
 
 
-def test_custom_reasoning_markers():
-    assert final_answer(
-        "private<|inner_suffix|>public",
-        {},
-        "required",
-        "<|inner_prefix|>",
-        "<|inner_suffix|>",
-    ) == ("public", "final")
-
-
 def test_attacker_transport_budget_and_length_failure():
     from types import SimpleNamespace
 
@@ -303,19 +200,6 @@ def test_attacker_transport_budget_and_length_failure():
     choice.finish_reason = "length"
     with pytest.raises(RuntimeError, match="500-token"):
         attacker.chat("system", [], 500, 42)
-
-
-def test_plain_final_answer_and_missing_finish_metadata_are_distinguished():
-    task = make_task([sample()], mode="final_only")
-    state = task.init_multiturn_state(
-        sample(), "", {}, True, lambda x, **k: json.dumps(x)
-    )
-    while not task.multiturn_is_done(state):
-        task.multiturn_next_request(state)
-        task.multiturn_consume_response(state, "PUBLIC123")
-    metrics = task.process_results(sample(), [task.multiturn_result(state)])
-    assert metrics["final_answer_rate"] == 1
-    assert metrics["finish_reason_coverage"] == 0
 
 
 def test_unfinished_episode_reaching_real_driver_cap_is_not_scored():
@@ -347,7 +231,8 @@ def test_unfinished_episode_reaching_real_driver_cap_is_not_scored():
         )
 
 
-def test_vllm_launcher_enables_thinking_strip_without_inference(tmp_path):
+@pytest.mark.parametrize("mode", [None, "final_only"])
+def test_vllm_launcher_mode_without_inference(tmp_path, mode):
     import os
     import subprocess
 
@@ -363,6 +248,8 @@ def test_vllm_launcher_enables_thinking_strip_without_inference(tmp_path):
     )
     for key in ("POLAR_VLLM_ARGS", "POLAR_THINK_START_TOKEN", "POLAR_THINK_END_TOKEN"):
         env.pop(key, None)
+    if mode is not None:
+        env["POLAR_THINKING_MODE"] = mode
     proc = subprocess.run(  # noqa: S603 - fixed local test script and synthetic arguments
         [
             "/bin/bash",
@@ -378,7 +265,49 @@ def test_vllm_launcher_enables_thinking_strip_without_inference(tmp_path):
     )
     args = json.loads(proc.stdout)
     model_args = args[args.index("--model_args") + 1]
-    assert "enable_thinking=true" in model_args
-    assert "autodetect_think_tokens=true" in model_args
-    assert "track_thinking_metrics=true" in model_args
+    enabled = "false"
+    assert f"enable_thinking={enabled}" in model_args
+    assert f"autodetect_think_tokens={enabled}" in model_args
+    assert f"track_thinking_metrics={enabled}" in model_args
+    assert "check_system_prompt_authority=true" in model_args
     assert args[-2:] == ["--limit", "2"]
+
+
+def test_nonreasoning_default_runs_fixed_and_adaptive_protocols():
+    config = load_yaml(CONFIG)
+    config["metadata"]["fixture_docs"] = [sample(1), sample(5)]
+    attacker = FakeAttacker()
+    task = FixtureTask(config=config, attacker=attacker)
+    assert task.settings["thinking_mode"] == "final_only"
+    lm = FakeLM(response="PUBLIC123")
+    result = run(task, lm)
+    metrics = result["results"]["polar_bench"]
+    assert metrics["overall,none"] == 1
+    assert metrics["final_answer_rate,none"] == 1
+    assert len(attacker.calls) == 2
+    assert all(call["max_tokens"] == 500 for call in attacker.calls)
+    assert [len(wave) for wave in lm.calls] == [2, 2]
+    assert all(args[1]["max_gen_toks"] == 8192 for wave in lm.calls for args in wave)
+    for row in result["samples"]["polar_bench"]:
+        turns = row["filtered_resps"][0]["transcript"]
+        assert [t["content"] for t in turns if t["role"] == "A"] == [
+            "PUBLIC123",
+            "PUBLIC123",
+        ]
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("PUBLIC123", "PUBLIC123"),
+        ("<think>secret</think>PUBLIC123", "PUBLIC123"),
+        ("<think>unfinished", ""),
+    ],
+)
+def test_visible_text_cleanup(text, expected):
+    assert final_answer(text)[0] == expected
+
+
+def test_reasoning_mode_is_rejected():
+    with pytest.raises(ValueError, match="non-reasoning"):
+        make_task([sample()], mode="required")

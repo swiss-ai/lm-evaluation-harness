@@ -758,10 +758,6 @@ class VLLM(TemplateLM):
                         track_thinking_metrics=self.track_thinking_metrics,
                     )
                 )
-                # Preserve the engine's termination reason for metadata-aware tasks.
-                length_res[-1]["finish_reason"] = getattr(
-                    output.outputs[0], "finish_reason", None
-                )
                 # use secondary stop seqs to cut off should-have-been-stopped content post-hoc
                 generated_text = postprocess_generated_text(
                     generated_text, _gen_kwargs.get("until"), self.think_end_token

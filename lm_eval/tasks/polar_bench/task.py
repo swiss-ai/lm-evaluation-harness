@@ -18,26 +18,16 @@ class ListDocs(list):
         return dict.fromkeys(self[0]) if self else {}
 
 
-def final_answer(response, info, mode, start_token, end_token):
-    """Fail closed on unfinished reasoning, including an opening in the prefill.
+def final_answer(response):
+    """Visible text for non-reasoning models; reject unexpected incomplete tags.
 
-    Native HF/vLLM stripping happens before this hook, so has_close is essential:
-    the returned string alone cannot distinguish prefilled reasoning from an answer.
-    final_only is an explicit contract for non-reasoning / final-only API endpoints.
+    This defensive cleanup does not support reasoning-prefilled chat templates.
     """
     response = str(response or "")
-    has_inline_close = end_token in response
-    has_close = info.get("thinking_format_has_close")
-    if has_close == 0 or (
-        mode == "required" and has_close != 1 and not has_inline_close
-    ):
-        return "", "unfinished_or_unverified_thinking"
-    if start_token in response and response.rfind(start_token) > response.rfind(
-        end_token
-    ):
+    if "<think>" in response and response.rfind("<think>") > response.rfind("</think>"):
         return "", "unfinished_thinking"
-    if has_inline_close:
-        response = response.rsplit(end_token, 1)[1]
+    if "</think>" in response:
+        response = response.rsplit("</think>", 1)[1]
     response = utils.strip_internal_channel_tags(response).strip()
     return response, "final" if response else "empty_final"
 
@@ -53,13 +43,7 @@ class PolarBenchTask(ConfigurableTask):
         metadata = config.setdefault("metadata", {})
         settings = {
             "thinking_mode": os.getenv(
-                "POLAR_THINKING_MODE", metadata.get("thinking_mode", "required")
-            ),
-            "think_start_token": os.getenv(
-                "POLAR_THINK_START_TOKEN", metadata.get("think_start_token", "<think>")
-            ),
-            "think_end_token": os.getenv(
-                "POLAR_THINK_END_TOKEN", metadata.get("think_end_token", "</think>")
+                "POLAR_THINKING_MODE", metadata.get("thinking_mode", "final_only")
             ),
             "model_a_seed_name": os.getenv(
                 "POLAR_MODEL_A_NAME",
@@ -76,10 +60,10 @@ class PolarBenchTask(ConfigurableTask):
             "attacker_max_tokens": 500,
             "protocol": "final-answer-only-v2",
         }
-        if settings["thinking_mode"] not in {"required", "final_only"}:
-            raise ValueError("POLAR_THINKING_MODE must be required or final_only")
-        if not settings["think_start_token"] or not settings["think_end_token"]:
-            raise ValueError("Reasoning boundary tokens must be nonempty")
+        if settings["thinking_mode"] != "final_only":
+            raise ValueError(
+                "This integration supports only non-reasoning models (final_only)"
+            )
         if not 1 <= settings["max_rounds"] <= self.MAX_MULTITURN_STEPS:
             raise ValueError("POLAR_MAX_ROUNDS must be between 1 and 64")
         metadata.update(settings)
@@ -229,19 +213,9 @@ class PolarBenchTask(ConfigurableTask):
         return prompt, generation
 
     def multiturn_consume_response(self, state, response):
-        self.multiturn_consume_response_with_info(state, response, [])
-
-    def multiturn_consume_response_with_info(self, state, response, generation_info):
-        info = deepcopy(generation_info[-1]) if generation_info else {}
-        answer, status = final_answer(
-            response,
-            info,
-            self.settings["thinking_mode"],
-            self.settings["think_start_token"],
-            self.settings["think_end_token"],
-        )
+        answer, status = final_answer(response)
         state["transcript"].append({"role": "A", "content": answer})
-        state["turn_info"].append({"status": status, "generation_info": info})
+        state["turn_info"].append({"status": status})
         state["turn"] += 1
         if state["turn"] >= state["budget"]:
             state.update(done=True, stop_reason="turn_budget")
@@ -267,14 +241,6 @@ class PolarBenchTask(ConfigurableTask):
         )
         turns = result["turn_info"]
         n = len(turns)
-        truncated = [
-            t["generation_info"].get("finish_reason") == "length" for t in turns
-        ]
-        observed = [
-            "finish_reason" in t["generation_info"]
-            and t["generation_info"]["finish_reason"] is not None
-            for t in turns
-        ]
         return {
             "privacy": score["privacy_score"],
             "utility": score["utility_score"],
@@ -282,17 +248,5 @@ class PolarBenchTask(ConfigurableTask):
             "final_answer_rate": sum(t["status"] == "final" for t in turns) / n
             if n
             else 0.0,
-            "unfinished_thinking_rate": sum(
-                t["status"]
-                in {"unfinished_thinking", "unfinished_or_unverified_thinking"}
-                for t in turns
-            )
-            / n
-            if n
-            else 0.0,
-            "length_limit_rate": sum(truncated) / sum(observed)
-            if any(observed)
-            else 0.0,
-            "finish_reason_coverage": sum(observed) / n if n else 0.0,
             "zero_turn_rate": float(n == 0),
         }
