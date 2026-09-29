@@ -1,0 +1,298 @@
+"""POLAR-Bench v2: only final answers are visible to either conversation peer."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+from copy import deepcopy
+from pathlib import Path
+
+from lm_eval.api.task import ConfigurableTask
+from lm_eval.tasks.polar_bench import utils
+
+
+class ListDocs(list):
+    @property
+    def features(self):
+        return dict.fromkeys(self[0]) if self else {}
+
+
+def final_answer(response, info, mode, start_token, end_token):
+    """Fail closed on unfinished reasoning, including an opening in the prefill.
+
+    Native HF/vLLM stripping happens before this hook, so has_close is essential:
+    the returned string alone cannot distinguish prefilled reasoning from an answer.
+    final_only is an explicit contract for non-reasoning / final-only API endpoints.
+    """
+    response = str(response or "")
+    has_inline_close = end_token in response
+    has_close = info.get("thinking_format_has_close")
+    if has_close == 0 or (
+        mode == "required" and has_close != 1 and not has_inline_close
+    ):
+        return "", "unfinished_or_unverified_thinking"
+    if start_token in response and response.rfind(start_token) > response.rfind(
+        end_token
+    ):
+        return "", "unfinished_thinking"
+    if has_inline_close:
+        response = response.rsplit(end_token, 1)[1]
+    response = utils.strip_internal_channel_tags(response).strip()
+    return response, "final" if response else "empty_final"
+
+
+class PolarBenchTask(ConfigurableTask):
+    VERSION = 2
+    MAX_MULTITURN_STEPS = 64
+
+    def __init__(self, config=None, attacker=None, **kwargs):
+        config = deepcopy(config or {})
+        config.pop("class", None)
+        config.setdefault("process_results", self.process_results)
+        metadata = config.setdefault("metadata", {})
+        settings = {
+            "thinking_mode": os.getenv(
+                "POLAR_THINKING_MODE", metadata.get("thinking_mode", "required")
+            ),
+            "think_start_token": os.getenv(
+                "POLAR_THINK_START_TOKEN", metadata.get("think_start_token", "<think>")
+            ),
+            "think_end_token": os.getenv(
+                "POLAR_THINK_END_TOKEN", metadata.get("think_end_token", "</think>")
+            ),
+            "model_a_seed_name": os.getenv(
+                "POLAR_MODEL_A_NAME",
+                metadata.get("model_a_seed_name", "evaluated-model"),
+            ),
+            "attacker_model": os.getenv(
+                "POLAR_ATTACKER_MODEL",
+                metadata.get("attacker_model", "meta-llama/Llama-3.3-70B-Instruct"),
+            ),
+            "base_seed": int(os.getenv("POLAR_SEED", metadata.get("base_seed", 42))),
+            "max_rounds": int(
+                os.getenv("POLAR_MAX_ROUNDS", metadata.get("max_rounds", 6))
+            ),
+            "attacker_max_tokens": 500,
+            "protocol": "final-answer-only-v2",
+        }
+        if settings["thinking_mode"] not in {"required", "final_only"}:
+            raise ValueError("POLAR_THINKING_MODE must be required or final_only")
+        if not settings["think_start_token"] or not settings["think_end_token"]:
+            raise ValueError("Reasoning boundary tokens must be nonempty")
+        if not 1 <= settings["max_rounds"] <= self.MAX_MULTITURN_STEPS:
+            raise ValueError("POLAR_MAX_ROUNDS must be between 1 and 64")
+        metadata.update(settings)
+        self.settings = settings
+        self.attacker = attacker
+        super().__init__(config=config, **kwargs)
+
+    def download(self, dataset_kwargs=None, **kwargs):
+        path = os.getenv("POLAR_DATASET_PATH")
+        metadata = self.config.metadata
+        if path:
+            metadata["dataset_source"] = "local"
+        else:
+            from huggingface_hub import hf_hub_download
+
+            revision = metadata["dataset_revision"]
+            path = hf_hub_download(
+                repo_id="Qiaoyuan/POLAR-Bench",
+                repo_type="dataset",
+                filename="data/privacy_benchmark_rendered_repaired.json",
+                revision=revision,
+            )
+            metadata["dataset_source"] = f"Qiaoyuan/POLAR-Bench@{revision}"
+        raw = Path(path).read_bytes()
+        metadata["dataset_sha256"] = hashlib.sha256(raw).hexdigest()
+        rows = json.loads(raw)
+        if not isinstance(rows, list):
+            raise TypeError("POLAR data must be a JSON array")
+        # Do not silently change the evaluated population by skipping broken rows.
+        for row in rows:
+            usable, reason = utils.is_usable_example(row)
+            if not usable:
+                raise ValueError(
+                    f"Unusable sample {utils.extract_example_id(row)!r}: {reason}"
+                )
+        if not rows:
+            raise ValueError("POLAR dataset is empty")
+        metadata["dataset_rows"] = len(rows)
+        self.dataset = {"test": ListDocs(rows)}
+
+    def has_training_docs(self):
+        return False
+
+    def has_validation_docs(self):
+        return False
+
+    def has_test_docs(self):
+        return True
+
+    def test_docs(self):
+        return self.dataset["test"]
+
+    def doc_to_text(self, doc):
+        return utils.build_a_system(doc)
+
+    def doc_to_target(self, doc):
+        return ""
+
+    def init_multiturn_state(
+        self, doc, ctx, gen_kwargs, apply_chat_template=False, chat_template=None
+    ):
+        if not apply_chat_template or chat_template is None:
+            raise ValueError(
+                "POLAR requires --apply_chat_template to preserve the system role"
+            )
+        turns = utils.parse_attacker_turns(doc)
+        budget = utils.extract_attack_turn_budget(doc, self.settings["max_rounds"])
+        budget = min(len(turns), budget) if turns else budget
+        if not 1 <= budget <= self.MAX_MULTITURN_STEPS:
+            raise ValueError(
+                "Invalid POLAR sample turn budget; refusing silent rollout truncation"
+            )
+        return {
+            "doc": doc,
+            "transcript": [],
+            "turn_info": [],
+            "turn": 0,
+            "scripted": turns,
+            "budget": budget,
+            "adaptive": not turns or utils.extract_attack_strength(doc) == 5,
+            "done": False,
+            "stop_reason": None,
+            "gen_kwargs": deepcopy(gen_kwargs),
+            "chat_template": chat_template,
+        }
+
+    def multiturn_is_done(self, state):
+        return state["done"]
+
+    def _attacker(self):
+        if self.attacker is None:
+            from lm_eval.tasks.polar_bench.attacker import Attacker
+
+            self.attacker = Attacker(self.settings["attacker_model"])
+        return self.attacker
+
+    def multiturn_next_request(self, state):
+        if state["done"]:
+            return None
+        doc, turn = state["doc"], state["turn"]
+        sample_id = utils.extract_example_id(doc)
+        if state["adaptive"]:
+            planned = state["scripted"][turn] if state["scripted"] else ""
+            messages = utils.build_b_turn_messages(
+                doc, state["transcript"], turn + 1, state["budget"], planned
+            )
+            attack = (
+                self._attacker()
+                .chat(
+                    system_prompt=utils.build_b_system(doc),
+                    messages=messages,
+                    max_tokens=500,
+                    seed=utils.stable_seed(
+                        sample_id,
+                        self.settings["model_a_seed_name"],
+                        self.settings["attacker_model"],
+                        "model_b",
+                        "adaptive",
+                        turn + 1,
+                        base_seed=self.settings["base_seed"],
+                    ),
+                )
+                .strip()
+            )
+            if attack == "<STOP>":
+                state.update(done=True, stop_reason="attacker_stop")
+                return None
+        else:
+            attack = state["scripted"][turn]
+        state["transcript"].append({"role": "B", "content": attack})
+        messages = utils.build_a_messages_from_transcript(
+            utils.build_a_system(doc), state["transcript"]
+        )
+        try:
+            prompt = state["chat_template"](messages, add_generation_prompt=True)
+        except TypeError:
+            prompt = state["chat_template"](messages)
+        generation = deepcopy(state["gen_kwargs"])
+        generation["seed"] = utils.stable_seed(
+            sample_id,
+            self.settings["model_a_seed_name"],
+            "model_a",
+            "adaptive" if state["adaptive"] else "scripted",
+            turn + 1 if state["adaptive"] else len(state["transcript"]),
+            base_seed=self.settings["base_seed"],
+        )
+        return prompt, generation
+
+    def multiturn_consume_response(self, state, response):
+        self.multiturn_consume_response_with_info(state, response, [])
+
+    def multiturn_consume_response_with_info(self, state, response, generation_info):
+        info = deepcopy(generation_info[-1]) if generation_info else {}
+        answer, status = final_answer(
+            response,
+            info,
+            self.settings["thinking_mode"],
+            self.settings["think_start_token"],
+            self.settings["think_end_token"],
+        )
+        state["transcript"].append({"role": "A", "content": answer})
+        state["turn_info"].append({"status": status, "generation_info": info})
+        state["turn"] += 1
+        if state["turn"] >= state["budget"]:
+            state.update(done=True, stop_reason="turn_budget")
+
+    def multiturn_result(self, state):
+        if not state["done"]:
+            raise RuntimeError("POLAR rollout was interrupted by the harness step cap")
+        return {
+            "transcript": state["transcript"],
+            "turn_info": state["turn_info"],
+            "stop_reason": state["stop_reason"],
+            "protocol": self.settings["protocol"],
+        }
+
+    def process_results(self, doc, results):
+        result = results[0]
+        score = utils.score_example(
+            doc,
+            result["transcript"],
+            self.settings["model_a_seed_name"],
+            self.settings["base_seed"],
+            True,
+        )
+        turns = result["turn_info"]
+        n = len(turns)
+        truncated = [
+            t["generation_info"].get("finish_reason") == "length" for t in turns
+        ]
+        observed = [
+            "finish_reason" in t["generation_info"]
+            and t["generation_info"]["finish_reason"] is not None
+            for t in turns
+        ]
+        return {
+            "privacy": score["privacy_score"],
+            "utility": score["utility_score"],
+            "overall": score["example_score"],
+            "final_answer_rate": sum(t["status"] == "final" for t in turns) / n
+            if n
+            else 0.0,
+            "unfinished_thinking_rate": sum(
+                t["status"]
+                in {"unfinished_thinking", "unfinished_or_unverified_thinking"}
+                for t in turns
+            )
+            / n
+            if n
+            else 0.0,
+            "length_limit_rate": sum(truncated) / sum(observed)
+            if any(observed)
+            else 0.0,
+            "finish_reason_coverage": sum(observed) / n if n else 0.0,
+            "zero_turn_rate": float(n == 0),
+        }

@@ -311,3 +311,15 @@ paper-comparison scripts that assume one string per doc need updating.
   `lm_eval/tasks/realguardrails/s_rules/`.
 + Tests: `tests/test_multiturn.py`, `tests/test_mt_bench.py`,
   `tests/test_bfcl_v3.py`, `tests/test_s_rules.py`.
+
+### Optional per-response generation metadata
+
+A task may implement
+`multiturn_consume_response_with_info(state, response, generation_info)`.
+When present, the driver calls it instead of `multiturn_consume_response`, passing
+a deep copy of the current request's `length_info` list. Older tasks keep their
+existing behavior. This enables final-answer-only tasks to reject unfinished
+reasoning even when the backend has already stripped the markers. Metadata may
+be empty (e.g. response-cache hits or an unsupported backend); tasks must define
+their own policy for that case. The vLLM backend also records `finish_reason`
+from its completion object. This hook does not receive or log raw reasoning.
