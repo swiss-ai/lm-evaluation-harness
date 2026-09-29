@@ -175,7 +175,8 @@ def test_fixed_and_adaptive_seeds_match_original_formula():
             task.multiturn_consume_response(state, "<think>reason</think>PUBLIC123")
 
 
-def test_attacker_transport_budget_and_length_failure():
+@pytest.mark.parametrize("budget", [500, 32768])
+def test_attacker_transport_budget_and_length_failure(budget):
     from types import SimpleNamespace
 
     from lm_eval.tasks.polar_bench.attacker import Attacker
@@ -195,11 +196,11 @@ def test_attacker_transport_budget_and_length_failure():
     attacker.client = SimpleNamespace(
         chat=SimpleNamespace(completions=SimpleNamespace(create=create))
     )
-    assert attacker.chat("system", [], 500, 42) == "Ask a question"
-    assert calls[0]["max_tokens"] == 500 and calls[0]["seed"] == 42
+    assert attacker.chat("system", [], budget, 42) == "Ask a question"
+    assert calls[0]["max_tokens"] == budget and calls[0]["seed"] == 42
     choice.finish_reason = "length"
-    with pytest.raises(RuntimeError, match="500-token"):
-        attacker.chat("system", [], 500, 42)
+    with pytest.raises(RuntimeError, match=f"{budget}-token"):
+        attacker.chat("system", [], budget, 42)
 
 
 def test_unfinished_episode_reaching_real_driver_cap_is_not_scored():
@@ -285,7 +286,7 @@ def test_nonreasoning_default_runs_fixed_and_adaptive_protocols():
     assert metrics["overall,none"] == 1
     assert metrics["final_answer_rate,none"] == 1
     assert len(attacker.calls) == 2
-    assert all(call["max_tokens"] == 500 for call in attacker.calls)
+    assert all(call["max_tokens"] == 32768 for call in attacker.calls)
     assert [len(wave) for wave in lm.calls] == [2, 2]
     assert all(args[1]["max_gen_toks"] == 8192 for wave in lm.calls for args in wave)
     for row in result["samples"]["polar_bench"]:
@@ -311,3 +312,20 @@ def test_visible_text_cleanup(text, expected):
 def test_reasoning_mode_is_rejected():
     with pytest.raises(ValueError, match="non-reasoning"):
         make_task([sample()], mode="required")
+
+
+def test_attacker_budget_override_is_used_and_recorded(monkeypatch):
+    monkeypatch.setenv("POLAR_ATTACKER_MAX_TOKENS", "8192")
+    attacker = FakeAttacker()
+    task = make_task([sample(5)], attacker)
+    run(task, FakeLM())
+    assert len(attacker.calls) == 2
+    assert all(call["max_tokens"] == 8192 for call in attacker.calls)
+    assert task.config.metadata["attacker_max_tokens"] == 8192
+
+
+@pytest.mark.parametrize("budget", ["0", "-1", "abc"])
+def test_invalid_attacker_budget_is_rejected(monkeypatch, budget):
+    monkeypatch.setenv("POLAR_ATTACKER_MAX_TOKENS", budget)
+    with pytest.raises(ValueError):
+        make_task([sample()])

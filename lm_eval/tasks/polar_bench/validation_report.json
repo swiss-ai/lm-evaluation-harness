@@ -91,5 +91,15 @@
     "generation_metadata": "absent, as in original task callback",
     "real_inference": false
   },
-  "gpu_validation": "Deferred to the cluster; no real vLLM inference performed."
+  "gpu_validation": "Deferred to the cluster; no real vLLM inference performed.",
+  "reference_comparison_note": "Historical offline comparison used the original B budget of 500 tokens; it is not evidence of parity for the increased B budget.",
+  "attacker_budget_update": {
+    "default_max_tokens": 32768,
+    "override_env": "POLAR_ATTACKER_MAX_TOKENS",
+    "timeout_seconds_per_attempt": 600,
+    "timeout_override_env": "POLAR_ATTACKER_TIMEOUT",
+    "related_tests_passed": 45,
+    "real_inference": false,
+    "truncation_handling": "Raise on finish_reason=length; no finite budget guarantees completion."
+  }
 }

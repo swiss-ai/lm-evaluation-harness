@@ -24,3 +24,4 @@ metadata:
   requires_system_prompt_authority: true
   max_rounds: 6
   base_seed: 42
+  attacker_max_tokens: 32768

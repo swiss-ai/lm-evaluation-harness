@@ -57,7 +57,12 @@ class PolarBenchTask(ConfigurableTask):
             "max_rounds": int(
                 os.getenv("POLAR_MAX_ROUNDS", metadata.get("max_rounds", 6))
             ),
-            "attacker_max_tokens": 500,
+            "attacker_max_tokens": int(
+                os.getenv(
+                    "POLAR_ATTACKER_MAX_TOKENS",
+                    metadata.get("attacker_max_tokens", 32768),
+                )
+            ),
             "protocol": "final-answer-only-v2",
         }
         if settings["thinking_mode"] != "final_only":
@@ -66,6 +71,8 @@ class PolarBenchTask(ConfigurableTask):
             )
         if not 1 <= settings["max_rounds"] <= self.MAX_MULTITURN_STEPS:
             raise ValueError("POLAR_MAX_ROUNDS must be between 1 and 64")
+        if settings["attacker_max_tokens"] < 1:
+            raise ValueError("POLAR_ATTACKER_MAX_TOKENS must be a positive integer")
         metadata.update(settings)
         self.settings = settings
         self.attacker = attacker
@@ -175,7 +182,7 @@ class PolarBenchTask(ConfigurableTask):
                 .chat(
                     system_prompt=utils.build_b_system(doc),
                     messages=messages,
-                    max_tokens=500,
+                    max_tokens=self.settings["attacker_max_tokens"],
                     seed=utils.stable_seed(
                         sample_id,
                         self.settings["model_a_seed_name"],

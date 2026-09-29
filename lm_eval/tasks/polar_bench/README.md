@@ -25,8 +25,11 @@ scope.
 
 ## Protocol and scoring
 
-- A: **8,192 generated tokens per round**; B: **500**. Override A with
-  `--gen_kwargs max_gen_toks=16384` if needed.
+- A: **8,192 generated tokens per round**; B: **32,768** by default. Override A with
+  `--gen_kwargs max_gen_toks=16384` if needed. Set
+  `POLAR_ATTACKER_MAX_TOKENS=65536` to change B's per-request budget; its resolved
+  value is recorded in task metadata. For reasoning B services, this budget can
+  include reasoning as well as visible output; it is not a visible-answer quota.
 - Visible A answers enter subsequent A/B history and the scorer.
 - B's `<STOP>` ends the dialogue before the next A call. A refusal or privacy leak
   alone does not stop it. Empty or truncated B attacks fail explicitly.
@@ -61,6 +64,7 @@ without modifying that repository.
 export POLAR_ATTACKER_BASE_URL='https://YOUR_B_SERVICE/v1'
 # Set POLAR_ATTACKER_API_KEY securely if the endpoint requires it.
 export POLAR_ATTACKER_MODEL='meta-llama/Llama-3.3-70B-Instruct'
+export POLAR_ATTACKER_MAX_TOKENS=32768
 export POLAR_DATASET_PATH='/path/to/polar-smoke-50.json'
 export POLAR_OUTPUT_PATH='results/polar-nonreasoning-smoke'
 export POLAR_VLLM_ARGS='tensor_parallel_size=4,data_parallel_size=1'
@@ -70,8 +74,14 @@ bash scripts/run_polar_vllm.sh /path/to/non-reasoning-A-model
 Use a subset covering all five attack protocols and ten domains rather than
 the first 50 dataset rows. It is an integration test, not a representative
 leaderboard estimate. B must be reachable from the evaluation node, with its
-served model ID matching `POLAR_ATTACKER_MODEL`. Both A and B should be fixed
-non-reasoning models for this first validation.
+served model ID matching `POLAR_ATTACKER_MODEL`. A must be non-reasoning. A reasoning B service may be tested when it returns
+its final answer separately in `message.content`; the client does not forward
+separate `reasoning`/`reasoning_content` fields. A larger budget does not guarantee
+completion. The B timeout defaults to 600 seconds per attempt; override with
+`POLAR_ATTACKER_TIMEOUT`. A slow endpoint may still time out. The service must
+support the requested output limit, and its context must fit both input and output.
+The default 32,768-token B budget differs from the original 500-token protocol;
+record the B model and budget when comparing results.
 
 Run one harness process; vLLM tensor parallelism is supported. Do not wrap this
 launcher in `accelerate launch`. The context must fit the document, policy,
@@ -92,7 +102,7 @@ HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 python -m pytest \
 
 ```
 
-The completed reference comparison is recorded in `validation_report.json`:
+The historical reference comparison (B budget 500) is recorded in `validation_report.json`:
 all 7,852 rows were checked for targets, eligibility and system prompts, and
 50 representative dialogues (160 A turns) were compared using fake A/B replies.
 The one-off comparison script is not included in this integration.
