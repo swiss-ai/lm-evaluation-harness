@@ -41,7 +41,7 @@ class SGLangLM(TemplateLM):
         # batch args from lm-eval interface:  https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md
         batch_size: str | int = 1,
         max_batch_size=None,
-        max_model_len: int = None,
+        max_model_len: int | None = None,
         max_gen_toks: int = 256,
         add_bos_token: bool | None = False,
         ########## SGlang native args ##########
@@ -294,7 +294,7 @@ class SGLangLM(TemplateLM):
                     # add EOS token to stop sequences
                     until = handle_stop_sequences(kwargs.pop("until", None), eos=eos)
                 else:
-                    raise ValueError(
+                    raise ValueError(  # noqa: TRY004
                         f"Expected `kwargs` to be of type `dict` but got {type(gen_kwargs)}"
                     )
                 if "max_gen_toks" in kwargs.keys():
@@ -360,7 +360,7 @@ class SGLangLM(TemplateLM):
 
     def _model_generate(
         self,
-        requests: list[list[int]] = None,
+        requests: list[list[int]] | None = None,
         generate: bool = False,
         sampling_params: list[dict] | dict | None = None,
         return_logprob: bool = False,
@@ -369,7 +369,7 @@ class SGLangLM(TemplateLM):
     ):
         # check sglang sampling parameters: https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/sampling/sampling_params.py#L21  and https://docs.sglang.ai/references/sampling_params.html.
         if not generate:
-            sampling_params = sampling_params if sampling_params else {}
+            sampling_params = sampling_params or {}
             sampling_params.update(
                 {
                     "temperature": 0,
@@ -420,7 +420,7 @@ class SGLangLM(TemplateLM):
     def tok_encode(
         self,
         string: str | list[str],
-        left_truncate_len: int = None,
+        left_truncate_len: int | None = None,
         add_special_tokens: bool = False,
         truncation: bool = False,
     ) -> list[int] | list[list[int]]:
@@ -455,7 +455,6 @@ class SGLangLM(TemplateLM):
         Returns:
             str: The name of the model's tokenizer and/or chat template.
         """
-        pass
 
     def chat_template(self, chat_template: bool | str = False) -> str:
         """
@@ -476,7 +475,6 @@ class SGLangLM(TemplateLM):
         Returns:
             str: The selected chat template in Jinja format.
         """
-        pass
 
     def apply_chat_template(
         self,
