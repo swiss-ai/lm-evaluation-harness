@@ -63,6 +63,9 @@ class SGLangLM(TemplateLM):
         prefix_token_id: int | None = None,
         chat_template_args: dict | None = None,
         chat_template_path: str | None = None,
+        # chat-template switch, folded into chat_template_args as for hf; None keeps the
+        # template default. Must be a named parameter: `**kwargs` goes to `sgl.Engine`.
+        enable_thinking: bool | None = None,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         # Start marker for thinking tags - used for the thinking-format metric. Auto-
@@ -133,6 +136,8 @@ class SGLangLM(TemplateLM):
             strip=False,
             chat_template_path=chat_template_path,
         )
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
         # Auto-detect open/close tokens from the chat template when opted in and not
         # forced. When on, fails loud if the template declares reasoning tokens but the
         # close can't be resolved; pass `think_end_token=` or drop the opt-in to escape.

@@ -34,6 +34,39 @@ class TestVLLMValidation:
                 enable_expert_parallel=True,
             )
 
+    @pytest.mark.parametrize(
+        ("kwargs", "expected"),
+        [
+            ({}, None),
+            ({"enable_thinking": False}, False),
+            ({"enable_thinking": True}, True),
+            ({"chat_template_args": {"enable_thinking": False}}, False),
+        ],
+    )
+    def test_enable_thinking_forwarded_only_when_set(self, kwargs, expected):
+        """Unset leaves the template default: no enable_thinking kwarg reaches it."""
+        from lm_eval.models.vllm_causallms import VLLM
+
+        tokenizer = MagicMock()
+        tokenizer.chat_template = None
+        with (
+            patch.multiple(
+                "lm_eval.models.vllm_causallms",
+                LLM=MagicMock(),
+                get_tokenizer=MagicMock(return_value=tokenizer),
+                configure_pad_token=lambda tok, **_: tok,
+            ),
+            patch("transformers.AutoConfig.from_pretrained", MagicMock()),
+        ):
+            lm = VLLM(pretrained="mock-model", **kwargs)
+        lm.apply_chat_template([{"role": "user", "content": "hi"}])
+        rendered = tokenizer.apply_chat_template.call_args.kwargs
+        assert lm.enable_thinking is expected
+        if expected is None:
+            assert "enable_thinking" not in rendered
+        else:
+            assert rendered["enable_thinking"] is expected
+
 
 @pytest.mark.skip(reason="requires CUDA")
 class Test_VLLM:
