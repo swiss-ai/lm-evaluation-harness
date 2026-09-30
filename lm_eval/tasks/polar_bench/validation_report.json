@@ -101,5 +101,11 @@
     "related_tests_passed": 45,
     "real_inference": false,
     "truncation_handling": "Raise on finish_reason=length; no finite budget guarantees completion."
+  },
+  "config_export_fix": {
+    "regression": "Real OpenAI/httpx client with mocked HTTP responses reproduced TypeError cannot pickle _thread.RLock before the fix; complete evaluation and JSON config export pass after the fix.",
+    "related_tests_passed": 46,
+    "real_inference": false,
+    "core_files_changed": false
   }
 }

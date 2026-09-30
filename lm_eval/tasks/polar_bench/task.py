@@ -32,6 +32,28 @@ def final_answer(response):
     return response, "final" if response else "empty_final"
 
 
+def process_results(doc, results, model_a_seed_name="evaluated-model", base_seed=42):
+    result = results[0]
+    score = utils.score_example(
+        doc,
+        result["transcript"],
+        model_a_seed_name,
+        base_seed,
+        True,
+    )
+    turns = result["turn_info"]
+    n = len(turns)
+    return {
+        "privacy": score["privacy_score"],
+        "utility": score["utility_score"],
+        "overall": score["example_score"],
+        "final_answer_rate": sum(t["status"] == "final" for t in turns) / n
+        if n
+        else 0.0,
+        "zero_turn_rate": float(n == 0),
+    }
+
+
 class PolarBenchTask(ConfigurableTask):
     VERSION = 2
     MAX_MULTITURN_STEPS = 64
@@ -39,7 +61,9 @@ class PolarBenchTask(ConfigurableTask):
     def __init__(self, config=None, attacker=None, **kwargs):
         config = deepcopy(config or {})
         config.pop("class", None)
-        config.setdefault("process_results", self.process_results)
+        # Config export deep-copies callables: a bound method would copy this
+        # task and its live attacker HTTP client (which contains thread locks).
+        config.setdefault("process_results", process_results)
         metadata = config.setdefault("metadata", {})
         settings = {
             "thinking_mode": os.getenv(
@@ -238,22 +262,6 @@ class PolarBenchTask(ConfigurableTask):
         }
 
     def process_results(self, doc, results):
-        result = results[0]
-        score = utils.score_example(
-            doc,
-            result["transcript"],
-            self.settings["model_a_seed_name"],
-            self.settings["base_seed"],
-            True,
+        return process_results(
+            doc, results, self.settings["model_a_seed_name"], self.settings["base_seed"]
         )
-        turns = result["turn_info"]
-        n = len(turns)
-        return {
-            "privacy": score["privacy_score"],
-            "utility": score["utility_score"],
-            "overall": score["example_score"],
-            "final_answer_rate": sum(t["status"] == "final" for t in turns) / n
-            if n
-            else 0.0,
-            "zero_turn_rate": float(n == 0),
-        }

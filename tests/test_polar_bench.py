@@ -329,3 +329,47 @@ def test_invalid_attacker_budget_is_rejected(monkeypatch, budget):
     monkeypatch.setenv("POLAR_ATTACKER_MAX_TOKENS", budget)
     with pytest.raises(ValueError):
         make_task([sample()])
+
+
+def test_real_attacker_client_does_not_break_config_export(monkeypatch):
+    import httpx
+    import openai
+
+    monkeypatch.setenv("POLAR_ATTACKER_BASE_URL", "https://offline.invalid/v1")
+    monkeypatch.setenv("POLAR_ATTACKER_API_KEY", "offline-test-key")
+    original_client = openai.OpenAI
+
+    def respond(request):
+        return httpx.Response(
+            200,
+            json={
+                "id": "offline",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "fixed-B",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {
+                            "role": "assistant",
+                            "content": "Attacker follow-up",
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(respond)) as http_client:
+        monkeypatch.setattr(
+            openai,
+            "OpenAI",
+            lambda **kwargs: original_client(**kwargs, http_client=http_client),
+        )
+        task = make_task([sample(1), sample(5)])
+        result = run(task, FakeLM())
+        assert task.attacker is not None
+        assert result["results"]["polar_bench"]["overall,none"] == 1
+        serialized = json.dumps(task.dump_config())
+        assert "offline-test-key" not in serialized
+        assert len(result["samples"]["polar_bench"]) == 2
