@@ -427,3 +427,80 @@ def test_localchatcompletion_remote_tokenizer_unauthenticated(monkeypatch):
     assert captured["verify_certificate"] is False
     assert captured["ca_cert_path"] is None
     assert captured["auth_token"] is None
+
+
+class _RecordingTokenizer:
+    """Stands in for an HF tokenizer and records the template kwargs it is given."""
+
+    def __init__(self):
+        self.calls = []
+
+    def apply_chat_template(self, chat_history, **kwargs):
+        self.calls.append(kwargs)
+        effort = kwargs.get("reasoning_effort", "medium")
+        return f"Reasoning: {effort}\n" + chat_history[-1]["content"]
+
+
+def _completions_with_tokenizer(**kwargs):
+    model = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        **kwargs,
+    )
+    model.tokenizer_backend = "huggingface"
+    model.tokenizer = _RecordingTokenizer()
+    return model
+
+
+def test_local_completions_renders_chat_template_args():
+    model = _completions_with_tokenizer(chat_template_args={"reasoning_effort": "high"})
+    chat = [{"role": "user", "content": "What is 2+2?"}]
+
+    assert model.apply_chat_template(chat) == "Reasoning: high\nWhat is 2+2?"
+    assert model.tokenizer.calls[0]["reasoning_effort"] == "high"
+
+
+def test_local_completions_without_chat_template_args_is_unchanged():
+    model = _completions_with_tokenizer()
+    chat = [{"role": "user", "content": "What is 2+2?"}]
+
+    assert model.apply_chat_template(chat) == "Reasoning: medium\nWhat is 2+2?"
+    assert "reasoning_effort" not in model.tokenizer.calls[0]
+
+
+def test_chat_template_args_refused_when_server_renders_template():
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    model = LocalChatCompletion(
+        base_url="http://test-url.com",
+        model="test-model",
+        chat_template_args={"reasoning_effort": "high"},
+    )
+
+    with pytest.raises(ValueError, match="chat_template_args"):
+        model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+
+@pytest.mark.parametrize("enable_thinking", [True, False])
+def test_local_completions_folds_enable_thinking_into_template_args(enable_thinking):
+    model = _completions_with_tokenizer(
+        enable_thinking=enable_thinking,
+        chat_template_args={"reasoning_effort": "low"},
+    )
+
+    model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+    assert model.tokenizer.calls[0]["enable_thinking"] is enable_thinking
+    assert model.tokenizer.calls[0]["reasoning_effort"] == "low"
+
+
+def test_enable_thinking_alone_refused_when_server_renders_template():
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    model = LocalChatCompletion(
+        base_url="http://test-url.com", model="test-model", enable_thinking=False
+    )
+
+    with pytest.raises(ValueError, match=r"enable_thinking"):
+        model.apply_chat_template([{"role": "user", "content": "hi"}])

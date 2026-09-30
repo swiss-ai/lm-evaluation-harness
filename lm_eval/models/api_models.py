@@ -142,6 +142,12 @@ class TemplateAPI(TemplateLM):
         timeout: int = 300,
         header: dict[str, str] | None = None,
         max_images: int = 1,
+        # extra keyword arguments for the chat template, e.g. {"reasoning_effort": "high"};
+        # only used where the template is rendered client-side with an HF tokenizer
+        chat_template_args: dict[str, Any] | None = None,
+        # chat-template switch, folded into chat_template_args as for hf; None keeps the
+        # template default
+        enable_thinking: bool | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -204,6 +210,9 @@ class TemplateAPI(TemplateLM):
         self._eos_string = eos_string
         self.timeout = int(timeout)
         self.max_images = int(max_images)
+        self.chat_template_args = dict(chat_template_args or {})
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
 
         eval_logger.info(f"Using tokenizer {self.tokenizer_backend}")
         if self.tokenizer_backend is None:
@@ -355,9 +364,20 @@ class TemplateAPI(TemplateLM):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **self.chat_template_args,
                 **kwargs,
             )
-        elif self.tokenizer_backend == "remote" and self.tokenized_requests:
+        # Past this point the server renders the template, so the arguments would be
+        # dropped silently; refuse instead of scoring a different prompt than asked for.
+        if self.chat_template_args:
+            raise ValueError(
+                "chat_template_args (including enable_thinking) need the chat template "
+                "rendered client-side with a Hugging Face tokenizer, e.g. local-completions "
+                "with tokenizer_backend=huggingface. Here the server renders it (a "
+                "chat-completions model, or no local tokenizer), so they can't be applied: "
+                f"{sorted(self.chat_template_args)}"
+            )
+        if self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history
         else:
             # bit of a hack. We'll load back before sending to the API

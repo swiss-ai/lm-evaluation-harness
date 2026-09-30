@@ -84,6 +84,7 @@ class LocalCompletionsAPI(TemplateAPI):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **self.chat_template_args,
             )
         return super().apply_chat_template(chat_history, add_generation_prompt)
 
