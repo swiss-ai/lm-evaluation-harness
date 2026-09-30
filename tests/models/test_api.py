@@ -493,3 +493,14 @@ def test_local_completions_folds_enable_thinking_into_template_args(enable_think
 
     assert model.tokenizer.calls[0]["enable_thinking"] is enable_thinking
     assert model.tokenizer.calls[0]["reasoning_effort"] == "low"
+
+
+def test_enable_thinking_alone_refused_when_server_renders_template():
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    model = LocalChatCompletion(
+        base_url="http://test-url.com", model="test-model", enable_thinking=False
+    )
+
+    with pytest.raises(ValueError, match=r"enable_thinking"):
+        model.apply_chat_template([{"role": "user", "content": "hi"}])
