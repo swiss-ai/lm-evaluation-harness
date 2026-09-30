@@ -31,6 +31,11 @@ with contextlib.suppress(ModuleNotFoundError):
     import sglang as sgl
 
 
+def _sglang_device_type(device: str | None) -> str | None:
+    """Drop a device index: SGLang takes a device type ("cuda"), not "cuda:0"."""
+    return device.split(":", 1)[0] if device else device
+
+
 @register_model("sglang")
 class SGLangLM(TemplateLM):
     _DEFAULT_MAX_LENGTH = 2048
@@ -89,7 +94,10 @@ class SGLangLM(TemplateLM):
                 "Please install sglang via official document here:https://docs.sglang.ai/start/install.html#install-sglang"
             )
 
-        assert "cuda" in device or device is None, "SGLang only supports CUDA"
+        assert device is None or "cuda" in device, "SGLang only supports CUDA"
+        # The CLI's default device is "cuda:0"; SGLang crashes at startup on anything
+        # but a bare device type, and places the model on GPUs itself from tp/dp_size.
+        device = _sglang_device_type(device)
         assert context_length is None or max_model_len is None, (
             "Either context_length or max_model_len may be provided, but not both"
         )
