@@ -1018,3 +1018,19 @@ class TestTruncateBeforeStops:
         assert truncate_before_stops(text, ["\n\n"]) == postprocess_generated_text(
             text, ["\n\n"], None
         )
+
+
+def test_postprocess_strips_the_reasoning_before_applying_the_stops():
+    # a task stop inside the reasoning must not cut the answer off
+    generation = (
+        "<think>Analyze. Question: x\n\ny</think>\n\nThe answer is 18.\nQuestion: next"
+    )
+    assert (
+        postprocess_generated_text(generation, ["Question:", "\n\n"], "</think>")
+        == "The answer is 18.\n"
+    )
+    # no close: the stops apply to the whole text, as before
+    assert (
+        postprocess_generated_text("18\nQuestion: next", ["Question:"], "</think>")
+        == "18\n"
+    )
