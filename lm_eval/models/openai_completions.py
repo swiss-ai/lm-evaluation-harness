@@ -112,6 +112,8 @@ class LocalCompletionsAPI(TemplateAPI):
                 "temperature": temperature,
                 "stop": stop,
                 "seed": seed,
+                # reasoning markers made of special tokens (see TemplateAPI)
+                **({"skip_special_tokens": False} if self.keep_special_tokens else {}),
                 **gen_kwargs,
             }
         else:

@@ -504,3 +504,96 @@ def test_enable_thinking_alone_refused_when_server_renders_template():
 
     with pytest.raises(ValueError, match=r"enable_thinking"):
         model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+
+def _thinking_api(**kwargs):
+    return LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        **kwargs,
+    )
+
+
+def _generate(model, text, until):
+    from lm_eval.api.instance import Instance
+
+    instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("Question: Janet has 16 eggs...\nAnswer:", {"until": until}),
+        idx=0,
+    )
+    sent: list[dict] = []
+
+    def model_call(messages, generate=True, gen_kwargs=None, **_):
+        sent.append(
+            model._create_payload(messages, generate=True, gen_kwargs=gen_kwargs)
+        )
+        return {"choices": [{"index": 0, "text": text}]}
+
+    with patch.object(model, "model_call", side_effect=model_call):
+        result = model.generate_until([instance])
+    return result, instance, sent
+
+
+REASONING = (
+    "<think>\nAnalyze. Question: Janet has 16 eggs, eats 3, bakes 4.\n\nSo 9 * 2 = 18.\n</think>\n\n"
+    "The answer is 18.\nQuestion: next one"
+)
+
+
+def test_api_thinking_holds_stops_back_and_strips_the_reasoning():
+    model = _thinking_api(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    result, instance, sent = _generate(model, REASONING, ["Question:", "\n\n"])
+
+    # the task stops don't go to the server (they'd cut into the reasoning)...
+    assert "Question:" not in sent[0]["stop"] and "\n\n" not in sent[0]["stop"]
+    # ...and apply to the answer once the reasoning is stripped
+    assert result == ["The answer is 18.\n"]
+    info = instance.length_info[0]
+    assert info["thinking_format_correct"] == 1
+    assert info["thinking_length_chars"] > 0
+
+
+def test_api_without_think_tokens_is_unchanged():
+    model = _thinking_api()
+    result, instance, sent = _generate(model, "The answer is 18.", ["Question:"])
+    assert sent[0]["stop"][0] == "Question:"
+    assert result == ["The answer is 18."]
+    assert "skip_special_tokens" not in sent[0]
+    assert "thinking_length_chars" not in instance.length_info[0]
+
+
+def test_api_keeps_special_tokens_when_the_markers_are_special():
+    model = _thinking_api(think_end_token="<|channel|>final<|message|>")  # noqa: S106
+    model.keep_special_tokens = (
+        True  # as derived from a tokenizer where they're special
+    )
+    _, _, sent = _generate(
+        model, "analysis ... <|channel|>final<|message|>18", ["Question:"]
+    )
+    assert sent[0]["skip_special_tokens"] is False
+
+
+def test_special_tokens_are_read_from_the_tokenizer():
+    from types import SimpleNamespace
+
+    from lm_eval.models.api_models import _special_tokens
+
+    class Added:
+        def __init__(self, text, special):
+            self.text, self.special = text, special
+
+        def __str__(self):
+            return self.text
+
+    tokenizer = SimpleNamespace(
+        all_special_tokens=["<|return|>"],
+        added_tokens_decoder={
+            1: Added("<|channel|>", True),
+            2: Added("<think>", False),
+        },
+    )
+    assert _special_tokens(tokenizer) == {"<|return|>", "<|channel|>"}
+    assert _special_tokens(None) == set()
