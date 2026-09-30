@@ -15,6 +15,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from typing_extensions import TypedDict
 
 from lm_eval.utils import maybe_warn, warning_once
@@ -759,7 +760,7 @@ def check_system_boilerplate(
     ]
     try:
         rendered = render_fn(demo)
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Template doesn't support a system role (or errored) — can't assess.
         return
 
