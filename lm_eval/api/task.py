@@ -368,6 +368,7 @@ class Task(abc.ABC):
         samples: list[int] | None = None,
         rank: int = 0,
         world_size: int = 1,
+        cache_rank: int | None = None,
         cache_requests: bool = False,
         rewrite_requests_cache: bool = False,
         system_instruction: str | None = None,
@@ -382,6 +383,8 @@ class Task(abc.ABC):
         og_limit = limit
 
         cache_key = f"requests-{self._config.task}-{self.config.num_fewshot}shot-rank{rank}-world_size{world_size}"
+        if cache_rank is not None and cache_rank != rank:
+            cache_key += f"-process{cache_rank}"
         cache_key += "-chat_template" if apply_chat_template else ""
         cache_key += "-fewshot_as_multiturn" if fewshot_as_multiturn else ""
         cache_key += (

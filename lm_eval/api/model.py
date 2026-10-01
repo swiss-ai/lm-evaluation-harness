@@ -4,9 +4,10 @@ import json
 import logging
 import os
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional
 
 from tqdm import tqdm
+from typing_extensions import Self
 
 from lm_eval import utils
 
@@ -18,8 +19,6 @@ if TYPE_CHECKING:
 
 
 eval_logger = logging.getLogger(__name__)
-
-T = TypeVar("T", bound="LM")
 
 
 class LM(abc.ABC):
@@ -34,6 +33,7 @@ class LM(abc.ABC):
         self._rank = 0
         self._world_size = 1
         self._device = None
+        self._model_metrics: list[dict[str, Any]] = []
         self.cache_hook: CacheHook = CacheHook(None)
 
     @abc.abstractmethod
@@ -52,7 +52,6 @@ class LM(abc.ABC):
             A list of ``(logprob, is_greedy)`` tuples — the log-probability of
             the continuation and whether it would be produced by greedy decoding.
         """
-        pass
 
     @abc.abstractmethod
     def loglikelihood_rolling(self, requests: list["Instance"]) -> list[float]:
@@ -93,7 +92,6 @@ class LM(abc.ABC):
             A list of ``(logprob,)`` tuples — the log-probability of the string
             conditioned on the BOS/EOS token (or ``prefix_token_id``).
         """
-        pass
 
     # TODO: Add an optional max length
     @abc.abstractmethod
@@ -108,7 +106,6 @@ class LM(abc.ABC):
         Returns:
             A list of generated continuation strings, one per request.
         """
-        pass
 
     def apply_chat_template(
         self,
@@ -132,8 +129,8 @@ class LM(abc.ABC):
 
     @classmethod
     def create_from_arg_string(
-        cls: type[T], arg_string: str, additional_config: dict | None = None
-    ) -> T:
+        cls, arg_string: str, additional_config: dict | None = None
+    ) -> Self:
         """Create an LM instance from a comma-separated argument string.
 
         Args:
@@ -150,10 +147,10 @@ class LM(abc.ABC):
 
     @classmethod
     def create_from_arg_obj(
-        cls: type[T],
+        cls,
         arg_dict: dict[str, Any],
         additional_config: dict[str, Any] | None = None,
-    ) -> T:
+    ) -> Self:
         """Create an LM instance from a dictionary of arguments.
 
         Args:
@@ -196,16 +193,63 @@ class LM(abc.ABC):
         """
         return tensor
 
-    def gather_object(self, obj, dst=0):
-        """Gather a Python object to ``dst`` rank.
-
-        Returns list of objects on ``dst``, None on others. Default: returns ``[obj]``.
-        """
-        return [obj]
-
     def barrier(self) -> None:
         """Synchronization barrier. Default: no-op."""
         return
+
+    @property
+    def process_rank(self) -> int:
+        """Physical process rank, which may differ from the data-parallel rank."""
+        accelerator = getattr(self, "accelerator", None)
+        if accelerator is not None and hasattr(accelerator, "process_index"):
+            return accelerator.process_index
+        if global_rank := os.environ.get("RANK"):
+            return int(global_rank)
+        return self.rank or int(os.environ.get("LOCAL_RANK", "0"))
+
+    @property
+    def cache_rank(self) -> int:
+        """Process-unique rank used to isolate cache files."""
+        return self.process_rank
+
+    @property
+    def is_main_process(self) -> bool:
+        """Whether this process is responsible for publishing final results."""
+        accelerator = getattr(self, "accelerator", None)
+        if accelerator is not None and hasattr(accelerator, "is_main_process"):
+            return accelerator.is_main_process
+        return self.process_rank == 0
+
+    def all_gather_object(self, obj):
+        """Gather a Python object from every data-parallel worker."""
+        if self.world_size <= 1:
+            return [obj]
+
+        import torch
+
+        gathered = [None] * self.world_size
+        torch.distributed.all_gather_object(gathered, obj)
+        return gathered
+
+    def gather_object(self, obj, dst: int = 0):
+        """Gather a Python object on one data-parallel worker."""
+        if self.world_size <= 1:
+            return [obj]
+
+        import torch
+
+        gathered = [None] * self.world_size if self.rank == dst else None
+        torch.distributed.gather_object(obj, gathered, dst=dst)
+        return gathered
+
+    def add_model_metrics(self, metrics: dict[str, Any]) -> None:
+        """Record metrics produced by a model backend during evaluation."""
+        if metrics:
+            self._model_metrics.append(metrics)
+
+    def get_model_metrics(self) -> list[dict[str, Any]]:
+        """Return model metrics recorded during evaluation."""
+        return self._model_metrics
 
     @property
     def tokenizer_name(self) -> str:
@@ -360,7 +404,6 @@ class TemplateLM(LM):
         Must handle strings that already contain the BOS token when
         ``add_special_tokens`` is None. Otherwise, uses the flag as given.
         """
-        pass
 
     @abc.abstractmethod
     def _loglikelihood_tokens(

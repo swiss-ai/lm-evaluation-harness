@@ -58,6 +58,7 @@ class WandbLogger:
         # pop the step key from the args to save for all logging calls
         self.step = self.wandb_args.pop("step", None)
         self.consumed_tokens = self.wandb_args.pop("consumed_tokens", None)
+        self.total_flops = self.wandb_args.pop("total_flops", None)
 
         # initialize a W&B run
         if wandb.run is None:
@@ -73,6 +74,9 @@ class WandbLogger:
         else:
             step_metric_name = "ConsumedTokens"
             self.step_metrics["ConsumedTokens"] = self.consumed_tokens
+        if self.total_flops is not None:
+            self.step_metrics["flops"] = self.total_flops
+            self.run.define_metric("flops")
         self.run.define_metric(step_metric_name)
         self.run.define_metric("*", step_metric=step_metric_name)
 
@@ -197,8 +201,37 @@ class WandbLogger:
             f.write(dumped)
         self.run.log_artifact(artifact)
 
+    def _log_model_metrics(self) -> None:
+        """Log model-produced metric records to W&B."""
+        records = self.results.get("model_metrics", [])
+        if not records:
+            return
+
+        global_step_name = "inference/global_step"
+        previous_step = self.run.summary.get(global_step_name, 0)
+        first_global_step = (
+            int(previous_step) + 1 if isinstance(previous_step, (int, float)) else 1
+        )
+        parent_steps = {
+            key: value for key, value in self.step_metrics.items() if value is not None
+        }
+        self.run.define_metric(global_step_name)
+        self.run.define_metric("inference/*", step_metric=global_step_name)
+        for local_step, metrics in enumerate(records, start=1):
+            self.run.log(
+                {
+                    global_step_name: first_global_step + local_step - 1,
+                    "inference/local_step": local_step,
+                    **parent_steps,
+                    **{f"inference/{key}": value for key, value in metrics.items()},
+                },
+                commit=True,
+            )
+
     def log_eval_result(self) -> None:
         """Log evaluation results to W&B."""
+        self._log_model_metrics()
+
         # Log configs to wandb
         configs = self._get_config()
         self.run.config.update(configs, allow_val_change=self.step is not None)

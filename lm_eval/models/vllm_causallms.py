@@ -513,6 +513,9 @@ class VLLM(TemplateLM):
                 requests: list[list[int]],
                 lora_request: LoRARequest,
             ):
+                if not requests:
+                    return []
+
                 # inner LLM must not itself use ray — nested placement groups
                 # deadlock on V1. Let vLLM auto-pick (uni for TP=1, mp for TP>1).
                 model_args = {

@@ -24,6 +24,9 @@ def _load_vllm_adapter(monkeypatch):
         def __init__(self, prompt_token_ids):
             self.prompt_token_ids = prompt_token_ids
 
+    class FakeTextPrompt:
+        pass
+
     class FakeLLM:
         def __init__(self, **model_args):
             dp_env = {
@@ -40,6 +43,7 @@ def _load_vllm_adapter(monkeypatch):
     vllm.__path__ = []
     vllm.LLM = FakeLLM
     vllm.SamplingParams = FakeSamplingParams
+    vllm.TextPrompt = FakeTextPrompt
     vllm.TokensPrompt = FakeTokensPrompt
     vllm_lora = ModuleType("vllm.lora")
     vllm_lora.__path__ = []
@@ -122,3 +126,40 @@ def test_dense_dp_uses_independent_gpu_reserved_ray_replicas(monkeypatch):
     assert all("distributed_executor_backend" not in args for args, _ in engine_calls)
     assert all(not dp_env for _, dp_env in engine_calls)
     assert shutdowns == [True]
+
+
+def test_dense_dp_skips_empty_replicas(monkeypatch):
+    adapter, reservations, engine_calls, shutdowns = _load_vllm_adapter(monkeypatch)
+
+    model = object.__new__(adapter.VLLM)
+    model.data_parallel_size = 2
+    model.tensor_parallel_size = 1
+    model.model_args = {"model": "test-model"}
+    model.lora_request = None
+
+    requests = [[1]]
+    sampling = [adapter.SamplingParams(max_tokens=1)]
+    outputs = adapter.VLLM._model_generate(
+        model, requests, generate=True, sampling_params=sampling
+    )
+
+    assert outputs == requests
+    assert reservations == [1]
+    assert len(engine_calls) == 1
+    assert shutdowns == [True]
+
+
+def test_vllm_vlm_import_does_not_require_ray(monkeypatch):
+    _load_vllm_adapter(monkeypatch)
+    monkeypatch.delitem(sys.modules, "ray")
+    monkeypatch.setitem(sys.modules, "transformers", ModuleType("transformers"))
+    monkeypatch.setitem(
+        model_registry._objs,
+        "vllm-vlm",
+        "lm_eval.models.vllm_vlms:VLLM_VLM",
+    )
+    sys.modules.pop("lm_eval.models.vllm_vlms", None)
+
+    adapter = importlib.import_module("lm_eval.models.vllm_vlms")
+
+    assert adapter.VLLM_VLM.__name__ == "VLLM_VLM"
