@@ -5,6 +5,7 @@ import itertools
 import json
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable, Iterable
 from functools import cached_property
 from typing import (
@@ -59,6 +60,32 @@ LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = os.environ.get(
 eval_logger = logging.getLogger(__name__)
 
 LogLikelihoodInputs = tuple[tuple[str, str], list[int], list[int]]
+
+
+class _RequestProgress:
+    """Logs how many concurrent API requests have finished, about every 5%: they're
+    awaited together, so a long run would otherwise show nothing until all are done."""
+
+    def __init__(self, label: str, total: int, steps: int = 20) -> None:
+        self.label, self.total = label, total
+        self.finished = self.retries = 0
+        self.step = max(1, -(-total // steps))
+        self.next_report = self.step
+        self.started = time.monotonic()
+
+    def retried(self) -> None:
+        self.retries += 1
+
+    def add(self, n: int) -> None:
+        self.finished += n
+        if self.finished < self.next_report and self.finished < self.total:
+            return
+        self.next_report = (self.finished // self.step + 1) * self.step
+        minutes, seconds = divmod(int(time.monotonic() - self.started), 60)
+        eval_logger.info(
+            f"{self.label}: {self.finished}/{self.total} requests done "
+            f"({minutes}m{seconds:02d}s, {self.retries} retries so far)"
+        )
 
 
 def _special_tokens(tokenizer) -> set[str]:
@@ -693,6 +720,14 @@ class TemplateAPI(TemplateLM):
         ctxlens = ctxlens or [None] * len(requests)
         conn = TCPConnector(limit=self._concurrent, ssl=self.verify_certificate)
         sem = asyncio.Semaphore(self._concurrent)
+        progress = _RequestProgress(
+            "generate_until" if generate else "loglikelihood", len(requests)
+        )
+
+        def _before_sleep(retry_state) -> None:
+            progress.retried()
+            eval_logger.info(f"Retry attempt {retry_state.attempt_number}")
+
         async with ClientSession(
             connector=conn, timeout=ClientTimeout(total=self.timeout)
         ) as session:
@@ -700,13 +735,16 @@ class TemplateAPI(TemplateLM):
                 stop=stop_after_attempt(self.max_retries),
                 wait=wait_exponential(multiplier=0.5, min=1, max=10),
                 reraise=True,
-                before_sleep=lambda retry_state: eval_logger.info(
-                    f"Retry attempt {retry_state.attempt_number}"
-                ),
+                before_sleep=_before_sleep,
             )(self.amodel_call)
             # Create tasks for each batch of request
-            tasks = [
-                asyncio.create_task(
+            tasks = []
+            for message, cache_key, ctxlen in zip(
+                chunks(requests, n=self._batch_size),
+                chunks(cache_keys, n=self._batch_size),
+                chunks(ctxlens, n=self._batch_size),
+            ):
+                task = asyncio.create_task(
                     retry_(
                         session=session,
                         sem=sem,
@@ -717,12 +755,9 @@ class TemplateAPI(TemplateLM):
                         **kwargs,
                     )
                 )
-                for message, cache_key, ctxlen in zip(
-                    chunks(requests, n=self._batch_size),
-                    chunks(cache_keys, n=self._batch_size),
-                    chunks(ctxlens, n=self._batch_size),
-                )
-            ]
+                size = len(message)
+                task.add_done_callback(lambda _, n=size: progress.add(n))
+                tasks.append(task)
 
             # Wait for every task before returning/raising -- gather()
             # propagating on the first failure would exit this `async with`

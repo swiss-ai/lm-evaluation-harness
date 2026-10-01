@@ -597,3 +597,52 @@ def test_special_tokens_are_read_from_the_tokenizer():
     )
     assert _special_tokens(tokenizer) == {"<|return|>", "<|channel|>"}
     assert _special_tokens(None) == set()
+
+
+def test_request_progress_reports_about_every_five_percent(caplog):
+    import logging
+
+    from lm_eval.models.api_models import _RequestProgress
+
+    progress = _RequestProgress("generate_until", 240)
+    with caplog.at_level(logging.INFO, logger="lm_eval.models.api_models"):
+        for _ in range(240):
+            progress.add(1)
+    lines = [
+        r.getMessage() for r in caplog.records if "requests done" in r.getMessage()
+    ]
+    assert len(lines) == 20  # every 12 of 240
+    assert lines[0].startswith("generate_until: 12/240 requests done (")
+    assert lines[-1].startswith("generate_until: 240/240 requests done (")
+
+
+def test_concurrent_requests_log_progress_and_retries(api, caplog):
+    import logging
+
+    calls = {"n": 0}
+
+    async def amodel_call(*, messages, **_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("transient")  # first call is retried
+        return ["answer"] * len(messages)
+
+    api._concurrent = 4
+    with (
+        patch.object(api, "amodel_call", side_effect=amodel_call),
+        caplog.at_level(logging.INFO, logger="lm_eval.models.api_models"),
+    ):
+        results = asyncio.run(
+            api.get_batched_requests(
+                [f"prompt {i}" for i in range(5)],
+                [None] * 5,
+                generate=True,
+                gen_kwargs={},
+            )
+        )
+    assert [r for batch in results for r in batch] == ["answer"] * 5
+    lines = [
+        r.getMessage() for r in caplog.records if "requests done" in r.getMessage()
+    ]
+    assert lines[-1].startswith("generate_until: 5/5 requests done (")
+    assert lines[-1].endswith("1 retries so far)")
