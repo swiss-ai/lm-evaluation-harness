@@ -332,8 +332,10 @@ def test_invalid_attacker_budget_is_rejected(monkeypatch, budget):
 
 
 def test_real_attacker_client_does_not_break_config_export(monkeypatch):
-    import httpx
-    import openai
+    # The base CPU environment does not install the optional API client.
+    # Keep this real-SDK regression active when the client is available.
+    httpx = pytest.importorskip("httpx", reason="Optional API transport not installed")
+    openai = pytest.importorskip("openai", reason="Optional attacker SDK not installed")
 
     monkeypatch.setenv("POLAR_ATTACKER_BASE_URL", "https://offline.invalid/v1")
     monkeypatch.setenv("POLAR_ATTACKER_API_KEY", "offline-test-key")
