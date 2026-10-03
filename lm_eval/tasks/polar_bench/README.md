@@ -107,5 +107,35 @@ all 7,852 rows were checked for targets, eligibility and system prompts, and
 50 representative dialogues (160 A turns) were compared using fake A/B replies.
 The one-off comparison script is not included in this integration.
 The regression tests above require no inference, credentials or GPUs.
-Real-model validation remains deferred to the cluster. Dashboard integration and
-SLURM submission are separate follow-up work.
+
+## Real-model integration validation
+
+A Clariden run on 2026-10-01 completed all 250 coverage samples with
+Qwen/Qwen2.5-7B-Instruct as A and locally served
+meta-llama/Llama-3.3-70B-Instruct as B. The subset covers every combination of
+10 domains, 5 protocols, and 5 privacy levels. It produced 771 A turns in
+378 seconds of evaluation time, excluding environment preparation and B startup.
+The run used harness commit `1002f1ed0bdb1611613d2f29cf89d293a22d977b`,
+A/B generation budgets of 8,192/32,768 tokens, and A/B context limits of
+32,768/65,536 tokens.
+
+| Metric | Value |
+| --- | ---: |
+| privacy | 0.3315714286 |
+| utility | 0.8632349206 |
+| overall | 0.5974031746 |
+| final_answer_rate | 1.0 |
+| zero_turn_rate | 0.0 |
+
+[W&B run](https://wandb.ai/apertus/polar-integration-test/runs/polar-qwen25-7b-llama33-70b-cover250-20261001-205856-9e6a-001)
+(access may require project permission). Online upload was confirmed after a
+separate upload-only retry; the original Slurm job retains its failed upload status.
+This validates the integration on a coverage subset, not the full 7,852-instance
+benchmark or a representative leaderboard estimate. The subset and two-node
+Slurm wrapper are not included in this task integration.
+
+The wrapper reused `evals-post-train` commit
+`b1b192ecab12f3310ad2da673c7a195a7e3c9fb7` without modifying its source.
+The launch helper in this PR runs within an existing GPU allocation and requires
+an already reachable B service; it does not submit Slurm jobs, deploy B, or upload
+to W&B. Shared dashboard inclusion remains a separate maintainer decision.
