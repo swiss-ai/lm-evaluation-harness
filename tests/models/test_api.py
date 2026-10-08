@@ -646,3 +646,39 @@ def test_concurrent_requests_log_progress_and_retries(api, caplog):
     ]
     assert lines[-1].startswith("generate_until: 5/5 requests done (")
     assert lines[-1].endswith("1 retries so far)")
+
+
+def _echo_choice(token_logprobs):
+    return {
+        "index": 0,
+        "logprobs": {
+            "token_logprobs": token_logprobs,
+            "top_logprobs": [None] + [{"x": lp} for lp in token_logprobs[1:]],
+        },
+    }
+
+
+def test_parse_logprobs_scores_only_the_continuation():
+    # context [1, 2, 3], continuation [4, 5], then the one generated token
+    out = {"choices": [_echo_choice([None, -1.0, -2.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(
+        out, tokens=[[1, 2, 3, 4, 5]], ctxlens=[3]
+    )
+    assert logprob == -7.0
+
+
+def test_parse_logprobs_ignores_an_extra_server_bos():
+    # The server tokenized one more token at the start (its own BOS before the
+    # chat template's) than the local tokenizer that counted ctxlen: the score
+    # must still cover exactly the continuation, not the last context token.
+    out = {"choices": [_echo_choice([None, -0.5, -1.0, -2.0, -30.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(
+        out, tokens=[[1, 2, 3, 99, 4, 5]], ctxlens=[4]
+    )
+    assert logprob == -7.0
+
+
+def test_parse_logprobs_without_tokens_slices_from_ctxlen():
+    out = {"choices": [_echo_choice([None, -1.0, -2.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(out, ctxlens=[3])
+    assert logprob == -7.0

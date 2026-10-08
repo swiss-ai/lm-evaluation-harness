@@ -137,14 +137,29 @@ class LocalCompletionsAPI(TemplateAPI):
         res = []
         if not isinstance(outputs, list):
             outputs = [outputs]
+        # One token list per request, in the same order as the choices across
+        # all outputs. Without them (or with untokenized inputs) fall back to
+        # slicing from the start.
+        inputs = iter(tokens) if tokens else None
         for out in outputs:
             for choice, ctxlen in zip(
                 sorted(out["choices"], key=itemgetter("index")), ctxlens
             ):
                 assert ctxlen > 0, "Context length must be greater than 0"
-                logprobs = sum(choice["logprobs"]["token_logprobs"][ctxlen:-1])
-                tokens_logprobs = choice["logprobs"]["token_logprobs"][ctxlen:-1]
-                top_logprobs = choice["logprobs"]["top_logprobs"][ctxlen:-1]
+                start = ctxlen
+                toks = next(inputs, None) if inputs is not None else None
+                if isinstance(toks, list) and toks and isinstance(toks[0], int):
+                    # The echoed prompt ends with the continuation and then the
+                    # one generated token, so anchor the continuation at the
+                    # end: the server may tokenize the start differently from
+                    # the local tokenizer that counted ctxlen (e.g. adding its
+                    # own BOS before a chat template's), which would otherwise
+                    # shift the slice into the context.
+                    n_cont = len(toks) - ctxlen
+                    start = len(choice["logprobs"]["token_logprobs"]) - 1 - n_cont
+                logprobs = sum(choice["logprobs"]["token_logprobs"][start:-1])
+                tokens_logprobs = choice["logprobs"]["token_logprobs"][start:-1]
+                top_logprobs = choice["logprobs"]["top_logprobs"][start:-1]
                 is_greedy = True
                 for tok, top in zip(tokens_logprobs, top_logprobs):
                     if tok != max(top.values()):
