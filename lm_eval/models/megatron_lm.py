@@ -319,7 +319,10 @@ class MegatronLMEval(LM):
             get_tokenizer,
             initialize_megatron,
         )
-        from megatron.training.arguments import core_transformer_config_from_args
+        from megatron.training.arguments import (
+            core_transformer_config_from_args,
+            parse_and_validate_args,
+        )
         from megatron.training.checkpointing import load_checkpoint
 
         devices = kwargs["devices"]
@@ -400,11 +403,15 @@ class MegatronLMEval(LM):
         eval_logger.info(f"Initializing Megatron with args: {' '.join(argv[1:])}")
 
         try:
-            # Initialize Megatron
-            initialize_megatron(
+            # Initialize Megatron. Newer Megatron-LM checkouts split arg parsing out of
+            # initialize_megatron() into parse_and_validate_args(); it no longer accepts
+            # extra_args_provider/args_defaults itself and expects global args to already
+            # be set (parse_and_validate_args() calls set_global_variables() internally).
+            parse_and_validate_args(
                 extra_args_provider=None,
                 args_defaults={"tokenizer_type": kwargs["tokenizer_type"]},
             )
+            initialize_megatron()
 
             args = get_args()
             self._args = args
