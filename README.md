@@ -383,11 +383,17 @@ The Megatron-LM backend supports the following parallelism modes:
 | Single GPU | `devices=1` (default) | Standard single GPU evaluation |
 | Data Parallelism | `devices>1, TP=1` | Each GPU has a full model replica, data is distributed |
 | Tensor Parallelism | `TP == devices` | Model layers are split across GPUs |
+| Tensor + Data Parallelism | `1 < TP < devices`, `devices % TP == 0` | Each TP group is one data-parallel evaluation worker |
 | Expert Parallelism | `EP == devices, TP=1` | For MoE models, experts are distributed across GPUs |
+| Tensor + Expert Parallelism | `TP>1, EP>1` | Dense layers use TP while experts use EP; ETP remains checkpoint-configured |
 
 > [!Note]
 > - Pipeline Parallelism (PP > 1) is not currently supported.
-> - Expert Parallelism (EP) cannot be combined with Tensor Parallelism (TP).
+> - For EP evaluation, pass the checkpoint's token dispatcher explicitly through `extra_args`; all-to-all is normally required.
+> - EP ranks receive different data shards but execute the same model collectives. Distributed padding is therefore aligned separately for every task and generation-argument group.
+> - With `--sequence-parallel`, Megatron evaluation pads each model forward to a sequence length divisible by TP, including each autoregressive generation step.
+> - Likelihood batches use right padding, including sequence-parallel alignment; the legacy autoregressive generation path remains left padded so each prompt ends at the final tensor position.
+> - Dynamic likelihood uses `use_inference_engine_for_likelihood=true` with `extra_args="--inference-dynamic-batching --inference-max-seq-length 4096"`. It reserves one context position for a discarded decode token and approximates `is_greedy` from MCore's top-1 payload.
 
 **Data Parallelism (4 GPUs, each with full model replica):**
 
@@ -405,11 +411,27 @@ torchrun --nproc-per-node=2 -m lm_eval --model megatron_lm \
     --tasks hellaswag
 ```
 
+**Tensor Parallelism with two data replicas (TP=2, DP=2):**
+
+```bash
+torchrun --nproc-per-node=4 -m lm_eval --model megatron_lm \
+    --model_args load=/path/to/checkpoint,tokenizer_model=/path/to/tokenizer,devices=4,tensor_model_parallel_size=2 \
+    --tasks hellaswag
+```
+
 **Expert Parallelism for MoE models (EP=4):**
 
 ```bash
 torchrun --nproc-per-node=4 -m lm_eval --model megatron_lm \
-    --model_args load=/path/to/moe_checkpoint,tokenizer_model=/path/to/tokenizer,devices=4,expert_model_parallel_size=4 \
+    --model_args load=/path/to/moe_checkpoint,tokenizer_model=/path/to/tokenizer,devices=4,expert_model_parallel_size=4,extra_args="--moe-token-dispatcher-type alltoall" \
+    --tasks hellaswag
+```
+
+**Tensor + Expert Parallelism (TP=2, EP=2):**
+
+```bash
+torchrun --nproc-per-node=4 -m lm_eval --model megatron_lm \
+    --model_args load=/path/to/moe_checkpoint,tokenizer_model=/path/to/tokenizer,devices=4,tensor_model_parallel_size=2,expert_model_parallel_size=2,extra_args="--expert-tensor-parallel-size 1 --moe-token-dispatcher-type alltoall --sequence-parallel" \
     --tasks hellaswag
 ```
 

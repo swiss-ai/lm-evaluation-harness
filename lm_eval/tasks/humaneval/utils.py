@@ -38,7 +38,9 @@ def pass_at_k(references: list[str], predictions: list[list[str]], k: list[int] 
         references=references,
         predictions=predictions,
         k=k,
-        num_workers=num_workers(predictions),
+        num_workers=int(
+            os.environ.get("CODE_EVAL_NUM_WORKERS", str(num_workers(predictions)))
+        ),
     )
     return res[0]
 
