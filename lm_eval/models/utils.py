@@ -4,6 +4,7 @@ import collections
 import fnmatch
 import itertools
 import logging
+import re
 import time
 from functools import wraps
 from typing import (
@@ -12,6 +13,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from typing_extensions import TypedDict
 
 from lm_eval.utils import maybe_warn, warning_once
@@ -958,7 +960,8 @@ def postprocess_generated_text(
     # Strip thinking content first so stop sequences apply to the response,
     # not to the reasoning trace (which often contains \n\n etc.)
     if think_end_token:
-        generation = generation.split(think_end_token)[-1].lstrip()
+        generation = generation.split(think_end_token)[-1]
+        generation = re.sub(r"^(?:[^\S\r\n]*\r?\n)+", "", generation)
     if stop:
         stop = [stop] if isinstance(stop, str) else stop
         for term in stop:
