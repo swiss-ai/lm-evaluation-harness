@@ -106913,6 +106913,11 @@
       "tags": [],
       "yaml_path": "pisa/_pisa_llm_judged.yaml"
     },
+    "polar_bench": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "polar_bench/polar_bench.yaml"
+    },
     "polemo2": {
       "kind": "TAG",
       "tags": [
