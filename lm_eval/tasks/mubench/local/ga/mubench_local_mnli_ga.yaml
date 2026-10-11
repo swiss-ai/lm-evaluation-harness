@@ -1,0 +1,8 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_mnli
+task: mubench_local_mnli_ga
+task_alias: mnli
+dataset_name: MNLIDataset_local_template_ga
+num_fewshot: 10
+fewshot_split: validation

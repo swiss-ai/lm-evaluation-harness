@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_hellaswag
+task: mubench_local_hellaswag_he
+task_alias: hellaswag
+dataset_name: HellaswagDataset_local_template_he

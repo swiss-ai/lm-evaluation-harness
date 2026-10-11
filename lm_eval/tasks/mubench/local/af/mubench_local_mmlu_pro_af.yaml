@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_mmlu_pro
+task: mubench_local_mmlu_pro_af
+task_alias: mmlu_pro
+dataset_name: MMLUProDataset_local_template_af

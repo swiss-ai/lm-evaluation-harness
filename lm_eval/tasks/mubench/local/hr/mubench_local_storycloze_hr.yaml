@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_storycloze
+task: mubench_local_storycloze_hr
+task_alias: storycloze
+dataset_name: StoryClozeDataset_local_template_hr

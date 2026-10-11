@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_mmlu
+task: mubench_local_mmlu_hr
+task_alias: mmlu
+dataset_name: MMLUDataset_local_template_hr

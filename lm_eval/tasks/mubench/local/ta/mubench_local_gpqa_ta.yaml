@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_gpqa
+task: mubench_local_gpqa_ta
+task_alias: gpqa
+dataset_name: GPQADataset_local_template_ta

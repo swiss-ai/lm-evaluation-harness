@@ -1,0 +1,68 @@
+group: mubench_local
+task:
+- mubench_local_af
+- mubench_local_ar
+- mubench_local_az
+- mubench_local_bg
+- mubench_local_bn
+- mubench_local_ca
+- mubench_local_ceb
+- mubench_local_cs
+- mubench_local_da
+- mubench_local_de
+- mubench_local_el
+- mubench_local_en
+- mubench_local_es
+- mubench_local_et
+- mubench_local_fa
+- mubench_local_fi
+- mubench_local_fr
+- mubench_local_ga
+- mubench_local_gu
+- mubench_local_he
+- mubench_local_hi
+- mubench_local_hr
+- mubench_local_hu
+- mubench_local_id
+- mubench_local_is
+- mubench_local_it
+- mubench_local_ja
+- mubench_local_jv
+- mubench_local_kk
+- mubench_local_km
+- mubench_local_kn
+- mubench_local_ko
+- mubench_local_lt
+- mubench_local_lv
+- mubench_local_ml
+- mubench_local_mr
+- mubench_local_ms
+- mubench_local_my
+- mubench_local_nl
+- mubench_local_no
+- mubench_local_pa
+- mubench_local_pl
+- mubench_local_pt
+- mubench_local_ro
+- mubench_local_ru
+- mubench_local_sk
+- mubench_local_sl
+- mubench_local_sq
+- mubench_local_sr
+- mubench_local_sv
+- mubench_local_sw
+- mubench_local_ta
+- mubench_local_te
+- mubench_local_th
+- mubench_local_tl
+- mubench_local_tr
+- mubench_local_uk
+- mubench_local_ur
+- mubench_local_uz
+- mubench_local_vi
+- mubench_local_zh
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0

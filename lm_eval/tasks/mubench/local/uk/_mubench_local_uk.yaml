@@ -1,0 +1,20 @@
+group: mubench_local_uk
+group_alias: uk
+task:
+- mubench_local_arc_challenge_uk
+- mubench_local_arc_easy_uk
+- mubench_local_bmlama_uk
+- mubench_local_gpqa_uk
+- mubench_local_hellaswag_uk
+- mubench_local_mmlu_uk
+- mubench_local_mmlu_pro_uk
+- mubench_local_mnli_uk
+- mubench_local_snli_uk
+- mubench_local_storycloze_uk
+- mubench_local_truthfulqa_uk
+- mubench_local_winogrande_uk
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0
