@@ -57,6 +57,57 @@ LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = os.environ.get(
     "LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER", ""
 )
 
+
+class Generation(str):
+    """A generated text that remembers why the server stopped generating it.
+
+    ``finish_reason`` is the OpenAI-style value ("stop", "length", ...) or None when
+    the response didn't carry one. Behaves as a plain ``str`` everywhere else; read
+    back in generate_until as the per-response ``generation_truncated`` flag.
+    """
+
+    finish_reason: str | None = None
+
+
+def parse_finish_reasons(outputs: Any) -> list[str | None]:
+    """Each choice's ``finish_reason``, in the order ``parse_generations`` returns
+    the texts (by choice index, across a batch of responses). Never raises."""
+    reasons: list[str | None] = []
+    for out in outputs if isinstance(outputs, list) else [outputs]:
+        try:
+            choices = out["choices"]
+            tmp: list[str | None] = [None] * len(choices)
+            for pos, choice in enumerate(choices):
+                tmp[choice.get("index", pos)] = choice.get("finish_reason")
+        except (IndexError, KeyError, TypeError, AttributeError):
+            tmp = [None]
+        reasons.extend(tmp)
+    return reasons
+
+
+def with_finish_reasons(texts: list[str], outputs: Any) -> list[str]:
+    """``texts`` as ``Generation``s carrying their choice's finish_reason; unchanged
+    when the response shape doesn't line up one choice per text."""
+    reasons = parse_finish_reasons(outputs)
+    if len(reasons) != len(texts):
+        return texts
+    tagged = []
+    for text, reason in zip(texts, reasons):
+        gen = Generation(text)
+        gen.finish_reason = reason
+        tagged.append(gen)
+    return tagged
+
+
+def truncation_info(text: Any) -> dict:
+    """``generation_truncated`` = 1 when the server stopped at the token budget
+    (finish_reason "length"), 0 when it stopped on its own; empty when unknown."""
+    reason = getattr(text, "finish_reason", None)
+    if reason is None:
+        return {}
+    return {"generation_truncated": int(reason == "length")}
+
+
 eval_logger = logging.getLogger(__name__)
 
 LogLikelihoodInputs = tuple[tuple[str, str], list[int], list[int]]
@@ -669,6 +720,8 @@ class TemplateAPI(TemplateLM):
                     answers.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
                 else:
                     answers.append(a)
+            if generate:
+                answers = with_finish_reasons(answers, outputs)
 
             # A thinking generation is cached once stripped (generate_until).
             if cache_keys and not (generate and self.think_end_token):
@@ -927,12 +980,12 @@ class TemplateAPI(TemplateLM):
                     generate=True,
                     gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                 )
-                for generated_text, context in zip(
-                    self.parse_generations(
-                        outputs=outputs,
-                        contexts=contexts,
-                    ),
-                    contexts,
+                generated = self.parse_generations(outputs=outputs, contexts=contexts)
+                reasons = parse_finish_reasons(outputs)
+                if len(reasons) != len(generated):
+                    reasons = [None] * len(generated)
+                for generated_text, context, reason in zip(
+                    generated, contexts, reasons
                 ):
                     # Always append to res to maintain the correct number of items
                     # even if generation failed (generated_text is None)
@@ -941,9 +994,10 @@ class TemplateAPI(TemplateLM):
                             f"API returned null content. Content filled with `LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = {LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER}`. Check reasoning_content field or generation limits."
                         )
                         # Patch "None" answer with consistent value (async and sync calls)
-                        res.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
+                        res.append(Generation(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER))
                     else:
-                        res.append(generated_text)
+                        res.append(Generation(generated_text))
+                    res[-1].finish_reason = reason
 
                     # partial caching only for successful generations; a thinking
                     # generation is cached once stripped (below)
@@ -1007,6 +1061,7 @@ class TemplateAPI(TemplateLM):
                     open_prefilled=self.think_open_prefilled,
                     track_thinking_metrics=self.track_thinking_metrics,
                 )
+                | truncation_info(text)
                 for text in res
             ],
         )

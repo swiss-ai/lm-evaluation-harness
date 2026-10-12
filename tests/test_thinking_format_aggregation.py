@@ -374,3 +374,18 @@ def test_group_sample_len_independent_of_sparse_metrics():
     aggregated = group.aggregate(results)
     assert aggregated["sample_len"] == 150
     assert aggregated["exact_match,none"] == pytest.approx((0.5 * 100 + 0.3 * 50) / 150)
+
+
+def test_truncation_flag_is_always_promoted():
+    # generation_truncated is a per-task rate on every generative task, thinking or
+    # not, so it isn't gated on include_length.
+    acc = _result_acc(
+        [
+            _inst([{"generation_truncated": 1, "response_length_chars": 9}]),
+            _inst([{"generation_truncated": 0}]),
+            _inst([{}]),  # server sent no finish_reason: not counted either way
+        ]
+    )
+    promote_generation_info_metrics(acc)
+    assert acc["raw_metrics"][("generation_truncated", "none")] == [1.0, 0.0]
+    assert ("response_length_chars", "none") not in acc["raw_metrics"]

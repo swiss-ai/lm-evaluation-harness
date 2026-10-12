@@ -37,6 +37,8 @@ class ResultAcc(TypedDict):
 THINKING_FORMAT_PREFIX = "thinking_format_"
 RESPONSE_LENGTH_PREFIX = "response_length_"
 THINKING_LENGTH_PREFIX = "thinking_length_"
+# generation_truncated: the server stopped at the token budget (finish_reason "length").
+GENERATION_PREFIX = "generation_"
 
 
 def promote_generation_info_metrics(
@@ -47,8 +49,8 @@ def promote_generation_info_metrics(
     Backends attach one metadata dictionary per generated response to
     ``Instance.length_info``. Values are first averaged per document and then flow
     through the normal aggregation, group, logger, and distributed-result paths.
-    Thinking-format flags are always promoted when present; response/thinking lengths
-    are opt-in.
+    Thinking-format flags and ``generation_truncated`` are always promoted when
+    present; response/thinking lengths are opt-in.
 
     Standard requests may contain extra responses from distributed padding, so their
     metadata is capped at ``Instance.repeats``. Multi-turn placeholders deliberately
@@ -60,7 +62,7 @@ def promote_generation_info_metrics(
         return isinstance(value, (int, float)) and not isinstance(value, bool)
 
     def _is_promoted(key: str) -> bool:
-        if key.startswith(THINKING_FORMAT_PREFIX):
+        if key.startswith((THINKING_FORMAT_PREFIX, GENERATION_PREFIX)):
             return True
         return include_length and key.startswith(
             (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
