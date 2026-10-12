@@ -37,6 +37,8 @@ class ResultAcc(TypedDict):
 THINKING_FORMAT_PREFIX = "thinking_format_"
 RESPONSE_LENGTH_PREFIX = "response_length_"
 THINKING_LENGTH_PREFIX = "thinking_length_"
+# generation_truncated: the server stopped at the token budget (finish_reason "length").
+GENERATION_PREFIX = "generation_"
 
 
 def promote_generation_info_metrics(
@@ -47,8 +49,8 @@ def promote_generation_info_metrics(
     Backends attach one metadata dictionary per generated response to
     ``Instance.length_info``. Values are first averaged per document and then flow
     through the normal aggregation, group, logger, and distributed-result paths.
-    Thinking-format flags are always promoted when present; response/thinking lengths
-    are opt-in.
+    Thinking-format flags and ``generation_truncated`` are always promoted when
+    present; response/thinking lengths are opt-in.
 
     Standard requests may contain extra responses from distributed padding, so their
     metadata is capped at ``Instance.repeats``. Multi-turn placeholders deliberately
@@ -60,7 +62,7 @@ def promote_generation_info_metrics(
         return isinstance(value, (int, float)) and not isinstance(value, bool)
 
     def _is_promoted(key: str) -> bool:
-        if key.startswith(THINKING_FORMAT_PREFIX):
+        if key.startswith((THINKING_FORMAT_PREFIX, GENERATION_PREFIX)):
             return True
         return include_length and key.startswith(
             (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
@@ -97,15 +99,13 @@ def print_writeout(task: Task) -> None:
                 f"Task: {task}; document {inst.doc_id}; context prompt (starting on next line):\
     \n{inst.args[0]}\n(end of prompt on previous line)\ntarget string or answer choice index (starting on next line):\n{task.doc_to_target(inst.doc)}\n(end of target on previous line)"
             )
-            eval_logger.info(f"Request: {str(inst)}")
+            eval_logger.info(f"Request: {inst!s}")
             break
 
 
-def get_sample_size(task, limit: int | float | None) -> int | None:
+def get_sample_size(task, limit: float | None) -> int | None:
     if limit is not None:
-        limit = (
-            int(math.ceil(len(task.eval_docs) * limit)) if limit < 1.0 else int(limit)
-        )
+        limit = math.ceil(len(task.eval_docs) * limit) if limit < 1.0 else int(limit)
     return limit
 
 

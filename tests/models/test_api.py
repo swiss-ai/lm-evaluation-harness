@@ -515,7 +515,7 @@ def _thinking_api(**kwargs):
     )
 
 
-def _generate(model, text, until):
+def _generate(model, text, until, finish_reason=None):
     from lm_eval.api.instance import Instance
 
     instance = Instance(
@@ -530,7 +530,10 @@ def _generate(model, text, until):
         sent.append(
             model._create_payload(messages, generate=True, gen_kwargs=gen_kwargs)
         )
-        return {"choices": [{"index": 0, "text": text}]}
+        choice = {"index": 0, "text": text}
+        if finish_reason is not None:
+            choice["finish_reason"] = finish_reason
+        return {"choices": [choice]}
 
     with patch.object(model, "model_call", side_effect=model_call):
         result = model.generate_until([instance])
@@ -563,6 +566,38 @@ def test_api_without_think_tokens_is_unchanged():
     assert result == ["The answer is 18."]
     assert "skip_special_tokens" not in sent[0]
     assert "thinking_length_chars" not in instance.length_info[0]
+
+
+@pytest.mark.parametrize(("reason", "flag"), [("length", 1), ("stop", 0)])
+def test_api_records_whether_the_server_hit_the_token_budget(reason, flag):
+    model = _thinking_api(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    result, instance, _ = _generate(
+        model, REASONING, ["Question:"], finish_reason=reason
+    )
+    assert instance.length_info[0]["generation_truncated"] == flag
+    # the reasoning is still stripped; the answer is a plain string to the task
+    assert result == ["The answer is 18.\n"]
+
+
+def test_api_without_a_finish_reason_records_no_truncation_flag():
+    _, instance, _ = _generate(_thinking_api(), "The answer is 18.", ["Question:"])
+    assert "generation_truncated" not in instance.length_info[0]
+
+
+def test_concurrent_answers_carry_their_finish_reason(api):
+    from lm_eval.models.api_models import with_finish_reasons
+
+    outputs = {
+        "choices": [
+            {"index": 1, "text": "b", "finish_reason": "length"},
+            {"index": 0, "text": "a", "finish_reason": "stop"},
+        ]
+    }
+    tagged = with_finish_reasons(api.parse_generations(outputs), outputs)
+    assert tagged == ["a", "b"]
+    assert [t.finish_reason for t in tagged] == ["stop", "length"]
+    # a response that doesn't line up one choice per text is left untouched
+    assert with_finish_reasons(["a"], {"choices": []}) == ["a"]
 
 
 def test_api_keeps_special_tokens_when_the_markers_are_special():
