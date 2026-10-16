@@ -1,7 +1,7 @@
 dataset_path: aialt/MuBench
 test_split: test
 output_type: multiple_choice
-doc_to_text: prompt
+doc_to_text: "{{prompt.rstrip()}}"
 doc_to_choice: choices
 doc_to_target: label
 num_fewshot: 0
