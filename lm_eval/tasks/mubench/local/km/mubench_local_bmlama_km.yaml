@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_bmlama
+task: mubench_local_bmlama_km
+task_alias: bmlama
+dataset_name: BMLAMADataset_local_template_km

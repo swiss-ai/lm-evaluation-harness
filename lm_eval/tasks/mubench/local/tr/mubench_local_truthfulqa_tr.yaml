@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_truthfulqa
+task: mubench_local_truthfulqa_tr
+task_alias: truthfulqa
+dataset_name: TruthfulQADataset_local_template_tr

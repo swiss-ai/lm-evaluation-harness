@@ -1,0 +1,20 @@
+group: mubench_local_km
+group_alias: km
+task:
+- mubench_local_arc_challenge_km
+- mubench_local_arc_easy_km
+- mubench_local_bmlama_km
+- mubench_local_gpqa_km
+- mubench_local_hellaswag_km
+- mubench_local_mmlu_km
+- mubench_local_mmlu_pro_km
+- mubench_local_mnli_km
+- mubench_local_snli_km
+- mubench_local_storycloze_km
+- mubench_local_truthfulqa_km
+- mubench_local_winogrande_km
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0

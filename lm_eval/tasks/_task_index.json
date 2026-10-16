@@ -100228,6 +100228,6244 @@
       "tags": [],
       "yaml_path": "mts_dialog/mts_dialog_perplexity.yaml"
     },
+    "mubench_local": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/_mubench_local.yaml"
+    },
+    "mubench_local_af": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/af/_mubench_local_af.yaml"
+    },
+    "mubench_local_ar": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ar/_mubench_local_ar.yaml"
+    },
+    "mubench_local_arc_challenge": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_arc_challenge_af",
+        "mubench_local_arc_challenge_ar",
+        "mubench_local_arc_challenge_az",
+        "mubench_local_arc_challenge_bg",
+        "mubench_local_arc_challenge_bn",
+        "mubench_local_arc_challenge_ca",
+        "mubench_local_arc_challenge_ceb",
+        "mubench_local_arc_challenge_cs",
+        "mubench_local_arc_challenge_da",
+        "mubench_local_arc_challenge_de",
+        "mubench_local_arc_challenge_el",
+        "mubench_local_arc_challenge_en",
+        "mubench_local_arc_challenge_es",
+        "mubench_local_arc_challenge_et",
+        "mubench_local_arc_challenge_fa",
+        "mubench_local_arc_challenge_fi",
+        "mubench_local_arc_challenge_fr",
+        "mubench_local_arc_challenge_ga",
+        "mubench_local_arc_challenge_gu",
+        "mubench_local_arc_challenge_he",
+        "mubench_local_arc_challenge_hi",
+        "mubench_local_arc_challenge_hr",
+        "mubench_local_arc_challenge_hu",
+        "mubench_local_arc_challenge_id",
+        "mubench_local_arc_challenge_is",
+        "mubench_local_arc_challenge_it",
+        "mubench_local_arc_challenge_ja",
+        "mubench_local_arc_challenge_jv",
+        "mubench_local_arc_challenge_kk",
+        "mubench_local_arc_challenge_km",
+        "mubench_local_arc_challenge_kn",
+        "mubench_local_arc_challenge_ko",
+        "mubench_local_arc_challenge_lt",
+        "mubench_local_arc_challenge_lv",
+        "mubench_local_arc_challenge_ml",
+        "mubench_local_arc_challenge_mr",
+        "mubench_local_arc_challenge_ms",
+        "mubench_local_arc_challenge_my",
+        "mubench_local_arc_challenge_nl",
+        "mubench_local_arc_challenge_no",
+        "mubench_local_arc_challenge_pa",
+        "mubench_local_arc_challenge_pl",
+        "mubench_local_arc_challenge_pt",
+        "mubench_local_arc_challenge_ro",
+        "mubench_local_arc_challenge_ru",
+        "mubench_local_arc_challenge_sk",
+        "mubench_local_arc_challenge_sl",
+        "mubench_local_arc_challenge_sq",
+        "mubench_local_arc_challenge_sr",
+        "mubench_local_arc_challenge_sv",
+        "mubench_local_arc_challenge_sw",
+        "mubench_local_arc_challenge_ta",
+        "mubench_local_arc_challenge_te",
+        "mubench_local_arc_challenge_th",
+        "mubench_local_arc_challenge_tl",
+        "mubench_local_arc_challenge_tr",
+        "mubench_local_arc_challenge_uk",
+        "mubench_local_arc_challenge_ur",
+        "mubench_local_arc_challenge_uz",
+        "mubench_local_arc_challenge_vi",
+        "mubench_local_arc_challenge_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_arc_challenge_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_arc_challenge_af.yaml"
+    },
+    "mubench_local_arc_challenge_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_arc_challenge_ar.yaml"
+    },
+    "mubench_local_arc_challenge_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_arc_challenge_az.yaml"
+    },
+    "mubench_local_arc_challenge_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_arc_challenge_bg.yaml"
+    },
+    "mubench_local_arc_challenge_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_arc_challenge_bn.yaml"
+    },
+    "mubench_local_arc_challenge_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_arc_challenge_ca.yaml"
+    },
+    "mubench_local_arc_challenge_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_arc_challenge_ceb.yaml"
+    },
+    "mubench_local_arc_challenge_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_arc_challenge_cs.yaml"
+    },
+    "mubench_local_arc_challenge_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_arc_challenge_da.yaml"
+    },
+    "mubench_local_arc_challenge_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_arc_challenge_de.yaml"
+    },
+    "mubench_local_arc_challenge_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_arc_challenge_el.yaml"
+    },
+    "mubench_local_arc_challenge_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_arc_challenge_en.yaml"
+    },
+    "mubench_local_arc_challenge_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_arc_challenge_es.yaml"
+    },
+    "mubench_local_arc_challenge_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_arc_challenge_et.yaml"
+    },
+    "mubench_local_arc_challenge_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_arc_challenge_fa.yaml"
+    },
+    "mubench_local_arc_challenge_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_arc_challenge_fi.yaml"
+    },
+    "mubench_local_arc_challenge_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_arc_challenge_fr.yaml"
+    },
+    "mubench_local_arc_challenge_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_arc_challenge_ga.yaml"
+    },
+    "mubench_local_arc_challenge_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_arc_challenge_gu.yaml"
+    },
+    "mubench_local_arc_challenge_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_arc_challenge_he.yaml"
+    },
+    "mubench_local_arc_challenge_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_arc_challenge_hi.yaml"
+    },
+    "mubench_local_arc_challenge_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_arc_challenge_hr.yaml"
+    },
+    "mubench_local_arc_challenge_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_arc_challenge_hu.yaml"
+    },
+    "mubench_local_arc_challenge_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_arc_challenge_id.yaml"
+    },
+    "mubench_local_arc_challenge_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_arc_challenge_is.yaml"
+    },
+    "mubench_local_arc_challenge_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_arc_challenge_it.yaml"
+    },
+    "mubench_local_arc_challenge_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_arc_challenge_ja.yaml"
+    },
+    "mubench_local_arc_challenge_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_arc_challenge_jv.yaml"
+    },
+    "mubench_local_arc_challenge_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_arc_challenge_kk.yaml"
+    },
+    "mubench_local_arc_challenge_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_arc_challenge_km.yaml"
+    },
+    "mubench_local_arc_challenge_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_arc_challenge_kn.yaml"
+    },
+    "mubench_local_arc_challenge_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_arc_challenge_ko.yaml"
+    },
+    "mubench_local_arc_challenge_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_arc_challenge_lt.yaml"
+    },
+    "mubench_local_arc_challenge_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_arc_challenge_lv.yaml"
+    },
+    "mubench_local_arc_challenge_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_arc_challenge_ml.yaml"
+    },
+    "mubench_local_arc_challenge_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_arc_challenge_mr.yaml"
+    },
+    "mubench_local_arc_challenge_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_arc_challenge_ms.yaml"
+    },
+    "mubench_local_arc_challenge_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_arc_challenge_my.yaml"
+    },
+    "mubench_local_arc_challenge_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_arc_challenge_nl.yaml"
+    },
+    "mubench_local_arc_challenge_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_arc_challenge_no.yaml"
+    },
+    "mubench_local_arc_challenge_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_arc_challenge_pa.yaml"
+    },
+    "mubench_local_arc_challenge_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_arc_challenge_pl.yaml"
+    },
+    "mubench_local_arc_challenge_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_arc_challenge_pt.yaml"
+    },
+    "mubench_local_arc_challenge_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_arc_challenge_ro.yaml"
+    },
+    "mubench_local_arc_challenge_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_arc_challenge_ru.yaml"
+    },
+    "mubench_local_arc_challenge_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_arc_challenge_sk.yaml"
+    },
+    "mubench_local_arc_challenge_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_arc_challenge_sl.yaml"
+    },
+    "mubench_local_arc_challenge_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_arc_challenge_sq.yaml"
+    },
+    "mubench_local_arc_challenge_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_arc_challenge_sr.yaml"
+    },
+    "mubench_local_arc_challenge_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_arc_challenge_sv.yaml"
+    },
+    "mubench_local_arc_challenge_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_arc_challenge_sw.yaml"
+    },
+    "mubench_local_arc_challenge_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_arc_challenge_ta.yaml"
+    },
+    "mubench_local_arc_challenge_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_arc_challenge_te.yaml"
+    },
+    "mubench_local_arc_challenge_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_arc_challenge_th.yaml"
+    },
+    "mubench_local_arc_challenge_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_arc_challenge_tl.yaml"
+    },
+    "mubench_local_arc_challenge_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_arc_challenge_tr.yaml"
+    },
+    "mubench_local_arc_challenge_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_arc_challenge_uk.yaml"
+    },
+    "mubench_local_arc_challenge_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_arc_challenge_ur.yaml"
+    },
+    "mubench_local_arc_challenge_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_arc_challenge_uz.yaml"
+    },
+    "mubench_local_arc_challenge_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_arc_challenge_vi.yaml"
+    },
+    "mubench_local_arc_challenge_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_challenge"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_arc_challenge_zh.yaml"
+    },
+    "mubench_local_arc_easy": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_arc_easy_af",
+        "mubench_local_arc_easy_ar",
+        "mubench_local_arc_easy_az",
+        "mubench_local_arc_easy_bg",
+        "mubench_local_arc_easy_bn",
+        "mubench_local_arc_easy_ca",
+        "mubench_local_arc_easy_ceb",
+        "mubench_local_arc_easy_cs",
+        "mubench_local_arc_easy_da",
+        "mubench_local_arc_easy_de",
+        "mubench_local_arc_easy_el",
+        "mubench_local_arc_easy_en",
+        "mubench_local_arc_easy_es",
+        "mubench_local_arc_easy_et",
+        "mubench_local_arc_easy_fa",
+        "mubench_local_arc_easy_fi",
+        "mubench_local_arc_easy_fr",
+        "mubench_local_arc_easy_ga",
+        "mubench_local_arc_easy_gu",
+        "mubench_local_arc_easy_he",
+        "mubench_local_arc_easy_hi",
+        "mubench_local_arc_easy_hr",
+        "mubench_local_arc_easy_hu",
+        "mubench_local_arc_easy_id",
+        "mubench_local_arc_easy_is",
+        "mubench_local_arc_easy_it",
+        "mubench_local_arc_easy_ja",
+        "mubench_local_arc_easy_jv",
+        "mubench_local_arc_easy_kk",
+        "mubench_local_arc_easy_km",
+        "mubench_local_arc_easy_kn",
+        "mubench_local_arc_easy_ko",
+        "mubench_local_arc_easy_lt",
+        "mubench_local_arc_easy_lv",
+        "mubench_local_arc_easy_ml",
+        "mubench_local_arc_easy_mr",
+        "mubench_local_arc_easy_ms",
+        "mubench_local_arc_easy_my",
+        "mubench_local_arc_easy_nl",
+        "mubench_local_arc_easy_no",
+        "mubench_local_arc_easy_pa",
+        "mubench_local_arc_easy_pl",
+        "mubench_local_arc_easy_pt",
+        "mubench_local_arc_easy_ro",
+        "mubench_local_arc_easy_ru",
+        "mubench_local_arc_easy_sk",
+        "mubench_local_arc_easy_sl",
+        "mubench_local_arc_easy_sq",
+        "mubench_local_arc_easy_sr",
+        "mubench_local_arc_easy_sv",
+        "mubench_local_arc_easy_sw",
+        "mubench_local_arc_easy_ta",
+        "mubench_local_arc_easy_te",
+        "mubench_local_arc_easy_th",
+        "mubench_local_arc_easy_tl",
+        "mubench_local_arc_easy_tr",
+        "mubench_local_arc_easy_uk",
+        "mubench_local_arc_easy_ur",
+        "mubench_local_arc_easy_uz",
+        "mubench_local_arc_easy_vi",
+        "mubench_local_arc_easy_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_arc_easy_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_arc_easy_af.yaml"
+    },
+    "mubench_local_arc_easy_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_arc_easy_ar.yaml"
+    },
+    "mubench_local_arc_easy_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_arc_easy_az.yaml"
+    },
+    "mubench_local_arc_easy_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_arc_easy_bg.yaml"
+    },
+    "mubench_local_arc_easy_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_arc_easy_bn.yaml"
+    },
+    "mubench_local_arc_easy_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_arc_easy_ca.yaml"
+    },
+    "mubench_local_arc_easy_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_arc_easy_ceb.yaml"
+    },
+    "mubench_local_arc_easy_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_arc_easy_cs.yaml"
+    },
+    "mubench_local_arc_easy_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_arc_easy_da.yaml"
+    },
+    "mubench_local_arc_easy_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_arc_easy_de.yaml"
+    },
+    "mubench_local_arc_easy_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_arc_easy_el.yaml"
+    },
+    "mubench_local_arc_easy_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_arc_easy_en.yaml"
+    },
+    "mubench_local_arc_easy_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_arc_easy_es.yaml"
+    },
+    "mubench_local_arc_easy_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_arc_easy_et.yaml"
+    },
+    "mubench_local_arc_easy_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_arc_easy_fa.yaml"
+    },
+    "mubench_local_arc_easy_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_arc_easy_fi.yaml"
+    },
+    "mubench_local_arc_easy_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_arc_easy_fr.yaml"
+    },
+    "mubench_local_arc_easy_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_arc_easy_ga.yaml"
+    },
+    "mubench_local_arc_easy_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_arc_easy_gu.yaml"
+    },
+    "mubench_local_arc_easy_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_arc_easy_he.yaml"
+    },
+    "mubench_local_arc_easy_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_arc_easy_hi.yaml"
+    },
+    "mubench_local_arc_easy_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_arc_easy_hr.yaml"
+    },
+    "mubench_local_arc_easy_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_arc_easy_hu.yaml"
+    },
+    "mubench_local_arc_easy_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_arc_easy_id.yaml"
+    },
+    "mubench_local_arc_easy_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_arc_easy_is.yaml"
+    },
+    "mubench_local_arc_easy_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_arc_easy_it.yaml"
+    },
+    "mubench_local_arc_easy_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_arc_easy_ja.yaml"
+    },
+    "mubench_local_arc_easy_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_arc_easy_jv.yaml"
+    },
+    "mubench_local_arc_easy_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_arc_easy_kk.yaml"
+    },
+    "mubench_local_arc_easy_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_arc_easy_km.yaml"
+    },
+    "mubench_local_arc_easy_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_arc_easy_kn.yaml"
+    },
+    "mubench_local_arc_easy_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_arc_easy_ko.yaml"
+    },
+    "mubench_local_arc_easy_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_arc_easy_lt.yaml"
+    },
+    "mubench_local_arc_easy_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_arc_easy_lv.yaml"
+    },
+    "mubench_local_arc_easy_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_arc_easy_ml.yaml"
+    },
+    "mubench_local_arc_easy_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_arc_easy_mr.yaml"
+    },
+    "mubench_local_arc_easy_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_arc_easy_ms.yaml"
+    },
+    "mubench_local_arc_easy_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_arc_easy_my.yaml"
+    },
+    "mubench_local_arc_easy_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_arc_easy_nl.yaml"
+    },
+    "mubench_local_arc_easy_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_arc_easy_no.yaml"
+    },
+    "mubench_local_arc_easy_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_arc_easy_pa.yaml"
+    },
+    "mubench_local_arc_easy_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_arc_easy_pl.yaml"
+    },
+    "mubench_local_arc_easy_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_arc_easy_pt.yaml"
+    },
+    "mubench_local_arc_easy_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_arc_easy_ro.yaml"
+    },
+    "mubench_local_arc_easy_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_arc_easy_ru.yaml"
+    },
+    "mubench_local_arc_easy_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_arc_easy_sk.yaml"
+    },
+    "mubench_local_arc_easy_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_arc_easy_sl.yaml"
+    },
+    "mubench_local_arc_easy_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_arc_easy_sq.yaml"
+    },
+    "mubench_local_arc_easy_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_arc_easy_sr.yaml"
+    },
+    "mubench_local_arc_easy_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_arc_easy_sv.yaml"
+    },
+    "mubench_local_arc_easy_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_arc_easy_sw.yaml"
+    },
+    "mubench_local_arc_easy_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_arc_easy_ta.yaml"
+    },
+    "mubench_local_arc_easy_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_arc_easy_te.yaml"
+    },
+    "mubench_local_arc_easy_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_arc_easy_th.yaml"
+    },
+    "mubench_local_arc_easy_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_arc_easy_tl.yaml"
+    },
+    "mubench_local_arc_easy_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_arc_easy_tr.yaml"
+    },
+    "mubench_local_arc_easy_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_arc_easy_uk.yaml"
+    },
+    "mubench_local_arc_easy_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_arc_easy_ur.yaml"
+    },
+    "mubench_local_arc_easy_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_arc_easy_uz.yaml"
+    },
+    "mubench_local_arc_easy_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_arc_easy_vi.yaml"
+    },
+    "mubench_local_arc_easy_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_arc_easy"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_arc_easy_zh.yaml"
+    },
+    "mubench_local_az": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/az/_mubench_local_az.yaml"
+    },
+    "mubench_local_bg": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/bg/_mubench_local_bg.yaml"
+    },
+    "mubench_local_bmlama": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_bmlama_af",
+        "mubench_local_bmlama_ar",
+        "mubench_local_bmlama_az",
+        "mubench_local_bmlama_bg",
+        "mubench_local_bmlama_bn",
+        "mubench_local_bmlama_ca",
+        "mubench_local_bmlama_ceb",
+        "mubench_local_bmlama_cs",
+        "mubench_local_bmlama_da",
+        "mubench_local_bmlama_de",
+        "mubench_local_bmlama_el",
+        "mubench_local_bmlama_en",
+        "mubench_local_bmlama_es",
+        "mubench_local_bmlama_et",
+        "mubench_local_bmlama_fa",
+        "mubench_local_bmlama_fi",
+        "mubench_local_bmlama_fr",
+        "mubench_local_bmlama_ga",
+        "mubench_local_bmlama_gu",
+        "mubench_local_bmlama_he",
+        "mubench_local_bmlama_hi",
+        "mubench_local_bmlama_hr",
+        "mubench_local_bmlama_hu",
+        "mubench_local_bmlama_id",
+        "mubench_local_bmlama_is",
+        "mubench_local_bmlama_it",
+        "mubench_local_bmlama_ja",
+        "mubench_local_bmlama_jv",
+        "mubench_local_bmlama_kk",
+        "mubench_local_bmlama_km",
+        "mubench_local_bmlama_kn",
+        "mubench_local_bmlama_ko",
+        "mubench_local_bmlama_lt",
+        "mubench_local_bmlama_lv",
+        "mubench_local_bmlama_ml",
+        "mubench_local_bmlama_mr",
+        "mubench_local_bmlama_ms",
+        "mubench_local_bmlama_my",
+        "mubench_local_bmlama_nl",
+        "mubench_local_bmlama_no",
+        "mubench_local_bmlama_pa",
+        "mubench_local_bmlama_pl",
+        "mubench_local_bmlama_pt",
+        "mubench_local_bmlama_ro",
+        "mubench_local_bmlama_ru",
+        "mubench_local_bmlama_sk",
+        "mubench_local_bmlama_sl",
+        "mubench_local_bmlama_sq",
+        "mubench_local_bmlama_sr",
+        "mubench_local_bmlama_sv",
+        "mubench_local_bmlama_sw",
+        "mubench_local_bmlama_ta",
+        "mubench_local_bmlama_te",
+        "mubench_local_bmlama_th",
+        "mubench_local_bmlama_tl",
+        "mubench_local_bmlama_tr",
+        "mubench_local_bmlama_uk",
+        "mubench_local_bmlama_ur",
+        "mubench_local_bmlama_uz",
+        "mubench_local_bmlama_vi",
+        "mubench_local_bmlama_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_bmlama_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_bmlama_af.yaml"
+    },
+    "mubench_local_bmlama_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_bmlama_ar.yaml"
+    },
+    "mubench_local_bmlama_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_bmlama_az.yaml"
+    },
+    "mubench_local_bmlama_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_bmlama_bg.yaml"
+    },
+    "mubench_local_bmlama_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_bmlama_bn.yaml"
+    },
+    "mubench_local_bmlama_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_bmlama_ca.yaml"
+    },
+    "mubench_local_bmlama_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_bmlama_ceb.yaml"
+    },
+    "mubench_local_bmlama_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_bmlama_cs.yaml"
+    },
+    "mubench_local_bmlama_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_bmlama_da.yaml"
+    },
+    "mubench_local_bmlama_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_bmlama_de.yaml"
+    },
+    "mubench_local_bmlama_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_bmlama_el.yaml"
+    },
+    "mubench_local_bmlama_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_bmlama_en.yaml"
+    },
+    "mubench_local_bmlama_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_bmlama_es.yaml"
+    },
+    "mubench_local_bmlama_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_bmlama_et.yaml"
+    },
+    "mubench_local_bmlama_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_bmlama_fa.yaml"
+    },
+    "mubench_local_bmlama_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_bmlama_fi.yaml"
+    },
+    "mubench_local_bmlama_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_bmlama_fr.yaml"
+    },
+    "mubench_local_bmlama_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_bmlama_ga.yaml"
+    },
+    "mubench_local_bmlama_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_bmlama_gu.yaml"
+    },
+    "mubench_local_bmlama_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_bmlama_he.yaml"
+    },
+    "mubench_local_bmlama_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_bmlama_hi.yaml"
+    },
+    "mubench_local_bmlama_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_bmlama_hr.yaml"
+    },
+    "mubench_local_bmlama_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_bmlama_hu.yaml"
+    },
+    "mubench_local_bmlama_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_bmlama_id.yaml"
+    },
+    "mubench_local_bmlama_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_bmlama_is.yaml"
+    },
+    "mubench_local_bmlama_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_bmlama_it.yaml"
+    },
+    "mubench_local_bmlama_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_bmlama_ja.yaml"
+    },
+    "mubench_local_bmlama_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_bmlama_jv.yaml"
+    },
+    "mubench_local_bmlama_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_bmlama_kk.yaml"
+    },
+    "mubench_local_bmlama_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_bmlama_km.yaml"
+    },
+    "mubench_local_bmlama_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_bmlama_kn.yaml"
+    },
+    "mubench_local_bmlama_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_bmlama_ko.yaml"
+    },
+    "mubench_local_bmlama_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_bmlama_lt.yaml"
+    },
+    "mubench_local_bmlama_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_bmlama_lv.yaml"
+    },
+    "mubench_local_bmlama_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_bmlama_ml.yaml"
+    },
+    "mubench_local_bmlama_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_bmlama_mr.yaml"
+    },
+    "mubench_local_bmlama_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_bmlama_ms.yaml"
+    },
+    "mubench_local_bmlama_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_bmlama_my.yaml"
+    },
+    "mubench_local_bmlama_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_bmlama_nl.yaml"
+    },
+    "mubench_local_bmlama_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_bmlama_no.yaml"
+    },
+    "mubench_local_bmlama_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_bmlama_pa.yaml"
+    },
+    "mubench_local_bmlama_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_bmlama_pl.yaml"
+    },
+    "mubench_local_bmlama_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_bmlama_pt.yaml"
+    },
+    "mubench_local_bmlama_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_bmlama_ro.yaml"
+    },
+    "mubench_local_bmlama_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_bmlama_ru.yaml"
+    },
+    "mubench_local_bmlama_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_bmlama_sk.yaml"
+    },
+    "mubench_local_bmlama_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_bmlama_sl.yaml"
+    },
+    "mubench_local_bmlama_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_bmlama_sq.yaml"
+    },
+    "mubench_local_bmlama_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_bmlama_sr.yaml"
+    },
+    "mubench_local_bmlama_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_bmlama_sv.yaml"
+    },
+    "mubench_local_bmlama_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_bmlama_sw.yaml"
+    },
+    "mubench_local_bmlama_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_bmlama_ta.yaml"
+    },
+    "mubench_local_bmlama_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_bmlama_te.yaml"
+    },
+    "mubench_local_bmlama_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_bmlama_th.yaml"
+    },
+    "mubench_local_bmlama_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_bmlama_tl.yaml"
+    },
+    "mubench_local_bmlama_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_bmlama_tr.yaml"
+    },
+    "mubench_local_bmlama_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_bmlama_uk.yaml"
+    },
+    "mubench_local_bmlama_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_bmlama_ur.yaml"
+    },
+    "mubench_local_bmlama_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_bmlama_uz.yaml"
+    },
+    "mubench_local_bmlama_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_bmlama_vi.yaml"
+    },
+    "mubench_local_bmlama_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_bmlama"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_bmlama_zh.yaml"
+    },
+    "mubench_local_bn": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/bn/_mubench_local_bn.yaml"
+    },
+    "mubench_local_ca": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ca/_mubench_local_ca.yaml"
+    },
+    "mubench_local_ceb": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ceb/_mubench_local_ceb.yaml"
+    },
+    "mubench_local_cs": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/cs/_mubench_local_cs.yaml"
+    },
+    "mubench_local_da": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/da/_mubench_local_da.yaml"
+    },
+    "mubench_local_de": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/de/_mubench_local_de.yaml"
+    },
+    "mubench_local_el": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/el/_mubench_local_el.yaml"
+    },
+    "mubench_local_en": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/en/_mubench_local_en.yaml"
+    },
+    "mubench_local_es": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/es/_mubench_local_es.yaml"
+    },
+    "mubench_local_et": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/et/_mubench_local_et.yaml"
+    },
+    "mubench_local_fa": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/fa/_mubench_local_fa.yaml"
+    },
+    "mubench_local_fi": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/fi/_mubench_local_fi.yaml"
+    },
+    "mubench_local_fr": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/fr/_mubench_local_fr.yaml"
+    },
+    "mubench_local_ga": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ga/_mubench_local_ga.yaml"
+    },
+    "mubench_local_gpqa": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_gpqa_af",
+        "mubench_local_gpqa_ar",
+        "mubench_local_gpqa_az",
+        "mubench_local_gpqa_bg",
+        "mubench_local_gpqa_bn",
+        "mubench_local_gpqa_ca",
+        "mubench_local_gpqa_ceb",
+        "mubench_local_gpqa_cs",
+        "mubench_local_gpqa_da",
+        "mubench_local_gpqa_de",
+        "mubench_local_gpqa_el",
+        "mubench_local_gpqa_en",
+        "mubench_local_gpqa_es",
+        "mubench_local_gpqa_et",
+        "mubench_local_gpqa_fa",
+        "mubench_local_gpqa_fi",
+        "mubench_local_gpqa_fr",
+        "mubench_local_gpqa_ga",
+        "mubench_local_gpqa_gu",
+        "mubench_local_gpqa_he",
+        "mubench_local_gpqa_hi",
+        "mubench_local_gpqa_hr",
+        "mubench_local_gpqa_hu",
+        "mubench_local_gpqa_id",
+        "mubench_local_gpqa_is",
+        "mubench_local_gpqa_it",
+        "mubench_local_gpqa_ja",
+        "mubench_local_gpqa_jv",
+        "mubench_local_gpqa_kk",
+        "mubench_local_gpqa_km",
+        "mubench_local_gpqa_kn",
+        "mubench_local_gpqa_ko",
+        "mubench_local_gpqa_lt",
+        "mubench_local_gpqa_lv",
+        "mubench_local_gpqa_ml",
+        "mubench_local_gpqa_mr",
+        "mubench_local_gpqa_ms",
+        "mubench_local_gpqa_my",
+        "mubench_local_gpqa_nl",
+        "mubench_local_gpqa_no",
+        "mubench_local_gpqa_pa",
+        "mubench_local_gpqa_pl",
+        "mubench_local_gpqa_pt",
+        "mubench_local_gpqa_ro",
+        "mubench_local_gpqa_ru",
+        "mubench_local_gpqa_sk",
+        "mubench_local_gpqa_sl",
+        "mubench_local_gpqa_sq",
+        "mubench_local_gpqa_sr",
+        "mubench_local_gpqa_sv",
+        "mubench_local_gpqa_sw",
+        "mubench_local_gpqa_ta",
+        "mubench_local_gpqa_te",
+        "mubench_local_gpqa_th",
+        "mubench_local_gpqa_tl",
+        "mubench_local_gpqa_tr",
+        "mubench_local_gpqa_uk",
+        "mubench_local_gpqa_ur",
+        "mubench_local_gpqa_uz",
+        "mubench_local_gpqa_vi",
+        "mubench_local_gpqa_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_gpqa_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_gpqa_af.yaml"
+    },
+    "mubench_local_gpqa_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_gpqa_ar.yaml"
+    },
+    "mubench_local_gpqa_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_gpqa_az.yaml"
+    },
+    "mubench_local_gpqa_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_gpqa_bg.yaml"
+    },
+    "mubench_local_gpqa_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_gpqa_bn.yaml"
+    },
+    "mubench_local_gpqa_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_gpqa_ca.yaml"
+    },
+    "mubench_local_gpqa_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_gpqa_ceb.yaml"
+    },
+    "mubench_local_gpqa_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_gpqa_cs.yaml"
+    },
+    "mubench_local_gpqa_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_gpqa_da.yaml"
+    },
+    "mubench_local_gpqa_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_gpqa_de.yaml"
+    },
+    "mubench_local_gpqa_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_gpqa_el.yaml"
+    },
+    "mubench_local_gpqa_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_gpqa_en.yaml"
+    },
+    "mubench_local_gpqa_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_gpqa_es.yaml"
+    },
+    "mubench_local_gpqa_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_gpqa_et.yaml"
+    },
+    "mubench_local_gpqa_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_gpqa_fa.yaml"
+    },
+    "mubench_local_gpqa_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_gpqa_fi.yaml"
+    },
+    "mubench_local_gpqa_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_gpqa_fr.yaml"
+    },
+    "mubench_local_gpqa_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_gpqa_ga.yaml"
+    },
+    "mubench_local_gpqa_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_gpqa_gu.yaml"
+    },
+    "mubench_local_gpqa_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_gpqa_he.yaml"
+    },
+    "mubench_local_gpqa_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_gpqa_hi.yaml"
+    },
+    "mubench_local_gpqa_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_gpqa_hr.yaml"
+    },
+    "mubench_local_gpqa_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_gpqa_hu.yaml"
+    },
+    "mubench_local_gpqa_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_gpqa_id.yaml"
+    },
+    "mubench_local_gpqa_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_gpqa_is.yaml"
+    },
+    "mubench_local_gpqa_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_gpqa_it.yaml"
+    },
+    "mubench_local_gpqa_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_gpqa_ja.yaml"
+    },
+    "mubench_local_gpqa_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_gpqa_jv.yaml"
+    },
+    "mubench_local_gpqa_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_gpqa_kk.yaml"
+    },
+    "mubench_local_gpqa_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_gpqa_km.yaml"
+    },
+    "mubench_local_gpqa_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_gpqa_kn.yaml"
+    },
+    "mubench_local_gpqa_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_gpqa_ko.yaml"
+    },
+    "mubench_local_gpqa_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_gpqa_lt.yaml"
+    },
+    "mubench_local_gpqa_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_gpqa_lv.yaml"
+    },
+    "mubench_local_gpqa_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_gpqa_ml.yaml"
+    },
+    "mubench_local_gpqa_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_gpqa_mr.yaml"
+    },
+    "mubench_local_gpqa_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_gpqa_ms.yaml"
+    },
+    "mubench_local_gpqa_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_gpqa_my.yaml"
+    },
+    "mubench_local_gpqa_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_gpqa_nl.yaml"
+    },
+    "mubench_local_gpqa_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_gpqa_no.yaml"
+    },
+    "mubench_local_gpqa_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_gpqa_pa.yaml"
+    },
+    "mubench_local_gpqa_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_gpqa_pl.yaml"
+    },
+    "mubench_local_gpqa_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_gpqa_pt.yaml"
+    },
+    "mubench_local_gpqa_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_gpqa_ro.yaml"
+    },
+    "mubench_local_gpqa_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_gpqa_ru.yaml"
+    },
+    "mubench_local_gpqa_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_gpqa_sk.yaml"
+    },
+    "mubench_local_gpqa_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_gpqa_sl.yaml"
+    },
+    "mubench_local_gpqa_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_gpqa_sq.yaml"
+    },
+    "mubench_local_gpqa_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_gpqa_sr.yaml"
+    },
+    "mubench_local_gpqa_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_gpqa_sv.yaml"
+    },
+    "mubench_local_gpqa_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_gpqa_sw.yaml"
+    },
+    "mubench_local_gpqa_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_gpqa_ta.yaml"
+    },
+    "mubench_local_gpqa_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_gpqa_te.yaml"
+    },
+    "mubench_local_gpqa_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_gpqa_th.yaml"
+    },
+    "mubench_local_gpqa_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_gpqa_tl.yaml"
+    },
+    "mubench_local_gpqa_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_gpqa_tr.yaml"
+    },
+    "mubench_local_gpqa_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_gpqa_uk.yaml"
+    },
+    "mubench_local_gpqa_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_gpqa_ur.yaml"
+    },
+    "mubench_local_gpqa_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_gpqa_uz.yaml"
+    },
+    "mubench_local_gpqa_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_gpqa_vi.yaml"
+    },
+    "mubench_local_gpqa_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_gpqa"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_gpqa_zh.yaml"
+    },
+    "mubench_local_gu": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/gu/_mubench_local_gu.yaml"
+    },
+    "mubench_local_he": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/he/_mubench_local_he.yaml"
+    },
+    "mubench_local_hellaswag": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_hellaswag_af",
+        "mubench_local_hellaswag_ar",
+        "mubench_local_hellaswag_az",
+        "mubench_local_hellaswag_bg",
+        "mubench_local_hellaswag_bn",
+        "mubench_local_hellaswag_ca",
+        "mubench_local_hellaswag_ceb",
+        "mubench_local_hellaswag_cs",
+        "mubench_local_hellaswag_da",
+        "mubench_local_hellaswag_de",
+        "mubench_local_hellaswag_el",
+        "mubench_local_hellaswag_en",
+        "mubench_local_hellaswag_es",
+        "mubench_local_hellaswag_et",
+        "mubench_local_hellaswag_fa",
+        "mubench_local_hellaswag_fi",
+        "mubench_local_hellaswag_fr",
+        "mubench_local_hellaswag_ga",
+        "mubench_local_hellaswag_gu",
+        "mubench_local_hellaswag_he",
+        "mubench_local_hellaswag_hi",
+        "mubench_local_hellaswag_hr",
+        "mubench_local_hellaswag_hu",
+        "mubench_local_hellaswag_id",
+        "mubench_local_hellaswag_is",
+        "mubench_local_hellaswag_it",
+        "mubench_local_hellaswag_ja",
+        "mubench_local_hellaswag_jv",
+        "mubench_local_hellaswag_kk",
+        "mubench_local_hellaswag_km",
+        "mubench_local_hellaswag_kn",
+        "mubench_local_hellaswag_ko",
+        "mubench_local_hellaswag_lt",
+        "mubench_local_hellaswag_lv",
+        "mubench_local_hellaswag_ml",
+        "mubench_local_hellaswag_mr",
+        "mubench_local_hellaswag_ms",
+        "mubench_local_hellaswag_my",
+        "mubench_local_hellaswag_nl",
+        "mubench_local_hellaswag_no",
+        "mubench_local_hellaswag_pa",
+        "mubench_local_hellaswag_pl",
+        "mubench_local_hellaswag_pt",
+        "mubench_local_hellaswag_ro",
+        "mubench_local_hellaswag_ru",
+        "mubench_local_hellaswag_sk",
+        "mubench_local_hellaswag_sl",
+        "mubench_local_hellaswag_sq",
+        "mubench_local_hellaswag_sr",
+        "mubench_local_hellaswag_sv",
+        "mubench_local_hellaswag_sw",
+        "mubench_local_hellaswag_ta",
+        "mubench_local_hellaswag_te",
+        "mubench_local_hellaswag_th",
+        "mubench_local_hellaswag_tl",
+        "mubench_local_hellaswag_tr",
+        "mubench_local_hellaswag_uk",
+        "mubench_local_hellaswag_ur",
+        "mubench_local_hellaswag_uz",
+        "mubench_local_hellaswag_vi",
+        "mubench_local_hellaswag_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_hellaswag_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_hellaswag_af.yaml"
+    },
+    "mubench_local_hellaswag_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_hellaswag_ar.yaml"
+    },
+    "mubench_local_hellaswag_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_hellaswag_az.yaml"
+    },
+    "mubench_local_hellaswag_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_hellaswag_bg.yaml"
+    },
+    "mubench_local_hellaswag_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_hellaswag_bn.yaml"
+    },
+    "mubench_local_hellaswag_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_hellaswag_ca.yaml"
+    },
+    "mubench_local_hellaswag_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_hellaswag_ceb.yaml"
+    },
+    "mubench_local_hellaswag_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_hellaswag_cs.yaml"
+    },
+    "mubench_local_hellaswag_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_hellaswag_da.yaml"
+    },
+    "mubench_local_hellaswag_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_hellaswag_de.yaml"
+    },
+    "mubench_local_hellaswag_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_hellaswag_el.yaml"
+    },
+    "mubench_local_hellaswag_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_hellaswag_en.yaml"
+    },
+    "mubench_local_hellaswag_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_hellaswag_es.yaml"
+    },
+    "mubench_local_hellaswag_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_hellaswag_et.yaml"
+    },
+    "mubench_local_hellaswag_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_hellaswag_fa.yaml"
+    },
+    "mubench_local_hellaswag_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_hellaswag_fi.yaml"
+    },
+    "mubench_local_hellaswag_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_hellaswag_fr.yaml"
+    },
+    "mubench_local_hellaswag_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_hellaswag_ga.yaml"
+    },
+    "mubench_local_hellaswag_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_hellaswag_gu.yaml"
+    },
+    "mubench_local_hellaswag_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_hellaswag_he.yaml"
+    },
+    "mubench_local_hellaswag_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_hellaswag_hi.yaml"
+    },
+    "mubench_local_hellaswag_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_hellaswag_hr.yaml"
+    },
+    "mubench_local_hellaswag_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_hellaswag_hu.yaml"
+    },
+    "mubench_local_hellaswag_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_hellaswag_id.yaml"
+    },
+    "mubench_local_hellaswag_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_hellaswag_is.yaml"
+    },
+    "mubench_local_hellaswag_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_hellaswag_it.yaml"
+    },
+    "mubench_local_hellaswag_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_hellaswag_ja.yaml"
+    },
+    "mubench_local_hellaswag_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_hellaswag_jv.yaml"
+    },
+    "mubench_local_hellaswag_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_hellaswag_kk.yaml"
+    },
+    "mubench_local_hellaswag_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_hellaswag_km.yaml"
+    },
+    "mubench_local_hellaswag_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_hellaswag_kn.yaml"
+    },
+    "mubench_local_hellaswag_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_hellaswag_ko.yaml"
+    },
+    "mubench_local_hellaswag_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_hellaswag_lt.yaml"
+    },
+    "mubench_local_hellaswag_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_hellaswag_lv.yaml"
+    },
+    "mubench_local_hellaswag_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_hellaswag_ml.yaml"
+    },
+    "mubench_local_hellaswag_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_hellaswag_mr.yaml"
+    },
+    "mubench_local_hellaswag_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_hellaswag_ms.yaml"
+    },
+    "mubench_local_hellaswag_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_hellaswag_my.yaml"
+    },
+    "mubench_local_hellaswag_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_hellaswag_nl.yaml"
+    },
+    "mubench_local_hellaswag_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_hellaswag_no.yaml"
+    },
+    "mubench_local_hellaswag_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_hellaswag_pa.yaml"
+    },
+    "mubench_local_hellaswag_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_hellaswag_pl.yaml"
+    },
+    "mubench_local_hellaswag_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_hellaswag_pt.yaml"
+    },
+    "mubench_local_hellaswag_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_hellaswag_ro.yaml"
+    },
+    "mubench_local_hellaswag_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_hellaswag_ru.yaml"
+    },
+    "mubench_local_hellaswag_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_hellaswag_sk.yaml"
+    },
+    "mubench_local_hellaswag_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_hellaswag_sl.yaml"
+    },
+    "mubench_local_hellaswag_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_hellaswag_sq.yaml"
+    },
+    "mubench_local_hellaswag_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_hellaswag_sr.yaml"
+    },
+    "mubench_local_hellaswag_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_hellaswag_sv.yaml"
+    },
+    "mubench_local_hellaswag_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_hellaswag_sw.yaml"
+    },
+    "mubench_local_hellaswag_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_hellaswag_ta.yaml"
+    },
+    "mubench_local_hellaswag_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_hellaswag_te.yaml"
+    },
+    "mubench_local_hellaswag_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_hellaswag_th.yaml"
+    },
+    "mubench_local_hellaswag_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_hellaswag_tl.yaml"
+    },
+    "mubench_local_hellaswag_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_hellaswag_tr.yaml"
+    },
+    "mubench_local_hellaswag_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_hellaswag_uk.yaml"
+    },
+    "mubench_local_hellaswag_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_hellaswag_ur.yaml"
+    },
+    "mubench_local_hellaswag_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_hellaswag_uz.yaml"
+    },
+    "mubench_local_hellaswag_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_hellaswag_vi.yaml"
+    },
+    "mubench_local_hellaswag_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_hellaswag"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_hellaswag_zh.yaml"
+    },
+    "mubench_local_hi": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/hi/_mubench_local_hi.yaml"
+    },
+    "mubench_local_hr": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/hr/_mubench_local_hr.yaml"
+    },
+    "mubench_local_hu": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/hu/_mubench_local_hu.yaml"
+    },
+    "mubench_local_id": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/id/_mubench_local_id.yaml"
+    },
+    "mubench_local_is": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/is/_mubench_local_is.yaml"
+    },
+    "mubench_local_it": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/it/_mubench_local_it.yaml"
+    },
+    "mubench_local_ja": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ja/_mubench_local_ja.yaml"
+    },
+    "mubench_local_jv": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/jv/_mubench_local_jv.yaml"
+    },
+    "mubench_local_kk": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/kk/_mubench_local_kk.yaml"
+    },
+    "mubench_local_km": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/km/_mubench_local_km.yaml"
+    },
+    "mubench_local_kn": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/kn/_mubench_local_kn.yaml"
+    },
+    "mubench_local_ko": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ko/_mubench_local_ko.yaml"
+    },
+    "mubench_local_lt": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/lt/_mubench_local_lt.yaml"
+    },
+    "mubench_local_lv": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/lv/_mubench_local_lv.yaml"
+    },
+    "mubench_local_ml": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ml/_mubench_local_ml.yaml"
+    },
+    "mubench_local_mmlu": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_mmlu_af",
+        "mubench_local_mmlu_ar",
+        "mubench_local_mmlu_az",
+        "mubench_local_mmlu_bg",
+        "mubench_local_mmlu_bn",
+        "mubench_local_mmlu_ca",
+        "mubench_local_mmlu_ceb",
+        "mubench_local_mmlu_cs",
+        "mubench_local_mmlu_da",
+        "mubench_local_mmlu_de",
+        "mubench_local_mmlu_el",
+        "mubench_local_mmlu_en",
+        "mubench_local_mmlu_es",
+        "mubench_local_mmlu_et",
+        "mubench_local_mmlu_fa",
+        "mubench_local_mmlu_fi",
+        "mubench_local_mmlu_fr",
+        "mubench_local_mmlu_ga",
+        "mubench_local_mmlu_gu",
+        "mubench_local_mmlu_he",
+        "mubench_local_mmlu_hi",
+        "mubench_local_mmlu_hr",
+        "mubench_local_mmlu_hu",
+        "mubench_local_mmlu_id",
+        "mubench_local_mmlu_is",
+        "mubench_local_mmlu_it",
+        "mubench_local_mmlu_ja",
+        "mubench_local_mmlu_jv",
+        "mubench_local_mmlu_kk",
+        "mubench_local_mmlu_km",
+        "mubench_local_mmlu_kn",
+        "mubench_local_mmlu_ko",
+        "mubench_local_mmlu_lt",
+        "mubench_local_mmlu_lv",
+        "mubench_local_mmlu_ml",
+        "mubench_local_mmlu_mr",
+        "mubench_local_mmlu_ms",
+        "mubench_local_mmlu_my",
+        "mubench_local_mmlu_nl",
+        "mubench_local_mmlu_no",
+        "mubench_local_mmlu_pa",
+        "mubench_local_mmlu_pl",
+        "mubench_local_mmlu_pt",
+        "mubench_local_mmlu_ro",
+        "mubench_local_mmlu_ru",
+        "mubench_local_mmlu_sk",
+        "mubench_local_mmlu_sl",
+        "mubench_local_mmlu_sq",
+        "mubench_local_mmlu_sr",
+        "mubench_local_mmlu_sv",
+        "mubench_local_mmlu_sw",
+        "mubench_local_mmlu_ta",
+        "mubench_local_mmlu_te",
+        "mubench_local_mmlu_th",
+        "mubench_local_mmlu_tl",
+        "mubench_local_mmlu_tr",
+        "mubench_local_mmlu_uk",
+        "mubench_local_mmlu_ur",
+        "mubench_local_mmlu_uz",
+        "mubench_local_mmlu_vi",
+        "mubench_local_mmlu_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_mmlu_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_mmlu_af.yaml"
+    },
+    "mubench_local_mmlu_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_mmlu_ar.yaml"
+    },
+    "mubench_local_mmlu_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_mmlu_az.yaml"
+    },
+    "mubench_local_mmlu_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_mmlu_bg.yaml"
+    },
+    "mubench_local_mmlu_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_mmlu_bn.yaml"
+    },
+    "mubench_local_mmlu_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_mmlu_ca.yaml"
+    },
+    "mubench_local_mmlu_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_mmlu_ceb.yaml"
+    },
+    "mubench_local_mmlu_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_mmlu_cs.yaml"
+    },
+    "mubench_local_mmlu_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_mmlu_da.yaml"
+    },
+    "mubench_local_mmlu_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_mmlu_de.yaml"
+    },
+    "mubench_local_mmlu_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_mmlu_el.yaml"
+    },
+    "mubench_local_mmlu_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_mmlu_en.yaml"
+    },
+    "mubench_local_mmlu_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_mmlu_es.yaml"
+    },
+    "mubench_local_mmlu_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_mmlu_et.yaml"
+    },
+    "mubench_local_mmlu_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_mmlu_fa.yaml"
+    },
+    "mubench_local_mmlu_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_mmlu_fi.yaml"
+    },
+    "mubench_local_mmlu_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_mmlu_fr.yaml"
+    },
+    "mubench_local_mmlu_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_mmlu_ga.yaml"
+    },
+    "mubench_local_mmlu_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_mmlu_gu.yaml"
+    },
+    "mubench_local_mmlu_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_mmlu_he.yaml"
+    },
+    "mubench_local_mmlu_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_mmlu_hi.yaml"
+    },
+    "mubench_local_mmlu_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_mmlu_hr.yaml"
+    },
+    "mubench_local_mmlu_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_mmlu_hu.yaml"
+    },
+    "mubench_local_mmlu_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_mmlu_id.yaml"
+    },
+    "mubench_local_mmlu_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_mmlu_is.yaml"
+    },
+    "mubench_local_mmlu_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_mmlu_it.yaml"
+    },
+    "mubench_local_mmlu_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_mmlu_ja.yaml"
+    },
+    "mubench_local_mmlu_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_mmlu_jv.yaml"
+    },
+    "mubench_local_mmlu_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_mmlu_kk.yaml"
+    },
+    "mubench_local_mmlu_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_mmlu_km.yaml"
+    },
+    "mubench_local_mmlu_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_mmlu_kn.yaml"
+    },
+    "mubench_local_mmlu_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_mmlu_ko.yaml"
+    },
+    "mubench_local_mmlu_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_mmlu_lt.yaml"
+    },
+    "mubench_local_mmlu_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_mmlu_lv.yaml"
+    },
+    "mubench_local_mmlu_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_mmlu_ml.yaml"
+    },
+    "mubench_local_mmlu_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_mmlu_mr.yaml"
+    },
+    "mubench_local_mmlu_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_mmlu_ms.yaml"
+    },
+    "mubench_local_mmlu_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_mmlu_my.yaml"
+    },
+    "mubench_local_mmlu_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_mmlu_nl.yaml"
+    },
+    "mubench_local_mmlu_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_mmlu_no.yaml"
+    },
+    "mubench_local_mmlu_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_mmlu_pa.yaml"
+    },
+    "mubench_local_mmlu_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_mmlu_pl.yaml"
+    },
+    "mubench_local_mmlu_pro": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_mmlu_pro_af",
+        "mubench_local_mmlu_pro_ar",
+        "mubench_local_mmlu_pro_az",
+        "mubench_local_mmlu_pro_bg",
+        "mubench_local_mmlu_pro_bn",
+        "mubench_local_mmlu_pro_ca",
+        "mubench_local_mmlu_pro_ceb",
+        "mubench_local_mmlu_pro_cs",
+        "mubench_local_mmlu_pro_da",
+        "mubench_local_mmlu_pro_de",
+        "mubench_local_mmlu_pro_el",
+        "mubench_local_mmlu_pro_en",
+        "mubench_local_mmlu_pro_es",
+        "mubench_local_mmlu_pro_et",
+        "mubench_local_mmlu_pro_fa",
+        "mubench_local_mmlu_pro_fi",
+        "mubench_local_mmlu_pro_fr",
+        "mubench_local_mmlu_pro_ga",
+        "mubench_local_mmlu_pro_gu",
+        "mubench_local_mmlu_pro_he",
+        "mubench_local_mmlu_pro_hi",
+        "mubench_local_mmlu_pro_hr",
+        "mubench_local_mmlu_pro_hu",
+        "mubench_local_mmlu_pro_id",
+        "mubench_local_mmlu_pro_is",
+        "mubench_local_mmlu_pro_it",
+        "mubench_local_mmlu_pro_ja",
+        "mubench_local_mmlu_pro_jv",
+        "mubench_local_mmlu_pro_kk",
+        "mubench_local_mmlu_pro_km",
+        "mubench_local_mmlu_pro_kn",
+        "mubench_local_mmlu_pro_ko",
+        "mubench_local_mmlu_pro_lt",
+        "mubench_local_mmlu_pro_lv",
+        "mubench_local_mmlu_pro_ml",
+        "mubench_local_mmlu_pro_mr",
+        "mubench_local_mmlu_pro_ms",
+        "mubench_local_mmlu_pro_my",
+        "mubench_local_mmlu_pro_nl",
+        "mubench_local_mmlu_pro_no",
+        "mubench_local_mmlu_pro_pa",
+        "mubench_local_mmlu_pro_pl",
+        "mubench_local_mmlu_pro_pt",
+        "mubench_local_mmlu_pro_ro",
+        "mubench_local_mmlu_pro_ru",
+        "mubench_local_mmlu_pro_sk",
+        "mubench_local_mmlu_pro_sl",
+        "mubench_local_mmlu_pro_sq",
+        "mubench_local_mmlu_pro_sr",
+        "mubench_local_mmlu_pro_sv",
+        "mubench_local_mmlu_pro_sw",
+        "mubench_local_mmlu_pro_ta",
+        "mubench_local_mmlu_pro_te",
+        "mubench_local_mmlu_pro_th",
+        "mubench_local_mmlu_pro_tl",
+        "mubench_local_mmlu_pro_tr",
+        "mubench_local_mmlu_pro_uk",
+        "mubench_local_mmlu_pro_ur",
+        "mubench_local_mmlu_pro_uz",
+        "mubench_local_mmlu_pro_vi",
+        "mubench_local_mmlu_pro_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_mmlu_pro_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_mmlu_pro_af.yaml"
+    },
+    "mubench_local_mmlu_pro_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_mmlu_pro_ar.yaml"
+    },
+    "mubench_local_mmlu_pro_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_mmlu_pro_az.yaml"
+    },
+    "mubench_local_mmlu_pro_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_mmlu_pro_bg.yaml"
+    },
+    "mubench_local_mmlu_pro_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_mmlu_pro_bn.yaml"
+    },
+    "mubench_local_mmlu_pro_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_mmlu_pro_ca.yaml"
+    },
+    "mubench_local_mmlu_pro_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_mmlu_pro_ceb.yaml"
+    },
+    "mubench_local_mmlu_pro_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_mmlu_pro_cs.yaml"
+    },
+    "mubench_local_mmlu_pro_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_mmlu_pro_da.yaml"
+    },
+    "mubench_local_mmlu_pro_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_mmlu_pro_de.yaml"
+    },
+    "mubench_local_mmlu_pro_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_mmlu_pro_el.yaml"
+    },
+    "mubench_local_mmlu_pro_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_mmlu_pro_en.yaml"
+    },
+    "mubench_local_mmlu_pro_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_mmlu_pro_es.yaml"
+    },
+    "mubench_local_mmlu_pro_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_mmlu_pro_et.yaml"
+    },
+    "mubench_local_mmlu_pro_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_mmlu_pro_fa.yaml"
+    },
+    "mubench_local_mmlu_pro_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_mmlu_pro_fi.yaml"
+    },
+    "mubench_local_mmlu_pro_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_mmlu_pro_fr.yaml"
+    },
+    "mubench_local_mmlu_pro_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_mmlu_pro_ga.yaml"
+    },
+    "mubench_local_mmlu_pro_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_mmlu_pro_gu.yaml"
+    },
+    "mubench_local_mmlu_pro_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_mmlu_pro_he.yaml"
+    },
+    "mubench_local_mmlu_pro_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_mmlu_pro_hi.yaml"
+    },
+    "mubench_local_mmlu_pro_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_mmlu_pro_hr.yaml"
+    },
+    "mubench_local_mmlu_pro_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_mmlu_pro_hu.yaml"
+    },
+    "mubench_local_mmlu_pro_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_mmlu_pro_id.yaml"
+    },
+    "mubench_local_mmlu_pro_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_mmlu_pro_is.yaml"
+    },
+    "mubench_local_mmlu_pro_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_mmlu_pro_it.yaml"
+    },
+    "mubench_local_mmlu_pro_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_mmlu_pro_ja.yaml"
+    },
+    "mubench_local_mmlu_pro_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_mmlu_pro_jv.yaml"
+    },
+    "mubench_local_mmlu_pro_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_mmlu_pro_kk.yaml"
+    },
+    "mubench_local_mmlu_pro_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_mmlu_pro_km.yaml"
+    },
+    "mubench_local_mmlu_pro_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_mmlu_pro_kn.yaml"
+    },
+    "mubench_local_mmlu_pro_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_mmlu_pro_ko.yaml"
+    },
+    "mubench_local_mmlu_pro_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_mmlu_pro_lt.yaml"
+    },
+    "mubench_local_mmlu_pro_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_mmlu_pro_lv.yaml"
+    },
+    "mubench_local_mmlu_pro_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_mmlu_pro_ml.yaml"
+    },
+    "mubench_local_mmlu_pro_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_mmlu_pro_mr.yaml"
+    },
+    "mubench_local_mmlu_pro_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_mmlu_pro_ms.yaml"
+    },
+    "mubench_local_mmlu_pro_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_mmlu_pro_my.yaml"
+    },
+    "mubench_local_mmlu_pro_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_mmlu_pro_nl.yaml"
+    },
+    "mubench_local_mmlu_pro_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_mmlu_pro_no.yaml"
+    },
+    "mubench_local_mmlu_pro_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_mmlu_pro_pa.yaml"
+    },
+    "mubench_local_mmlu_pro_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_mmlu_pro_pl.yaml"
+    },
+    "mubench_local_mmlu_pro_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_mmlu_pro_pt.yaml"
+    },
+    "mubench_local_mmlu_pro_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_mmlu_pro_ro.yaml"
+    },
+    "mubench_local_mmlu_pro_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_mmlu_pro_ru.yaml"
+    },
+    "mubench_local_mmlu_pro_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_mmlu_pro_sk.yaml"
+    },
+    "mubench_local_mmlu_pro_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_mmlu_pro_sl.yaml"
+    },
+    "mubench_local_mmlu_pro_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_mmlu_pro_sq.yaml"
+    },
+    "mubench_local_mmlu_pro_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_mmlu_pro_sr.yaml"
+    },
+    "mubench_local_mmlu_pro_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_mmlu_pro_sv.yaml"
+    },
+    "mubench_local_mmlu_pro_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_mmlu_pro_sw.yaml"
+    },
+    "mubench_local_mmlu_pro_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_mmlu_pro_ta.yaml"
+    },
+    "mubench_local_mmlu_pro_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_mmlu_pro_te.yaml"
+    },
+    "mubench_local_mmlu_pro_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_mmlu_pro_th.yaml"
+    },
+    "mubench_local_mmlu_pro_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_mmlu_pro_tl.yaml"
+    },
+    "mubench_local_mmlu_pro_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_mmlu_pro_tr.yaml"
+    },
+    "mubench_local_mmlu_pro_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_mmlu_pro_uk.yaml"
+    },
+    "mubench_local_mmlu_pro_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_mmlu_pro_ur.yaml"
+    },
+    "mubench_local_mmlu_pro_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_mmlu_pro_uz.yaml"
+    },
+    "mubench_local_mmlu_pro_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_mmlu_pro_vi.yaml"
+    },
+    "mubench_local_mmlu_pro_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu_pro"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_mmlu_pro_zh.yaml"
+    },
+    "mubench_local_mmlu_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_mmlu_pt.yaml"
+    },
+    "mubench_local_mmlu_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_mmlu_ro.yaml"
+    },
+    "mubench_local_mmlu_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_mmlu_ru.yaml"
+    },
+    "mubench_local_mmlu_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_mmlu_sk.yaml"
+    },
+    "mubench_local_mmlu_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_mmlu_sl.yaml"
+    },
+    "mubench_local_mmlu_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_mmlu_sq.yaml"
+    },
+    "mubench_local_mmlu_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_mmlu_sr.yaml"
+    },
+    "mubench_local_mmlu_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_mmlu_sv.yaml"
+    },
+    "mubench_local_mmlu_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_mmlu_sw.yaml"
+    },
+    "mubench_local_mmlu_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_mmlu_ta.yaml"
+    },
+    "mubench_local_mmlu_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_mmlu_te.yaml"
+    },
+    "mubench_local_mmlu_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_mmlu_th.yaml"
+    },
+    "mubench_local_mmlu_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_mmlu_tl.yaml"
+    },
+    "mubench_local_mmlu_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_mmlu_tr.yaml"
+    },
+    "mubench_local_mmlu_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_mmlu_uk.yaml"
+    },
+    "mubench_local_mmlu_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_mmlu_ur.yaml"
+    },
+    "mubench_local_mmlu_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_mmlu_uz.yaml"
+    },
+    "mubench_local_mmlu_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_mmlu_vi.yaml"
+    },
+    "mubench_local_mmlu_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mmlu"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_mmlu_zh.yaml"
+    },
+    "mubench_local_mnli": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_mnli_af",
+        "mubench_local_mnli_ar",
+        "mubench_local_mnli_az",
+        "mubench_local_mnli_bg",
+        "mubench_local_mnli_bn",
+        "mubench_local_mnli_ca",
+        "mubench_local_mnli_ceb",
+        "mubench_local_mnli_cs",
+        "mubench_local_mnli_da",
+        "mubench_local_mnli_de",
+        "mubench_local_mnli_el",
+        "mubench_local_mnli_en",
+        "mubench_local_mnli_es",
+        "mubench_local_mnli_et",
+        "mubench_local_mnli_fa",
+        "mubench_local_mnli_fi",
+        "mubench_local_mnli_fr",
+        "mubench_local_mnli_ga",
+        "mubench_local_mnli_gu",
+        "mubench_local_mnli_he",
+        "mubench_local_mnli_hi",
+        "mubench_local_mnli_hr",
+        "mubench_local_mnli_hu",
+        "mubench_local_mnli_id",
+        "mubench_local_mnli_is",
+        "mubench_local_mnli_it",
+        "mubench_local_mnli_ja",
+        "mubench_local_mnli_jv",
+        "mubench_local_mnli_kk",
+        "mubench_local_mnli_km",
+        "mubench_local_mnli_kn",
+        "mubench_local_mnli_ko",
+        "mubench_local_mnli_lt",
+        "mubench_local_mnli_lv",
+        "mubench_local_mnli_ml",
+        "mubench_local_mnli_mr",
+        "mubench_local_mnli_ms",
+        "mubench_local_mnli_my",
+        "mubench_local_mnli_nl",
+        "mubench_local_mnli_no",
+        "mubench_local_mnli_pa",
+        "mubench_local_mnli_pl",
+        "mubench_local_mnli_pt",
+        "mubench_local_mnli_ro",
+        "mubench_local_mnli_ru",
+        "mubench_local_mnli_sk",
+        "mubench_local_mnli_sl",
+        "mubench_local_mnli_sq",
+        "mubench_local_mnli_sr",
+        "mubench_local_mnli_sv",
+        "mubench_local_mnli_sw",
+        "mubench_local_mnli_ta",
+        "mubench_local_mnli_te",
+        "mubench_local_mnli_th",
+        "mubench_local_mnli_tl",
+        "mubench_local_mnli_tr",
+        "mubench_local_mnli_uk",
+        "mubench_local_mnli_ur",
+        "mubench_local_mnli_uz",
+        "mubench_local_mnli_vi",
+        "mubench_local_mnli_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_mnli_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_mnli_af.yaml"
+    },
+    "mubench_local_mnli_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_mnli_ar.yaml"
+    },
+    "mubench_local_mnli_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_mnli_az.yaml"
+    },
+    "mubench_local_mnli_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_mnli_bg.yaml"
+    },
+    "mubench_local_mnli_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_mnli_bn.yaml"
+    },
+    "mubench_local_mnli_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_mnli_ca.yaml"
+    },
+    "mubench_local_mnli_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_mnli_ceb.yaml"
+    },
+    "mubench_local_mnli_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_mnli_cs.yaml"
+    },
+    "mubench_local_mnli_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_mnli_da.yaml"
+    },
+    "mubench_local_mnli_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_mnli_de.yaml"
+    },
+    "mubench_local_mnli_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_mnli_el.yaml"
+    },
+    "mubench_local_mnli_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_mnli_en.yaml"
+    },
+    "mubench_local_mnli_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_mnli_es.yaml"
+    },
+    "mubench_local_mnli_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_mnli_et.yaml"
+    },
+    "mubench_local_mnli_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_mnli_fa.yaml"
+    },
+    "mubench_local_mnli_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_mnli_fi.yaml"
+    },
+    "mubench_local_mnli_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_mnli_fr.yaml"
+    },
+    "mubench_local_mnli_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_mnli_ga.yaml"
+    },
+    "mubench_local_mnli_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_mnli_gu.yaml"
+    },
+    "mubench_local_mnli_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_mnli_he.yaml"
+    },
+    "mubench_local_mnli_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_mnli_hi.yaml"
+    },
+    "mubench_local_mnli_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_mnli_hr.yaml"
+    },
+    "mubench_local_mnli_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_mnli_hu.yaml"
+    },
+    "mubench_local_mnli_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_mnli_id.yaml"
+    },
+    "mubench_local_mnli_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_mnli_is.yaml"
+    },
+    "mubench_local_mnli_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_mnli_it.yaml"
+    },
+    "mubench_local_mnli_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_mnli_ja.yaml"
+    },
+    "mubench_local_mnli_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_mnli_jv.yaml"
+    },
+    "mubench_local_mnli_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_mnli_kk.yaml"
+    },
+    "mubench_local_mnli_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_mnli_km.yaml"
+    },
+    "mubench_local_mnli_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_mnli_kn.yaml"
+    },
+    "mubench_local_mnli_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_mnli_ko.yaml"
+    },
+    "mubench_local_mnli_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_mnli_lt.yaml"
+    },
+    "mubench_local_mnli_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_mnli_lv.yaml"
+    },
+    "mubench_local_mnli_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_mnli_ml.yaml"
+    },
+    "mubench_local_mnli_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_mnli_mr.yaml"
+    },
+    "mubench_local_mnli_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_mnli_ms.yaml"
+    },
+    "mubench_local_mnli_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_mnli_my.yaml"
+    },
+    "mubench_local_mnli_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_mnli_nl.yaml"
+    },
+    "mubench_local_mnli_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_mnli_no.yaml"
+    },
+    "mubench_local_mnli_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_mnli_pa.yaml"
+    },
+    "mubench_local_mnli_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_mnli_pl.yaml"
+    },
+    "mubench_local_mnli_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_mnli_pt.yaml"
+    },
+    "mubench_local_mnli_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_mnli_ro.yaml"
+    },
+    "mubench_local_mnli_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_mnli_ru.yaml"
+    },
+    "mubench_local_mnli_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_mnli_sk.yaml"
+    },
+    "mubench_local_mnli_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_mnli_sl.yaml"
+    },
+    "mubench_local_mnli_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_mnli_sq.yaml"
+    },
+    "mubench_local_mnli_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_mnli_sr.yaml"
+    },
+    "mubench_local_mnli_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_mnli_sv.yaml"
+    },
+    "mubench_local_mnli_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_mnli_sw.yaml"
+    },
+    "mubench_local_mnli_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_mnli_ta.yaml"
+    },
+    "mubench_local_mnli_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_mnli_te.yaml"
+    },
+    "mubench_local_mnli_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_mnli_th.yaml"
+    },
+    "mubench_local_mnli_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_mnli_tl.yaml"
+    },
+    "mubench_local_mnli_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_mnli_tr.yaml"
+    },
+    "mubench_local_mnli_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_mnli_uk.yaml"
+    },
+    "mubench_local_mnli_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_mnli_ur.yaml"
+    },
+    "mubench_local_mnli_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_mnli_uz.yaml"
+    },
+    "mubench_local_mnli_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_mnli_vi.yaml"
+    },
+    "mubench_local_mnli_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_mnli"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_mnli_zh.yaml"
+    },
+    "mubench_local_mr": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/mr/_mubench_local_mr.yaml"
+    },
+    "mubench_local_ms": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ms/_mubench_local_ms.yaml"
+    },
+    "mubench_local_my": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/my/_mubench_local_my.yaml"
+    },
+    "mubench_local_nl": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/nl/_mubench_local_nl.yaml"
+    },
+    "mubench_local_no": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/no/_mubench_local_no.yaml"
+    },
+    "mubench_local_pa": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/pa/_mubench_local_pa.yaml"
+    },
+    "mubench_local_pl": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/pl/_mubench_local_pl.yaml"
+    },
+    "mubench_local_pt": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/pt/_mubench_local_pt.yaml"
+    },
+    "mubench_local_ro": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ro/_mubench_local_ro.yaml"
+    },
+    "mubench_local_ru": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ru/_mubench_local_ru.yaml"
+    },
+    "mubench_local_sk": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sk/_mubench_local_sk.yaml"
+    },
+    "mubench_local_sl": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sl/_mubench_local_sl.yaml"
+    },
+    "mubench_local_snli": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_snli_af",
+        "mubench_local_snli_ar",
+        "mubench_local_snli_az",
+        "mubench_local_snli_bg",
+        "mubench_local_snli_bn",
+        "mubench_local_snli_ca",
+        "mubench_local_snli_ceb",
+        "mubench_local_snli_cs",
+        "mubench_local_snli_da",
+        "mubench_local_snli_de",
+        "mubench_local_snli_el",
+        "mubench_local_snli_en",
+        "mubench_local_snli_es",
+        "mubench_local_snli_et",
+        "mubench_local_snli_fa",
+        "mubench_local_snli_fi",
+        "mubench_local_snli_fr",
+        "mubench_local_snli_ga",
+        "mubench_local_snli_gu",
+        "mubench_local_snli_he",
+        "mubench_local_snli_hi",
+        "mubench_local_snli_hr",
+        "mubench_local_snli_hu",
+        "mubench_local_snli_id",
+        "mubench_local_snli_is",
+        "mubench_local_snli_it",
+        "mubench_local_snli_ja",
+        "mubench_local_snli_jv",
+        "mubench_local_snli_kk",
+        "mubench_local_snli_km",
+        "mubench_local_snli_kn",
+        "mubench_local_snli_ko",
+        "mubench_local_snli_lt",
+        "mubench_local_snli_lv",
+        "mubench_local_snli_ml",
+        "mubench_local_snli_mr",
+        "mubench_local_snli_ms",
+        "mubench_local_snli_my",
+        "mubench_local_snli_nl",
+        "mubench_local_snli_no",
+        "mubench_local_snli_pa",
+        "mubench_local_snli_pl",
+        "mubench_local_snli_pt",
+        "mubench_local_snli_ro",
+        "mubench_local_snli_ru",
+        "mubench_local_snli_sk",
+        "mubench_local_snli_sl",
+        "mubench_local_snli_sq",
+        "mubench_local_snli_sr",
+        "mubench_local_snli_sv",
+        "mubench_local_snli_sw",
+        "mubench_local_snli_ta",
+        "mubench_local_snli_te",
+        "mubench_local_snli_th",
+        "mubench_local_snli_tl",
+        "mubench_local_snli_tr",
+        "mubench_local_snli_uk",
+        "mubench_local_snli_ur",
+        "mubench_local_snli_uz",
+        "mubench_local_snli_vi",
+        "mubench_local_snli_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_snli_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_snli_af.yaml"
+    },
+    "mubench_local_snli_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_snli_ar.yaml"
+    },
+    "mubench_local_snli_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_snli_az.yaml"
+    },
+    "mubench_local_snli_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_snli_bg.yaml"
+    },
+    "mubench_local_snli_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_snli_bn.yaml"
+    },
+    "mubench_local_snli_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_snli_ca.yaml"
+    },
+    "mubench_local_snli_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_snli_ceb.yaml"
+    },
+    "mubench_local_snli_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_snli_cs.yaml"
+    },
+    "mubench_local_snli_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_snli_da.yaml"
+    },
+    "mubench_local_snli_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_snli_de.yaml"
+    },
+    "mubench_local_snli_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_snli_el.yaml"
+    },
+    "mubench_local_snli_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_snli_en.yaml"
+    },
+    "mubench_local_snli_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_snli_es.yaml"
+    },
+    "mubench_local_snli_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_snli_et.yaml"
+    },
+    "mubench_local_snli_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_snli_fa.yaml"
+    },
+    "mubench_local_snli_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_snli_fi.yaml"
+    },
+    "mubench_local_snli_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_snli_fr.yaml"
+    },
+    "mubench_local_snli_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_snli_ga.yaml"
+    },
+    "mubench_local_snli_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_snli_gu.yaml"
+    },
+    "mubench_local_snli_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_snli_he.yaml"
+    },
+    "mubench_local_snli_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_snli_hi.yaml"
+    },
+    "mubench_local_snli_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_snli_hr.yaml"
+    },
+    "mubench_local_snli_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_snli_hu.yaml"
+    },
+    "mubench_local_snli_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_snli_id.yaml"
+    },
+    "mubench_local_snli_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_snli_is.yaml"
+    },
+    "mubench_local_snli_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_snli_it.yaml"
+    },
+    "mubench_local_snli_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_snli_ja.yaml"
+    },
+    "mubench_local_snli_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_snli_jv.yaml"
+    },
+    "mubench_local_snli_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_snli_kk.yaml"
+    },
+    "mubench_local_snli_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_snli_km.yaml"
+    },
+    "mubench_local_snli_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_snli_kn.yaml"
+    },
+    "mubench_local_snli_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_snli_ko.yaml"
+    },
+    "mubench_local_snli_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_snli_lt.yaml"
+    },
+    "mubench_local_snli_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_snli_lv.yaml"
+    },
+    "mubench_local_snli_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_snli_ml.yaml"
+    },
+    "mubench_local_snli_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_snli_mr.yaml"
+    },
+    "mubench_local_snli_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_snli_ms.yaml"
+    },
+    "mubench_local_snli_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_snli_my.yaml"
+    },
+    "mubench_local_snli_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_snli_nl.yaml"
+    },
+    "mubench_local_snli_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_snli_no.yaml"
+    },
+    "mubench_local_snli_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_snli_pa.yaml"
+    },
+    "mubench_local_snli_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_snli_pl.yaml"
+    },
+    "mubench_local_snli_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_snli_pt.yaml"
+    },
+    "mubench_local_snli_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_snli_ro.yaml"
+    },
+    "mubench_local_snli_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_snli_ru.yaml"
+    },
+    "mubench_local_snli_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_snli_sk.yaml"
+    },
+    "mubench_local_snli_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_snli_sl.yaml"
+    },
+    "mubench_local_snli_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_snli_sq.yaml"
+    },
+    "mubench_local_snli_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_snli_sr.yaml"
+    },
+    "mubench_local_snli_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_snli_sv.yaml"
+    },
+    "mubench_local_snli_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_snli_sw.yaml"
+    },
+    "mubench_local_snli_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_snli_ta.yaml"
+    },
+    "mubench_local_snli_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_snli_te.yaml"
+    },
+    "mubench_local_snli_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_snli_th.yaml"
+    },
+    "mubench_local_snli_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_snli_tl.yaml"
+    },
+    "mubench_local_snli_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_snli_tr.yaml"
+    },
+    "mubench_local_snli_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_snli_uk.yaml"
+    },
+    "mubench_local_snli_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_snli_ur.yaml"
+    },
+    "mubench_local_snli_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_snli_uz.yaml"
+    },
+    "mubench_local_snli_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_snli_vi.yaml"
+    },
+    "mubench_local_snli_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_snli"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_snli_zh.yaml"
+    },
+    "mubench_local_sq": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sq/_mubench_local_sq.yaml"
+    },
+    "mubench_local_sr": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sr/_mubench_local_sr.yaml"
+    },
+    "mubench_local_storycloze": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_storycloze_af",
+        "mubench_local_storycloze_ar",
+        "mubench_local_storycloze_az",
+        "mubench_local_storycloze_bg",
+        "mubench_local_storycloze_bn",
+        "mubench_local_storycloze_ca",
+        "mubench_local_storycloze_ceb",
+        "mubench_local_storycloze_cs",
+        "mubench_local_storycloze_da",
+        "mubench_local_storycloze_de",
+        "mubench_local_storycloze_el",
+        "mubench_local_storycloze_en",
+        "mubench_local_storycloze_es",
+        "mubench_local_storycloze_et",
+        "mubench_local_storycloze_fa",
+        "mubench_local_storycloze_fi",
+        "mubench_local_storycloze_fr",
+        "mubench_local_storycloze_ga",
+        "mubench_local_storycloze_gu",
+        "mubench_local_storycloze_he",
+        "mubench_local_storycloze_hi",
+        "mubench_local_storycloze_hr",
+        "mubench_local_storycloze_hu",
+        "mubench_local_storycloze_id",
+        "mubench_local_storycloze_is",
+        "mubench_local_storycloze_it",
+        "mubench_local_storycloze_ja",
+        "mubench_local_storycloze_jv",
+        "mubench_local_storycloze_kk",
+        "mubench_local_storycloze_km",
+        "mubench_local_storycloze_kn",
+        "mubench_local_storycloze_ko",
+        "mubench_local_storycloze_lt",
+        "mubench_local_storycloze_lv",
+        "mubench_local_storycloze_ml",
+        "mubench_local_storycloze_mr",
+        "mubench_local_storycloze_ms",
+        "mubench_local_storycloze_my",
+        "mubench_local_storycloze_nl",
+        "mubench_local_storycloze_no",
+        "mubench_local_storycloze_pa",
+        "mubench_local_storycloze_pl",
+        "mubench_local_storycloze_pt",
+        "mubench_local_storycloze_ro",
+        "mubench_local_storycloze_ru",
+        "mubench_local_storycloze_sk",
+        "mubench_local_storycloze_sl",
+        "mubench_local_storycloze_sq",
+        "mubench_local_storycloze_sr",
+        "mubench_local_storycloze_sv",
+        "mubench_local_storycloze_sw",
+        "mubench_local_storycloze_ta",
+        "mubench_local_storycloze_te",
+        "mubench_local_storycloze_th",
+        "mubench_local_storycloze_tl",
+        "mubench_local_storycloze_tr",
+        "mubench_local_storycloze_uk",
+        "mubench_local_storycloze_ur",
+        "mubench_local_storycloze_uz",
+        "mubench_local_storycloze_vi",
+        "mubench_local_storycloze_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_storycloze_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_storycloze_af.yaml"
+    },
+    "mubench_local_storycloze_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_storycloze_ar.yaml"
+    },
+    "mubench_local_storycloze_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_storycloze_az.yaml"
+    },
+    "mubench_local_storycloze_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_storycloze_bg.yaml"
+    },
+    "mubench_local_storycloze_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_storycloze_bn.yaml"
+    },
+    "mubench_local_storycloze_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_storycloze_ca.yaml"
+    },
+    "mubench_local_storycloze_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_storycloze_ceb.yaml"
+    },
+    "mubench_local_storycloze_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_storycloze_cs.yaml"
+    },
+    "mubench_local_storycloze_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_storycloze_da.yaml"
+    },
+    "mubench_local_storycloze_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_storycloze_de.yaml"
+    },
+    "mubench_local_storycloze_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_storycloze_el.yaml"
+    },
+    "mubench_local_storycloze_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_storycloze_en.yaml"
+    },
+    "mubench_local_storycloze_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_storycloze_es.yaml"
+    },
+    "mubench_local_storycloze_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_storycloze_et.yaml"
+    },
+    "mubench_local_storycloze_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_storycloze_fa.yaml"
+    },
+    "mubench_local_storycloze_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_storycloze_fi.yaml"
+    },
+    "mubench_local_storycloze_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_storycloze_fr.yaml"
+    },
+    "mubench_local_storycloze_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_storycloze_ga.yaml"
+    },
+    "mubench_local_storycloze_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_storycloze_gu.yaml"
+    },
+    "mubench_local_storycloze_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_storycloze_he.yaml"
+    },
+    "mubench_local_storycloze_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_storycloze_hi.yaml"
+    },
+    "mubench_local_storycloze_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_storycloze_hr.yaml"
+    },
+    "mubench_local_storycloze_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_storycloze_hu.yaml"
+    },
+    "mubench_local_storycloze_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_storycloze_id.yaml"
+    },
+    "mubench_local_storycloze_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_storycloze_is.yaml"
+    },
+    "mubench_local_storycloze_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_storycloze_it.yaml"
+    },
+    "mubench_local_storycloze_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_storycloze_ja.yaml"
+    },
+    "mubench_local_storycloze_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_storycloze_jv.yaml"
+    },
+    "mubench_local_storycloze_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_storycloze_kk.yaml"
+    },
+    "mubench_local_storycloze_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_storycloze_km.yaml"
+    },
+    "mubench_local_storycloze_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_storycloze_kn.yaml"
+    },
+    "mubench_local_storycloze_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_storycloze_ko.yaml"
+    },
+    "mubench_local_storycloze_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_storycloze_lt.yaml"
+    },
+    "mubench_local_storycloze_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_storycloze_lv.yaml"
+    },
+    "mubench_local_storycloze_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_storycloze_ml.yaml"
+    },
+    "mubench_local_storycloze_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_storycloze_mr.yaml"
+    },
+    "mubench_local_storycloze_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_storycloze_ms.yaml"
+    },
+    "mubench_local_storycloze_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_storycloze_my.yaml"
+    },
+    "mubench_local_storycloze_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_storycloze_nl.yaml"
+    },
+    "mubench_local_storycloze_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_storycloze_no.yaml"
+    },
+    "mubench_local_storycloze_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_storycloze_pa.yaml"
+    },
+    "mubench_local_storycloze_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_storycloze_pl.yaml"
+    },
+    "mubench_local_storycloze_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_storycloze_pt.yaml"
+    },
+    "mubench_local_storycloze_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_storycloze_ro.yaml"
+    },
+    "mubench_local_storycloze_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_storycloze_ru.yaml"
+    },
+    "mubench_local_storycloze_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_storycloze_sk.yaml"
+    },
+    "mubench_local_storycloze_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_storycloze_sl.yaml"
+    },
+    "mubench_local_storycloze_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_storycloze_sq.yaml"
+    },
+    "mubench_local_storycloze_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_storycloze_sr.yaml"
+    },
+    "mubench_local_storycloze_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_storycloze_sv.yaml"
+    },
+    "mubench_local_storycloze_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_storycloze_sw.yaml"
+    },
+    "mubench_local_storycloze_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_storycloze_ta.yaml"
+    },
+    "mubench_local_storycloze_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_storycloze_te.yaml"
+    },
+    "mubench_local_storycloze_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_storycloze_th.yaml"
+    },
+    "mubench_local_storycloze_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_storycloze_tl.yaml"
+    },
+    "mubench_local_storycloze_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_storycloze_tr.yaml"
+    },
+    "mubench_local_storycloze_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_storycloze_uk.yaml"
+    },
+    "mubench_local_storycloze_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_storycloze_ur.yaml"
+    },
+    "mubench_local_storycloze_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_storycloze_uz.yaml"
+    },
+    "mubench_local_storycloze_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_storycloze_vi.yaml"
+    },
+    "mubench_local_storycloze_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_storycloze"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_storycloze_zh.yaml"
+    },
+    "mubench_local_sv": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sv/_mubench_local_sv.yaml"
+    },
+    "mubench_local_sw": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/sw/_mubench_local_sw.yaml"
+    },
+    "mubench_local_ta": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ta/_mubench_local_ta.yaml"
+    },
+    "mubench_local_te": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/te/_mubench_local_te.yaml"
+    },
+    "mubench_local_th": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/th/_mubench_local_th.yaml"
+    },
+    "mubench_local_tl": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/tl/_mubench_local_tl.yaml"
+    },
+    "mubench_local_tr": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/tr/_mubench_local_tr.yaml"
+    },
+    "mubench_local_truthfulqa": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_truthfulqa_af",
+        "mubench_local_truthfulqa_ar",
+        "mubench_local_truthfulqa_az",
+        "mubench_local_truthfulqa_bg",
+        "mubench_local_truthfulqa_bn",
+        "mubench_local_truthfulqa_ca",
+        "mubench_local_truthfulqa_ceb",
+        "mubench_local_truthfulqa_cs",
+        "mubench_local_truthfulqa_da",
+        "mubench_local_truthfulqa_de",
+        "mubench_local_truthfulqa_el",
+        "mubench_local_truthfulqa_en",
+        "mubench_local_truthfulqa_es",
+        "mubench_local_truthfulqa_et",
+        "mubench_local_truthfulqa_fa",
+        "mubench_local_truthfulqa_fi",
+        "mubench_local_truthfulqa_fr",
+        "mubench_local_truthfulqa_ga",
+        "mubench_local_truthfulqa_gu",
+        "mubench_local_truthfulqa_he",
+        "mubench_local_truthfulqa_hi",
+        "mubench_local_truthfulqa_hr",
+        "mubench_local_truthfulqa_hu",
+        "mubench_local_truthfulqa_id",
+        "mubench_local_truthfulqa_is",
+        "mubench_local_truthfulqa_it",
+        "mubench_local_truthfulqa_ja",
+        "mubench_local_truthfulqa_jv",
+        "mubench_local_truthfulqa_kk",
+        "mubench_local_truthfulqa_km",
+        "mubench_local_truthfulqa_kn",
+        "mubench_local_truthfulqa_ko",
+        "mubench_local_truthfulqa_lt",
+        "mubench_local_truthfulqa_lv",
+        "mubench_local_truthfulqa_ml",
+        "mubench_local_truthfulqa_mr",
+        "mubench_local_truthfulqa_ms",
+        "mubench_local_truthfulqa_my",
+        "mubench_local_truthfulqa_nl",
+        "mubench_local_truthfulqa_no",
+        "mubench_local_truthfulqa_pa",
+        "mubench_local_truthfulqa_pl",
+        "mubench_local_truthfulqa_pt",
+        "mubench_local_truthfulqa_ro",
+        "mubench_local_truthfulqa_ru",
+        "mubench_local_truthfulqa_sk",
+        "mubench_local_truthfulqa_sl",
+        "mubench_local_truthfulqa_sq",
+        "mubench_local_truthfulqa_sr",
+        "mubench_local_truthfulqa_sv",
+        "mubench_local_truthfulqa_sw",
+        "mubench_local_truthfulqa_ta",
+        "mubench_local_truthfulqa_te",
+        "mubench_local_truthfulqa_th",
+        "mubench_local_truthfulqa_tl",
+        "mubench_local_truthfulqa_tr",
+        "mubench_local_truthfulqa_uk",
+        "mubench_local_truthfulqa_ur",
+        "mubench_local_truthfulqa_uz",
+        "mubench_local_truthfulqa_vi",
+        "mubench_local_truthfulqa_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_truthfulqa_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_truthfulqa_af.yaml"
+    },
+    "mubench_local_truthfulqa_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_truthfulqa_ar.yaml"
+    },
+    "mubench_local_truthfulqa_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_truthfulqa_az.yaml"
+    },
+    "mubench_local_truthfulqa_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_truthfulqa_bg.yaml"
+    },
+    "mubench_local_truthfulqa_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_truthfulqa_bn.yaml"
+    },
+    "mubench_local_truthfulqa_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_truthfulqa_ca.yaml"
+    },
+    "mubench_local_truthfulqa_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_truthfulqa_ceb.yaml"
+    },
+    "mubench_local_truthfulqa_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_truthfulqa_cs.yaml"
+    },
+    "mubench_local_truthfulqa_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_truthfulqa_da.yaml"
+    },
+    "mubench_local_truthfulqa_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_truthfulqa_de.yaml"
+    },
+    "mubench_local_truthfulqa_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_truthfulqa_el.yaml"
+    },
+    "mubench_local_truthfulqa_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_truthfulqa_en.yaml"
+    },
+    "mubench_local_truthfulqa_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_truthfulqa_es.yaml"
+    },
+    "mubench_local_truthfulqa_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_truthfulqa_et.yaml"
+    },
+    "mubench_local_truthfulqa_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_truthfulqa_fa.yaml"
+    },
+    "mubench_local_truthfulqa_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_truthfulqa_fi.yaml"
+    },
+    "mubench_local_truthfulqa_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_truthfulqa_fr.yaml"
+    },
+    "mubench_local_truthfulqa_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_truthfulqa_ga.yaml"
+    },
+    "mubench_local_truthfulqa_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_truthfulqa_gu.yaml"
+    },
+    "mubench_local_truthfulqa_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_truthfulqa_he.yaml"
+    },
+    "mubench_local_truthfulqa_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_truthfulqa_hi.yaml"
+    },
+    "mubench_local_truthfulqa_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_truthfulqa_hr.yaml"
+    },
+    "mubench_local_truthfulqa_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_truthfulqa_hu.yaml"
+    },
+    "mubench_local_truthfulqa_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_truthfulqa_id.yaml"
+    },
+    "mubench_local_truthfulqa_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_truthfulqa_is.yaml"
+    },
+    "mubench_local_truthfulqa_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_truthfulqa_it.yaml"
+    },
+    "mubench_local_truthfulqa_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_truthfulqa_ja.yaml"
+    },
+    "mubench_local_truthfulqa_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_truthfulqa_jv.yaml"
+    },
+    "mubench_local_truthfulqa_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_truthfulqa_kk.yaml"
+    },
+    "mubench_local_truthfulqa_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_truthfulqa_km.yaml"
+    },
+    "mubench_local_truthfulqa_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_truthfulqa_kn.yaml"
+    },
+    "mubench_local_truthfulqa_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_truthfulqa_ko.yaml"
+    },
+    "mubench_local_truthfulqa_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_truthfulqa_lt.yaml"
+    },
+    "mubench_local_truthfulqa_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_truthfulqa_lv.yaml"
+    },
+    "mubench_local_truthfulqa_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_truthfulqa_ml.yaml"
+    },
+    "mubench_local_truthfulqa_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_truthfulqa_mr.yaml"
+    },
+    "mubench_local_truthfulqa_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_truthfulqa_ms.yaml"
+    },
+    "mubench_local_truthfulqa_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_truthfulqa_my.yaml"
+    },
+    "mubench_local_truthfulqa_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_truthfulqa_nl.yaml"
+    },
+    "mubench_local_truthfulqa_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_truthfulqa_no.yaml"
+    },
+    "mubench_local_truthfulqa_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_truthfulqa_pa.yaml"
+    },
+    "mubench_local_truthfulqa_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_truthfulqa_pl.yaml"
+    },
+    "mubench_local_truthfulqa_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_truthfulqa_pt.yaml"
+    },
+    "mubench_local_truthfulqa_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_truthfulqa_ro.yaml"
+    },
+    "mubench_local_truthfulqa_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_truthfulqa_ru.yaml"
+    },
+    "mubench_local_truthfulqa_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_truthfulqa_sk.yaml"
+    },
+    "mubench_local_truthfulqa_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_truthfulqa_sl.yaml"
+    },
+    "mubench_local_truthfulqa_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_truthfulqa_sq.yaml"
+    },
+    "mubench_local_truthfulqa_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_truthfulqa_sr.yaml"
+    },
+    "mubench_local_truthfulqa_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_truthfulqa_sv.yaml"
+    },
+    "mubench_local_truthfulqa_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_truthfulqa_sw.yaml"
+    },
+    "mubench_local_truthfulqa_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_truthfulqa_ta.yaml"
+    },
+    "mubench_local_truthfulqa_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_truthfulqa_te.yaml"
+    },
+    "mubench_local_truthfulqa_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_truthfulqa_th.yaml"
+    },
+    "mubench_local_truthfulqa_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_truthfulqa_tl.yaml"
+    },
+    "mubench_local_truthfulqa_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_truthfulqa_tr.yaml"
+    },
+    "mubench_local_truthfulqa_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_truthfulqa_uk.yaml"
+    },
+    "mubench_local_truthfulqa_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_truthfulqa_ur.yaml"
+    },
+    "mubench_local_truthfulqa_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_truthfulqa_uz.yaml"
+    },
+    "mubench_local_truthfulqa_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_truthfulqa_vi.yaml"
+    },
+    "mubench_local_truthfulqa_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_truthfulqa"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_truthfulqa_zh.yaml"
+    },
+    "mubench_local_uk": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/uk/_mubench_local_uk.yaml"
+    },
+    "mubench_local_ur": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/ur/_mubench_local_ur.yaml"
+    },
+    "mubench_local_uz": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/uz/_mubench_local_uz.yaml"
+    },
+    "mubench_local_vi": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/vi/_mubench_local_vi.yaml"
+    },
+    "mubench_local_winogrande": {
+      "kind": "TAG",
+      "tags": [
+        "mubench_local_winogrande_af",
+        "mubench_local_winogrande_ar",
+        "mubench_local_winogrande_az",
+        "mubench_local_winogrande_bg",
+        "mubench_local_winogrande_bn",
+        "mubench_local_winogrande_ca",
+        "mubench_local_winogrande_ceb",
+        "mubench_local_winogrande_cs",
+        "mubench_local_winogrande_da",
+        "mubench_local_winogrande_de",
+        "mubench_local_winogrande_el",
+        "mubench_local_winogrande_en",
+        "mubench_local_winogrande_es",
+        "mubench_local_winogrande_et",
+        "mubench_local_winogrande_fa",
+        "mubench_local_winogrande_fi",
+        "mubench_local_winogrande_fr",
+        "mubench_local_winogrande_ga",
+        "mubench_local_winogrande_gu",
+        "mubench_local_winogrande_he",
+        "mubench_local_winogrande_hi",
+        "mubench_local_winogrande_hr",
+        "mubench_local_winogrande_hu",
+        "mubench_local_winogrande_id",
+        "mubench_local_winogrande_is",
+        "mubench_local_winogrande_it",
+        "mubench_local_winogrande_ja",
+        "mubench_local_winogrande_jv",
+        "mubench_local_winogrande_kk",
+        "mubench_local_winogrande_km",
+        "mubench_local_winogrande_kn",
+        "mubench_local_winogrande_ko",
+        "mubench_local_winogrande_lt",
+        "mubench_local_winogrande_lv",
+        "mubench_local_winogrande_ml",
+        "mubench_local_winogrande_mr",
+        "mubench_local_winogrande_ms",
+        "mubench_local_winogrande_my",
+        "mubench_local_winogrande_nl",
+        "mubench_local_winogrande_no",
+        "mubench_local_winogrande_pa",
+        "mubench_local_winogrande_pl",
+        "mubench_local_winogrande_pt",
+        "mubench_local_winogrande_ro",
+        "mubench_local_winogrande_ru",
+        "mubench_local_winogrande_sk",
+        "mubench_local_winogrande_sl",
+        "mubench_local_winogrande_sq",
+        "mubench_local_winogrande_sr",
+        "mubench_local_winogrande_sv",
+        "mubench_local_winogrande_sw",
+        "mubench_local_winogrande_ta",
+        "mubench_local_winogrande_te",
+        "mubench_local_winogrande_th",
+        "mubench_local_winogrande_tl",
+        "mubench_local_winogrande_tr",
+        "mubench_local_winogrande_uk",
+        "mubench_local_winogrande_ur",
+        "mubench_local_winogrande_uz",
+        "mubench_local_winogrande_vi",
+        "mubench_local_winogrande_zh"
+      ],
+      "yaml_path": null
+    },
+    "mubench_local_winogrande_af": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/af/mubench_local_winogrande_af.yaml"
+    },
+    "mubench_local_winogrande_ar": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ar/mubench_local_winogrande_ar.yaml"
+    },
+    "mubench_local_winogrande_az": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/az/mubench_local_winogrande_az.yaml"
+    },
+    "mubench_local_winogrande_bg": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/bg/mubench_local_winogrande_bg.yaml"
+    },
+    "mubench_local_winogrande_bn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/bn/mubench_local_winogrande_bn.yaml"
+    },
+    "mubench_local_winogrande_ca": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ca/mubench_local_winogrande_ca.yaml"
+    },
+    "mubench_local_winogrande_ceb": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ceb/mubench_local_winogrande_ceb.yaml"
+    },
+    "mubench_local_winogrande_cs": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/cs/mubench_local_winogrande_cs.yaml"
+    },
+    "mubench_local_winogrande_da": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/da/mubench_local_winogrande_da.yaml"
+    },
+    "mubench_local_winogrande_de": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/de/mubench_local_winogrande_de.yaml"
+    },
+    "mubench_local_winogrande_el": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/el/mubench_local_winogrande_el.yaml"
+    },
+    "mubench_local_winogrande_en": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/en/mubench_local_winogrande_en.yaml"
+    },
+    "mubench_local_winogrande_es": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/es/mubench_local_winogrande_es.yaml"
+    },
+    "mubench_local_winogrande_et": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/et/mubench_local_winogrande_et.yaml"
+    },
+    "mubench_local_winogrande_fa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/fa/mubench_local_winogrande_fa.yaml"
+    },
+    "mubench_local_winogrande_fi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/fi/mubench_local_winogrande_fi.yaml"
+    },
+    "mubench_local_winogrande_fr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/fr/mubench_local_winogrande_fr.yaml"
+    },
+    "mubench_local_winogrande_ga": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ga/mubench_local_winogrande_ga.yaml"
+    },
+    "mubench_local_winogrande_gu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/gu/mubench_local_winogrande_gu.yaml"
+    },
+    "mubench_local_winogrande_he": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/he/mubench_local_winogrande_he.yaml"
+    },
+    "mubench_local_winogrande_hi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/hi/mubench_local_winogrande_hi.yaml"
+    },
+    "mubench_local_winogrande_hr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/hr/mubench_local_winogrande_hr.yaml"
+    },
+    "mubench_local_winogrande_hu": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/hu/mubench_local_winogrande_hu.yaml"
+    },
+    "mubench_local_winogrande_id": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/id/mubench_local_winogrande_id.yaml"
+    },
+    "mubench_local_winogrande_is": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/is/mubench_local_winogrande_is.yaml"
+    },
+    "mubench_local_winogrande_it": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/it/mubench_local_winogrande_it.yaml"
+    },
+    "mubench_local_winogrande_ja": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ja/mubench_local_winogrande_ja.yaml"
+    },
+    "mubench_local_winogrande_jv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/jv/mubench_local_winogrande_jv.yaml"
+    },
+    "mubench_local_winogrande_kk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/kk/mubench_local_winogrande_kk.yaml"
+    },
+    "mubench_local_winogrande_km": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/km/mubench_local_winogrande_km.yaml"
+    },
+    "mubench_local_winogrande_kn": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/kn/mubench_local_winogrande_kn.yaml"
+    },
+    "mubench_local_winogrande_ko": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ko/mubench_local_winogrande_ko.yaml"
+    },
+    "mubench_local_winogrande_lt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/lt/mubench_local_winogrande_lt.yaml"
+    },
+    "mubench_local_winogrande_lv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/lv/mubench_local_winogrande_lv.yaml"
+    },
+    "mubench_local_winogrande_ml": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ml/mubench_local_winogrande_ml.yaml"
+    },
+    "mubench_local_winogrande_mr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/mr/mubench_local_winogrande_mr.yaml"
+    },
+    "mubench_local_winogrande_ms": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ms/mubench_local_winogrande_ms.yaml"
+    },
+    "mubench_local_winogrande_my": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/my/mubench_local_winogrande_my.yaml"
+    },
+    "mubench_local_winogrande_nl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/nl/mubench_local_winogrande_nl.yaml"
+    },
+    "mubench_local_winogrande_no": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/no/mubench_local_winogrande_no.yaml"
+    },
+    "mubench_local_winogrande_pa": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/pa/mubench_local_winogrande_pa.yaml"
+    },
+    "mubench_local_winogrande_pl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/pl/mubench_local_winogrande_pl.yaml"
+    },
+    "mubench_local_winogrande_pt": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/pt/mubench_local_winogrande_pt.yaml"
+    },
+    "mubench_local_winogrande_ro": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ro/mubench_local_winogrande_ro.yaml"
+    },
+    "mubench_local_winogrande_ru": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ru/mubench_local_winogrande_ru.yaml"
+    },
+    "mubench_local_winogrande_sk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sk/mubench_local_winogrande_sk.yaml"
+    },
+    "mubench_local_winogrande_sl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sl/mubench_local_winogrande_sl.yaml"
+    },
+    "mubench_local_winogrande_sq": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sq/mubench_local_winogrande_sq.yaml"
+    },
+    "mubench_local_winogrande_sr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sr/mubench_local_winogrande_sr.yaml"
+    },
+    "mubench_local_winogrande_sv": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sv/mubench_local_winogrande_sv.yaml"
+    },
+    "mubench_local_winogrande_sw": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/sw/mubench_local_winogrande_sw.yaml"
+    },
+    "mubench_local_winogrande_ta": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ta/mubench_local_winogrande_ta.yaml"
+    },
+    "mubench_local_winogrande_te": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/te/mubench_local_winogrande_te.yaml"
+    },
+    "mubench_local_winogrande_th": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/th/mubench_local_winogrande_th.yaml"
+    },
+    "mubench_local_winogrande_tl": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/tl/mubench_local_winogrande_tl.yaml"
+    },
+    "mubench_local_winogrande_tr": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/tr/mubench_local_winogrande_tr.yaml"
+    },
+    "mubench_local_winogrande_uk": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/uk/mubench_local_winogrande_uk.yaml"
+    },
+    "mubench_local_winogrande_ur": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/ur/mubench_local_winogrande_ur.yaml"
+    },
+    "mubench_local_winogrande_uz": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/uz/mubench_local_winogrande_uz.yaml"
+    },
+    "mubench_local_winogrande_vi": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/vi/mubench_local_winogrande_vi.yaml"
+    },
+    "mubench_local_winogrande_zh": {
+      "kind": "TASK",
+      "tags": [
+        "mubench_local_winogrande"
+      ],
+      "yaml_path": "mubench/local/zh/mubench_local_winogrande_zh.yaml"
+    },
+    "mubench_local_zh": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mubench/local/zh/_mubench_local_zh.yaml"
+    },
     "multi-if": {
       "kind": "TASK",
       "tags": [],
@@ -118799,6 +125037,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16178,
+  "entry_count": 16984,
   "schema_version": 1
 }

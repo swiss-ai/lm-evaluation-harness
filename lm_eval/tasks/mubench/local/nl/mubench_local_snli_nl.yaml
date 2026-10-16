@@ -1,0 +1,8 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_snli
+task: mubench_local_snli_nl
+task_alias: snli
+dataset_name: SNLIDataset_local_template_nl
+num_fewshot: 10
+fewshot_split: validation

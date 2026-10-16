@@ -1,0 +1,20 @@
+group: mubench_local_ru
+group_alias: ru
+task:
+- mubench_local_arc_challenge_ru
+- mubench_local_arc_easy_ru
+- mubench_local_bmlama_ru
+- mubench_local_gpqa_ru
+- mubench_local_hellaswag_ru
+- mubench_local_mmlu_ru
+- mubench_local_mmlu_pro_ru
+- mubench_local_mnli_ru
+- mubench_local_snli_ru
+- mubench_local_storycloze_ru
+- mubench_local_truthfulqa_ru
+- mubench_local_winogrande_ru
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0

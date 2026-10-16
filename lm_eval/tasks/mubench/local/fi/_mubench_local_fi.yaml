@@ -1,0 +1,20 @@
+group: mubench_local_fi
+group_alias: fi
+task:
+- mubench_local_arc_challenge_fi
+- mubench_local_arc_easy_fi
+- mubench_local_bmlama_fi
+- mubench_local_gpqa_fi
+- mubench_local_hellaswag_fi
+- mubench_local_mmlu_fi
+- mubench_local_mmlu_pro_fi
+- mubench_local_mnli_fi
+- mubench_local_snli_fi
+- mubench_local_storycloze_fi
+- mubench_local_truthfulqa_fi
+- mubench_local_winogrande_fi
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0

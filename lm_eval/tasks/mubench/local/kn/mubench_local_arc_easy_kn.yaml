@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_arc_easy
+task: mubench_local_arc_easy_kn
+task_alias: arc_easy
+dataset_name: ARCEasyDataset_local_template_kn

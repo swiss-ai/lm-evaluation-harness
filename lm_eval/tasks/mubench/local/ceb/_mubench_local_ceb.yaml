@@ -1,0 +1,20 @@
+group: mubench_local_ceb
+group_alias: ceb
+task:
+- mubench_local_arc_challenge_ceb
+- mubench_local_arc_easy_ceb
+- mubench_local_bmlama_ceb
+- mubench_local_gpqa_ceb
+- mubench_local_hellaswag_ceb
+- mubench_local_mmlu_ceb
+- mubench_local_mmlu_pro_ceb
+- mubench_local_mnli_ceb
+- mubench_local_snli_ceb
+- mubench_local_storycloze_ceb
+- mubench_local_truthfulqa_ceb
+- mubench_local_winogrande_ceb
+aggregate_metric_list:
+-   metric: acc
+    weight_by_size: false
+metadata:
+    version: 0.0

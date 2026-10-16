@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_winogrande
+task: mubench_local_winogrande_pt
+task_alias: winogrande
+dataset_name: WinoGrandeDataset_local_template_pt

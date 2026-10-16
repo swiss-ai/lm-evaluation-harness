@@ -1,0 +1,6 @@
+include: ../_mubench_template_yaml
+tag:
+- mubench_local_arc_challenge
+task: mubench_local_arc_challenge_bn
+task_alias: arc_challenge
+dataset_name: ARCChallengeDataset_local_template_bn
