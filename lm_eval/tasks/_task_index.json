@@ -70576,6 +70576,11 @@
       ],
       "yaml_path": null
     },
+    "ltb_v1": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ltb/ltb_v1.yaml"
+    },
     "m_arc": {
       "kind": "GROUP",
       "tags": [],
@@ -113146,6 +113151,11 @@
       "tags": [],
       "yaml_path": "pisa/_pisa_llm_judged.yaml"
     },
+    "polar_bench": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "polar_bench/polar_bench.yaml"
+    },
     "polemo2": {
       "kind": "TAG",
       "tags": [
@@ -125027,6 +125037,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16982,
+  "entry_count": 16984,
   "schema_version": 1
 }
