@@ -3,12 +3,20 @@
 import json
 from pathlib import Path
 
+import pytest
 from datasets import Dataset
 
 from lm_eval.api.model import LM
 from lm_eval.api.task import ConfigurableTask
 from lm_eval.evaluator import evaluate
 from lm_eval.tasks._yaml_loader import load_yaml
+
+
+# Multi-IF's checkers need the `ifeval` extra, which the CPU test job doesn't install.
+pytest.importorskip("langdetect")
+pytest.importorskip("immutabledict")
+pytest.importorskip("nltk")
+
 from lm_eval.tasks.multi_if import utils
 
 
