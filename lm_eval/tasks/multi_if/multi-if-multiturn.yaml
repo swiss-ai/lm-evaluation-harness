@@ -1,0 +1,136 @@
+task: multi-if-multiturn
+class: !function utils.MultiIFTask
+dataset_path: facebook/Multi-IF
+dataset_name: null
+output_type: multi_turn_generate
+process_docs: !function utils.process_docs
+test_split: train
+num_fewshot: 0
+doc_to_text: prompt
+doc_to_target: 0
+generation_kwargs:
+  until: []
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 1280
+process_results: !function utils.process_results
+metric_list:
+  - metric: turn_1_prompt_level_strict_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_1_prompt_level_loose_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_1_inst_level_strict_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_1_inst_level_loose_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_2_prompt_level_strict_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_2_prompt_level_loose_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_2_inst_level_strict_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_2_inst_level_loose_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_3_prompt_level_strict_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_3_prompt_level_loose_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: turn_3_inst_level_strict_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_3_inst_level_loose_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: turn_1_overall
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_english
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_french
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_hindi
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_portuguese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_spanish
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_russian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_italian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_1_overall_chinese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_english
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_french
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_hindi
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_portuguese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_spanish
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_russian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_italian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_2_overall_chinese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_english
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_french
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_hindi
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_portuguese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_spanish
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_russian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_italian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn_3_overall_chinese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+metadata:
+  version: 1.0
