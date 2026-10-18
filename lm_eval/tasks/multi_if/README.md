@@ -1,6 +1,60 @@
 # Multi-IF Evaluation
 
-*Note: Current implementation only supports the single-turn multilingual instructions.*
+### Tasks
+
+| Task | `output_type` | Turns | Metrics |
+|---|---|---|---|
+| `multi-if` | `generate_until` | turn 1 only | `{prompt,inst}_level_{strict,loose}_acc`, `overall`, `overall_<language>` |
+| `multi-if-multiturn` | `multi_turn_generate` | up to `MAX_TURNS` (default 3) | same, prefixed `turn_{k}_` |
+
+`multi-if-multiturn` plays each conversation turn by turn: the prompt for turn k is
+the full history (user turns 1..k plus the model's own replies to turns 1..k-1),
+rendered with the model's chat template. It requires `--apply_chat_template`:
+
+```bash
+lm_eval --model vllm --model_args pretrained=<model> \
+  --tasks multi-if-multiturn --apply_chat_template
+```
+
+The number of turns played is `MAX_TURNS` in `utils.py`. Both tasks share
+`process_docs` / `process_results`; `process_results` scores a string result as
+a single turn and a list result as one response per turn.
+
+### Scoring and edge cases
+
+- **Constraints are cumulative.** Each turn's prompt states one new instruction,
+  but turn k is scored against every instruction from turns 1..k
+  (`turn_k_instruction_id_list` in the dataset already contains them). This
+  matches the paper and the official scorer, so later turns are harder.
+- **Conversations with fewer turns.** 56 of the 4501 conversations have only 2
+  turns. They stop after turn 2 and emit no `turn_3_*` metrics, so turn-3
+  scores are over 4445 conversations, not counted as failures.
+- **`MAX_TURNS` lower than the conversation length.** Later turns are not
+  played and their metrics are not reported. With `MAX_TURNS = 1` and greedy
+  decoding, `turn_1_*` should match `multi-if` run with `--apply_chat_template`.
+- **Instruction kwargs can change between turns** (4 conversations, e.g. a
+  different forbidden word). Each turn is scored with its own kwargs.
+- **Empty-string kwargs.** Conversations `2215:14:zh` and `2616:4:zh` have
+  `keyword: ""` / `first_word: ""`. The checkers treat these as missing and
+  pick a random value, so those instructions are scored non-deterministically.
+- **`langdetect` is non-deterministic** (`change_case:english_*`,
+  `language:response_language`): short responses can be scored differently
+  across runs. This also affects `multi-if`.
+- **Context length.** Every turn resends the full history. If prompt plus
+  `max_gen_toks` exceeds the model's maximum length, the prompt is truncated
+  from the left, dropping early turns. Use a `max_model_len` of at least about
+  `MAX_TURNS * max_gen_toks` plus the prompts.
+- **Turn-end token.** If the model's EOS token is not its chat turn-end token,
+  generation runs past the turn. See `docs/multi_turn_rollout.md` for the fix.
+- **Decoding differs from the paper.** These tasks decode greedily; the
+  official setup uses temperature 0.6, top_p 0.9, max 1024 tokens
+  (`--gen_kwargs temperature=0.6,top_p=0.9,do_sample=True,max_gen_toks=1024`).
+- **Headline metric.** `overall` (`turn_k_overall` for the multi-turn task) is
+  the paper's headline: the mean of the four accuracies, each aggregated over
+  all docs first (`utils.agg_overall`). `overall_<language>` is the same score
+  restricted to one language (english, french, hindi, portuguese, spanish,
+  russian, italian, chinese). `overall` pools all languages, as the official
+  scorer's `all_languages` does.
 
 ### Paper
 

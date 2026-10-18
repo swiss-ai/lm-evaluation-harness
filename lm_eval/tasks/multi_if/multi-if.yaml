@@ -26,5 +26,32 @@ metric_list:
   - metric: inst_level_loose_acc
     aggregation: !function utils.agg_inst_level_acc
     higher_is_better: true
+  - metric: overall
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_english
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_french
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_hindi
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_portuguese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_spanish
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_russian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_italian
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: overall_chinese
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
 metadata:
   version: 1.0
