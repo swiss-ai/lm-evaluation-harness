@@ -114,7 +114,10 @@ def try_remote_generate(messages, model, temperature=0.0, max_tokens=32, max_ret
             }
             acquire_judge_rate_limit(f"{API_URL}:{model}")
             resp = requests.post(
-                f"{API_URL}/chat/completions", headers=headers, json=payload, timeout=600
+                f"{API_URL}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=600,
             )
             if resp.status_code == 200:
                 return resp.json()["choices"][0]["message"]["content"] or ""
@@ -123,7 +126,9 @@ def try_remote_generate(messages, model, temperature=0.0, max_tokens=32, max_ret
                 f"status {resp.status_code}: {resp.text[:300]}"
             )
         except Exception as e:  # noqa: BLE001
-            eval_logger.warning(f"RTP-LX judge attempt {attempt + 1}/{max_retries}: {e}")
+            eval_logger.warning(
+                f"RTP-LX judge attempt {attempt + 1}/{max_retries}: {e}"
+            )
         if attempt < max_retries - 1:
             time.sleep(min(2**attempt, 60))
     eval_logger.error(f"RTP-LX judge failed after {max_retries} attempts")
@@ -169,7 +174,9 @@ def _evaluate_single(item):
             return _eval_cache[key]
 
     model = _judge_model()
-    raw = try_remote_generate(_messages(model, item["prompt"], item["completion"]), model)
+    raw = try_remote_generate(
+        _messages(model, item["prompt"], item["completion"]), model
+    )
     label, cats = parse_llama_guard(raw)
     result = {"unsafe": label, "categories": cats, "raw": raw}
 

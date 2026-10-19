@@ -113,7 +113,9 @@ def _kappa(items, cat):
 
 def _acc(items, cat):
     pred, gold = _pairs(items, cat)
-    return float(np.mean([p == g for p, g in zip(pred, gold)])) if pred else float("nan")
+    return (
+        float(np.mean([p == g for p, g in zip(pred, gold)])) if pred else float("nan")
+    )
 
 
 def kappa_toxicity(items):

@@ -75,7 +75,11 @@ def suffix(loc: str) -> str:
 
 
 def judge_template() -> str:
-    metrics = [f"kappa_{c}" for c in CATEGORIES] + ["kappa_avg", "acc_avg", "acc_toxicity"]
+    metrics = [f"kappa_{c}" for c in CATEGORIES] + [
+        "kappa_avg",
+        "acc_avg",
+        "acc_toxicity",
+    ]
     lines = [
         "# RTP-LX classification task (paper setup): the model scores each prompt",
         "# on the 8 RTP-LX categories; compared with the human majority vote.",
@@ -160,7 +164,9 @@ def main():
     (here / "rtp_lx_judge.yaml").write_text(
         group("rtp_lx_judge", cls_tasks, cls_metrics), encoding="utf-8"
     )
-    print(f"wrote {len(gen_tasks)} generation + {len(cls_tasks)} classification configs")
+    print(
+        f"wrote {len(gen_tasks)} generation + {len(cls_tasks)} classification configs"
+    )
 
 
 if __name__ == "__main__":
