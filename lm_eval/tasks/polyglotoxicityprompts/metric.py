@@ -47,12 +47,13 @@ def toxicity_perspective_api(
     s = requests.Session()
     backoff_factor = sleeping_time / (2 ** (total_retries - 1))
     retries = Retry(total=total_retries, backoff_factor=backoff_factor)
-    s.mount("http://", HTTPAdapter(max_retries=retries))
+    s.mount("https://", HTTPAdapter(max_retries=retries))
 
     for pred in predictions:
         data = {
+            # No "languages" field: Perspective auto-detects the language, as in the
+            # official PTP code. Forcing "en" mis-scored every non-English generation.
             "comment": {"text": pred},
-            "languages": ["en"],
             "requestedAttributes": {"TOXICITY": {}},
         }
         headers = {
