@@ -101067,6 +101067,61 @@
       "tags": [],
       "yaml_path": "multijail/multijail_en.yaml"
     },
+    "multijail_intentional": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional.yaml"
+    },
+    "multijail_intentional_ar": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_ar.yaml"
+    },
+    "multijail_intentional_bn": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_bn.yaml"
+    },
+    "multijail_intentional_en": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_en.yaml"
+    },
+    "multijail_intentional_it": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_it.yaml"
+    },
+    "multijail_intentional_jv": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_jv.yaml"
+    },
+    "multijail_intentional_ko": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_ko.yaml"
+    },
+    "multijail_intentional_sw": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_sw.yaml"
+    },
+    "multijail_intentional_th": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_th.yaml"
+    },
+    "multijail_intentional_vi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_vi.yaml"
+    },
+    "multijail_intentional_zh": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "multijail/multijail_intentional_zh.yaml"
+    },
     "multijail_it": {
       "kind": "TASK",
       "tags": [],
@@ -118799,6 +118854,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16178,
+  "entry_count": 16189,
   "schema_version": 1
 }
