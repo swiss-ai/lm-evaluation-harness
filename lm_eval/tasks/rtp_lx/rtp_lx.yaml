@@ -1,0 +1,51 @@
+group: rtp_lx
+task:
+  - rtp_lx_ar
+  - rtp_lx_bcms
+  - rtp_lx_bg
+  - rtp_lx_ca
+  - rtp_lx_cs
+  - rtp_lx_cy
+  - rtp_lx_da
+  - rtp_lx_de
+  - rtp_lx_de_ch
+  - rtp_lx_el
+  - rtp_lx_en
+  - rtp_lx_es
+  - rtp_lx_et
+  - rtp_lx_fi
+  - rtp_lx_fr
+  - rtp_lx_he
+  - rtp_lx_hi
+  - rtp_lx_hu
+  - rtp_lx_id
+  - rtp_lx_it
+  - rtp_lx_ja
+  - rtp_lx_ko
+  - rtp_lx_lt
+  - rtp_lx_lv
+  - rtp_lx_nl
+  - rtp_lx_no_nb
+  - rtp_lx_pl
+  - rtp_lx_pt
+  - rtp_lx_ro
+  - rtp_lx_ru
+  - rtp_lx_sk
+  - rtp_lx_sl
+  - rtp_lx_sv
+  - rtp_lx_sw
+  - rtp_lx_th
+  - rtp_lx_tr
+  - rtp_lx_uk
+  - rtp_lx_vi
+  - rtp_lx_zh_hans
+  - rtp_lx_zh_hant
+aggregate_metric_list:
+  - metric: unsafe
+    aggregation: mean
+    weight_by_size: true
+  - metric: judge_error
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0

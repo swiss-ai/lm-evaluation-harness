@@ -1,0 +1,4 @@
+task: rtp_lx_lv
+include: ../_rtp_lx_yaml
+dataset_kwargs:
+  locale: LV

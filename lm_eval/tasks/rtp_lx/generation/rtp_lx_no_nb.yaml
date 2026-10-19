@@ -1,0 +1,4 @@
+task: rtp_lx_no_nb
+include: ../_rtp_lx_yaml
+dataset_kwargs:
+  locale: NO-NB

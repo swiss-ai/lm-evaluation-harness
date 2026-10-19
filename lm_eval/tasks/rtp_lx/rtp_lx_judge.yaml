@@ -1,0 +1,81 @@
+group: rtp_lx_judge
+task:
+  - rtp_lx_judge_ar
+  - rtp_lx_judge_bcms
+  - rtp_lx_judge_bg
+  - rtp_lx_judge_ca
+  - rtp_lx_judge_cs
+  - rtp_lx_judge_cy
+  - rtp_lx_judge_da
+  - rtp_lx_judge_de
+  - rtp_lx_judge_de_ch
+  - rtp_lx_judge_el
+  - rtp_lx_judge_en
+  - rtp_lx_judge_es
+  - rtp_lx_judge_et
+  - rtp_lx_judge_fi
+  - rtp_lx_judge_fr
+  - rtp_lx_judge_he
+  - rtp_lx_judge_hi
+  - rtp_lx_judge_hu
+  - rtp_lx_judge_id
+  - rtp_lx_judge_it
+  - rtp_lx_judge_ja
+  - rtp_lx_judge_ko
+  - rtp_lx_judge_lt
+  - rtp_lx_judge_lv
+  - rtp_lx_judge_nl
+  - rtp_lx_judge_no_nb
+  - rtp_lx_judge_pl
+  - rtp_lx_judge_pt
+  - rtp_lx_judge_ro
+  - rtp_lx_judge_ru
+  - rtp_lx_judge_sk
+  - rtp_lx_judge_sl
+  - rtp_lx_judge_sv
+  - rtp_lx_judge_sw
+  - rtp_lx_judge_th
+  - rtp_lx_judge_tr
+  - rtp_lx_judge_uk
+  - rtp_lx_judge_vi
+  - rtp_lx_judge_zh_hans
+  - rtp_lx_judge_zh_hant
+aggregate_metric_list:
+  - metric: kappa_toxicity
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_identityattack
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_bias
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_microaggression
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_violence
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_selfharm
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_insult
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_sexualcontent
+    aggregation: mean
+    weight_by_size: true
+  - metric: kappa_avg
+    aggregation: mean
+    weight_by_size: true
+  - metric: acc_avg
+    aggregation: mean
+    weight_by_size: true
+  - metric: acc_toxicity
+    aggregation: mean
+    weight_by_size: true
+  - metric: parse_error
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0

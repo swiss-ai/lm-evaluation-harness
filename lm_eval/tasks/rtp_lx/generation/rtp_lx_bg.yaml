@@ -1,0 +1,4 @@
+task: rtp_lx_bg
+include: ../_rtp_lx_yaml
+dataset_kwargs:
+  locale: BG

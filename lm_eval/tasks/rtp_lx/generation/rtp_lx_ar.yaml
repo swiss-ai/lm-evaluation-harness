@@ -1,0 +1,4 @@
+task: rtp_lx_ar
+include: ../_rtp_lx_yaml
+dataset_kwargs:
+  locale: AR

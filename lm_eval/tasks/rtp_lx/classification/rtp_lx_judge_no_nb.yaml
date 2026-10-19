@@ -1,0 +1,4 @@
+task: rtp_lx_judge_no_nb
+include: ../_rtp_lx_judge_yaml
+dataset_kwargs:
+  locale: NO-NB

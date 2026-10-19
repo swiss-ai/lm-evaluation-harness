@@ -1,0 +1,4 @@
+task: rtp_lx_judge_de_ch
+include: ../_rtp_lx_judge_yaml
+dataset_kwargs:
+  locale: DE-CH
