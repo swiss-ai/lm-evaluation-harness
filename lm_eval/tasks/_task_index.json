@@ -107330,6 +107330,186 @@
       "tags": [],
       "yaml_path": "polyglotoxicitypromptsllama/wildchat/polyglotoxicitypromptsllama_wildchat_spanish.yaml"
     },
+    "polyguardprompts": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts.yaml"
+    },
+    "polyguardprompts_ar": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_ar.yaml"
+    },
+    "polyguardprompts_cls": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls.yaml"
+    },
+    "polyguardprompts_cls_ar": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_ar.yaml"
+    },
+    "polyguardprompts_cls_cs": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_cs.yaml"
+    },
+    "polyguardprompts_cls_de": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_de.yaml"
+    },
+    "polyguardprompts_cls_en": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_en.yaml"
+    },
+    "polyguardprompts_cls_es": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_es.yaml"
+    },
+    "polyguardprompts_cls_fr": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_fr.yaml"
+    },
+    "polyguardprompts_cls_hi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_hi.yaml"
+    },
+    "polyguardprompts_cls_it": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_it.yaml"
+    },
+    "polyguardprompts_cls_ja": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_ja.yaml"
+    },
+    "polyguardprompts_cls_ko": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_ko.yaml"
+    },
+    "polyguardprompts_cls_nl": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_nl.yaml"
+    },
+    "polyguardprompts_cls_pl": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_pl.yaml"
+    },
+    "polyguardprompts_cls_pt": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_pt.yaml"
+    },
+    "polyguardprompts_cls_ru": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_ru.yaml"
+    },
+    "polyguardprompts_cls_sv": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_sv.yaml"
+    },
+    "polyguardprompts_cls_th": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_th.yaml"
+    },
+    "polyguardprompts_cls_zh": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cls_zh.yaml"
+    },
+    "polyguardprompts_cs": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_cs.yaml"
+    },
+    "polyguardprompts_de": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_de.yaml"
+    },
+    "polyguardprompts_en": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_en.yaml"
+    },
+    "polyguardprompts_es": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_es.yaml"
+    },
+    "polyguardprompts_fr": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_fr.yaml"
+    },
+    "polyguardprompts_hi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_hi.yaml"
+    },
+    "polyguardprompts_it": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_it.yaml"
+    },
+    "polyguardprompts_ja": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_ja.yaml"
+    },
+    "polyguardprompts_ko": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_ko.yaml"
+    },
+    "polyguardprompts_nl": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_nl.yaml"
+    },
+    "polyguardprompts_pl": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_pl.yaml"
+    },
+    "polyguardprompts_pt": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_pt.yaml"
+    },
+    "polyguardprompts_ru": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_ru.yaml"
+    },
+    "polyguardprompts_sv": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_sv.yaml"
+    },
+    "polyguardprompts_th": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_th.yaml"
+    },
+    "polyguardprompts_zh": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyguardprompts/polyguardprompts_zh.yaml"
+    },
     "polymath": {
       "kind": "GROUP",
       "tags": [],
@@ -118799,6 +118979,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16178,
+  "entry_count": 16214,
   "schema_version": 1
 }
