@@ -1,0 +1,4 @@
+task: polyglotoxicitypromptsllama_v2_small_arabic
+include: ../_polyglotoxicitypromptsllama_v2_yaml
+dataset_name: ptp-ar
+test_split: small

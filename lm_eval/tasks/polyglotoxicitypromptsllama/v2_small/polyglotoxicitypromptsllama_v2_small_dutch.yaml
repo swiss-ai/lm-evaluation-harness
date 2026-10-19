@@ -1,0 +1,4 @@
+task: polyglotoxicitypromptsllama_v2_small_dutch
+include: ../_polyglotoxicitypromptsllama_v2_yaml
+dataset_name: ptp-nl
+test_split: small

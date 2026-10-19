@@ -1,0 +1,4 @@
+task: polyglotoxicitypromptsllama_v2_wildchat_german
+include: ../_polyglotoxicitypromptsllama_v2_yaml
+dataset_name: wildchat-de
+test_split: train

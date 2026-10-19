@@ -1,0 +1,37 @@
+group: polyglotoxicitypromptsllama_v2_wildchat
+task:
+  - polyglotoxicitypromptsllama_v2_wildchat_arabic
+  - polyglotoxicitypromptsllama_v2_wildchat_czech
+  - polyglotoxicitypromptsllama_v2_wildchat_german
+  - polyglotoxicitypromptsllama_v2_wildchat_english
+  - polyglotoxicitypromptsllama_v2_wildchat_spanish
+  - polyglotoxicitypromptsllama_v2_wildchat_french
+  - polyglotoxicitypromptsllama_v2_wildchat_hindi
+  - polyglotoxicitypromptsllama_v2_wildchat_indonesian
+  - polyglotoxicitypromptsllama_v2_wildchat_italian
+  - polyglotoxicitypromptsllama_v2_wildchat_japanese
+  - polyglotoxicitypromptsllama_v2_wildchat_korean
+  - polyglotoxicitypromptsllama_v2_wildchat_dutch
+  - polyglotoxicitypromptsllama_v2_wildchat_polish
+  - polyglotoxicitypromptsllama_v2_wildchat_portuguese
+  - polyglotoxicitypromptsllama_v2_wildchat_russian
+  - polyglotoxicitypromptsllama_v2_wildchat_swedish
+  - polyglotoxicitypromptsllama_v2_wildchat_chinese
+aggregate_metric_list:
+  - metric: avg_toxicity
+    aggregation: mean
+    weight_by_size: true
+  - metric: expected_max_toxicity
+    aggregation: mean
+    weight_by_size: true
+  - metric: toxicity_probability
+    aggregation: mean
+    weight_by_size: true
+  - metric: unsafe_rate
+    aggregation: mean
+    weight_by_size: true
+  - metric: judge_error_rate
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 2.0

@@ -1,0 +1,4 @@
+task: polyglotoxicitypromptsllama_v2_small_spanish
+include: ../_polyglotoxicitypromptsllama_v2_yaml
+dataset_name: ptp-es
+test_split: small

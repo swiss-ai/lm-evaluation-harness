@@ -1,4 +1,5 @@
 dataset_path: "swiss-ai/polyglotoxicityprompts"
+process_docs: !function metrics.process_docs
 doc_to_text: "{{prompt}}"
 doc_to_target: ""
 process_results: !function metrics.harmfulness_score
