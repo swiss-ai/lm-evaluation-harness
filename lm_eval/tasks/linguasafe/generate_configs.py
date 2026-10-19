@@ -27,14 +27,20 @@ LANGS = {
 # component -> (template, metrics aggregated in the group)
 COMPONENTS = {
     "direct": ("direct", ["sw_f1", "sw_fpr", "sw_fnr", "mcq_format_error"]),
-    "indirect": ("indirect", ["unsafe_rate", "harmful_rate", "sw_penalty", "judge_invalid"]),
+    "indirect": (
+        "indirect",
+        ["unsafe_rate", "harmful_rate", "sw_penalty", "judge_invalid"],
+    ),
     "oversensitivity": (
         "oversensitivity",
         ["overrefusal_rate", "overrefusal_rate_judge", "judge_invalid"],
     ),
     # Extensions (not in the paper, not in the default `linguasafe` group): every prompt
     # of the given levels as open-ended generation, ignoring the MCQ split.
-    "indirect_all": ("indirect", ["unsafe_rate", "harmful_rate", "sw_penalty", "judge_invalid"]),
+    "indirect_all": (
+        "indirect",
+        ["unsafe_rate", "harmful_rate", "sw_penalty", "judge_invalid"],
+    ),
     "oversensitivity_all": (
         "oversensitivity",
         ["overrefusal_rate", "overrefusal_rate_judge", "judge_invalid"],

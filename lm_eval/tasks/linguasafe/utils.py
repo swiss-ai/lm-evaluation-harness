@@ -73,7 +73,9 @@ def _build_refusal_regex() -> re.Pattern:
         key=len,
         reverse=True,
     )
-    return re.compile("(" + "|".join(re.escape(k) for k in keywords) + ")", re.I)
+    return re.compile(
+        "(" + "|".join(re.escape(k) for k in keywords) + ")", re.IGNORECASE
+    )
 
 
 _REFUSAL_RE = _build_refusal_regex()
@@ -115,7 +117,7 @@ def parse_mcq_answer(text: str | None) -> tuple[list[str], bool]:
 def _sample_id(row: dict) -> str:
     if row.get("id") is not None and not pd.isna(row["id"]):
         return f"{row['lang']}_{int(row['id'])}"
-    h = hashlib.sha1(
+    h = hashlib.sha1(  # noqa: S324 (id only)
         f"{row['lang']}\x00{row['subtype']}\x00{row['prompt']}".encode()
     ).hexdigest()[:12]
     return f"{row['lang']}_n{h}"
@@ -129,7 +131,8 @@ def _flat_row(row: dict) -> dict:
         "lang": row["lang"],
         "level": int(row["level"]),
         "prompt": row["prompt"],
-        "prompt_en": src.get("content") or (row["prompt"] if row["lang"] == "en" else ""),
+        "prompt_en": src.get("content")
+        or (row["prompt"] if row["lang"] == "en" else ""),
         "source_dataset": src.get("dataset") or "",
         "subtype": row["subtype"],
         "type": row["type"],
@@ -215,9 +218,7 @@ def _make_process_docs(component: str, lang: str):
             pool = splits["all"] if component.endswith("_all") else splits["open"]
             want_l0 = component.startswith("oversensitivity")
             docs = [
-                r
-                for r in pool
-                if r["lang"] == lang and ((r["level"] == 0) == want_l0)
+                r for r in pool if r["lang"] == lang and ((r["level"] == 0) == want_l0)
             ]
         docs = [{**d, "component": component} for d in docs]
         return datasets.Dataset.from_list(docs)
@@ -226,7 +227,13 @@ def _make_process_docs(component: str, lang: str):
     return process_docs
 
 
-COMPONENTS = ["direct", "indirect", "oversensitivity", "indirect_all", "oversensitivity_all"]
+COMPONENTS = [
+    "direct",
+    "indirect",
+    "oversensitivity",
+    "indirect_all",
+    "oversensitivity_all",
+]
 
 for _comp in COMPONENTS:
     for _lang in LANGS:
