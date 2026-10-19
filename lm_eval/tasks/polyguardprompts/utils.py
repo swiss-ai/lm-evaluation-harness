@@ -19,8 +19,11 @@ released, to stay comparable with the paper's classifier numbers.
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
-import datasets
+
+if TYPE_CHECKING:
+    import datasets
 
 
 LANGUAGES = {
@@ -64,8 +67,11 @@ _REFUSAL_PATTERNS = {
     "Swedish": r"(tyvärr|jag är ledsen|förlåt).{0,40}(kan jag inte|jag kan inte)|jag kan (tyvärr )?inte (hjälpa|översätta)",
     "Thai": r"ขออภัย|ขอโทษ.{0,40}ไม่สามารถ|ไม่สามารถ(ช่วย|แปล)",
 }
-_EN_REFUSAL = re.compile(r"(sorry|apologi[sz]e).{0,40}(can't|cannot|unable)|i (can't|cannot) (help|assist|translate)", re.I)
-_REFUSAL_RE = {k: re.compile(v, re.I) for k, v in _REFUSAL_PATTERNS.items()}
+_EN_REFUSAL = re.compile(
+    r"(sorry|apologi[sz]e).{0,40}(can't|cannot|unable)|i (can't|cannot) (help|assist|translate)",
+    re.IGNORECASE,
+)
+_REFUSAL_RE = {k: re.compile(v, re.IGNORECASE) for k, v in _REFUSAL_PATTERNS.items()}
 # Translator refusals are one or two sentences; real prompts that contain such
 # a phrase are much longer than the English-source refusal would justify.
 _MAX_REFUSAL_CHARS = 300
@@ -90,7 +96,9 @@ def is_translator_refusal(prompt: str, prompt_en: str, language: str) -> bool:
     return bool(_REFUSAL_RE[language].search(text))
 
 
-def _with_meta(dataset: datasets.Dataset, language: str, lang_code: str) -> datasets.Dataset:
+def _with_meta(
+    dataset: datasets.Dataset, language: str, lang_code: str
+) -> datasets.Dataset:
     en_prompts = _english_prompts(dataset)
     ds = dataset.filter(lambda d: d["language"] == language)
 
@@ -99,13 +107,17 @@ def _with_meta(dataset: datasets.Dataset, language: str, lang_code: str) -> data
         return {
             "lang": lang_code,
             "prompt_en": prompt_en,
-            "translator_refusal": is_translator_refusal(doc["prompt"], prompt_en, language),
+            "translator_refusal": is_translator_refusal(
+                doc["prompt"], prompt_en, language
+            ),
         }
 
     return ds.map(add)
 
 
-def process_docs_generation(dataset: datasets.Dataset, language: str, lang_code: str) -> datasets.Dataset:
+def process_docs_generation(
+    dataset: datasets.Dataset, language: str, lang_code: str
+) -> datasets.Dataset:
     ds = _with_meta(dataset, language, lang_code)
     ds = ds.filter(lambda d: not d["translator_refusal"])
     ds = ds.sort("id")
@@ -119,7 +131,9 @@ def process_docs_generation(dataset: datasets.Dataset, language: str, lang_code:
     return ds.select(keep)
 
 
-def process_docs_classifier(dataset: datasets.Dataset, language: str, lang_code: str) -> datasets.Dataset:
+def process_docs_classifier(
+    dataset: datasets.Dataset, language: str, lang_code: str
+) -> datasets.Dataset:
     return _with_meta(dataset, language, lang_code)
 
 
@@ -135,4 +149,6 @@ def _make(fn, language, code):
 # ``!function utils.process_docs_<lang>`` / ``utils.process_docs_cls_<lang>``.
 for _code, _lang in LANGUAGES.items():
     globals()[f"process_docs_{_code}"] = _make(process_docs_generation, _lang, _code)
-    globals()[f"process_docs_cls_{_code}"] = _make(process_docs_classifier, _lang, _code)
+    globals()[f"process_docs_cls_{_code}"] = _make(
+        process_docs_classifier, _lang, _code
+    )
