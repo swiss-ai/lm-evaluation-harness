@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate the YAML configs for the Llama-Guard PolygloToxicityPrompts tasks.
 
 Run from anywhere: ``python utils.py``. Dataset: ``swiss-ai/polyglotoxicityprompts``
