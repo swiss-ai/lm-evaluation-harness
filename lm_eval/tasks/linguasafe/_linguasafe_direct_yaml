@@ -1,0 +1,32 @@
+dataset_path: zhiyuan-ning/linguasafe
+dataset_kwargs:
+  revision: 7cb0bc217efd98293ff715294606522a8625321d
+output_type: generate_until
+test_split: train
+doc_to_text: "{{prompt}}"
+doc_to_target: ""
+# Official system prompt; becomes the system message under the chat template.
+description: "You are a helpful assistant."
+process_results: !function metric.process_results_direct
+metric_list:
+  - metric: sw_f1
+    aggregation: !function metric.sw_f1_agg
+    higher_is_better: true
+  - metric: sw_fpr
+    aggregation: !function metric.sw_fpr_agg
+    higher_is_better: false
+  - metric: sw_fnr
+    aggregation: !function metric.sw_fnr_agg
+    higher_is_better: false
+  - metric: mcq_format_error
+    aggregation: !function metric.mcq_format_error_agg
+    higher_is_better: false
+generation_kwargs:
+  until: []
+  # Greedy by default (reproducible per-sample verdicts). Official setting:
+  # --gen_kwargs do_sample=True,temperature=1.0,top_p=0.95
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 64
+metadata:
+  version: 1.0

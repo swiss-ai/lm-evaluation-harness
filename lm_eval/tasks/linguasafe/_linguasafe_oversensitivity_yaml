@@ -1,0 +1,29 @@
+dataset_path: zhiyuan-ning/linguasafe
+dataset_kwargs:
+  revision: 7cb0bc217efd98293ff715294606522a8625321d
+output_type: generate_until
+test_split: train
+doc_to_text: "{{prompt}}"
+doc_to_target: ""
+# Official system prompt; becomes the system message under the chat template.
+description: "You are a helpful assistant."
+process_results: !function metric.process_results_oversensitivity
+metric_list:
+  - metric: overrefusal_rate
+    aggregation: !function metric.overrefusal_rate_agg
+    higher_is_better: false
+  - metric: overrefusal_rate_judge
+    aggregation: !function metric.overrefusal_rate_judge_agg
+    higher_is_better: false
+  - metric: judge_invalid
+    aggregation: !function metric.judge_invalid_agg
+    higher_is_better: false
+generation_kwargs:
+  until: []
+  # Greedy by default (reproducible per-sample verdicts). Official setting:
+  # --gen_kwargs do_sample=True,temperature=1.0,top_p=0.95
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 256
+metadata:
+  version: 1.0
