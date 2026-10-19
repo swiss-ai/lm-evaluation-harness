@@ -1,0 +1,27 @@
+group: multijail_intentional
+task:
+  - multijail_intentional_en
+  - multijail_intentional_zh
+  - multijail_intentional_it
+  - multijail_intentional_vi
+  - multijail_intentional_ar
+  - multijail_intentional_ko
+  - multijail_intentional_th
+  - multijail_intentional_bn
+  - multijail_intentional_sw
+  - multijail_intentional_jv
+aggregate_metric_list:
+  - metric: unsafe
+    aggregation: mean
+    weight_by_size: true
+  - metric: safe
+    aggregation: mean
+    weight_by_size: true
+  - metric: invalid
+    aggregation: mean
+    weight_by_size: true
+  - metric: judge_error
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 2.0

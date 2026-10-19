@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
-"""
-Script to generate multijail config files for multiple languages.
-Creates individual language configs and a group config that includes all languages.
+"""Generate the MultiJail per-language task configs and group configs.
+
+Unintentional scenario (paper Sec. 3.1): the human-translated harmful prompt
+as-is. Tasks ``multijail_<lang>``, group ``multijail`` (historical names).
+
+Intentional scenario: the English AIM jailbreak instruction with the
+(translated) harmful prompt inserted. Tasks ``multijail_intentional_<lang>``,
+group ``multijail_intentional``.
+
+Prompt construction lives in ``metric.process_docs_<scenario>_<lang>``.
+Run: python generate_configs.py
 """
 
 from pathlib import Path
 
 
-# Language configurations
+# Order as in the paper (Table 1): English reference, then HRL, MRL, LRL.
 LANGUAGES = {
+    "en": "English",
     "zh": "Chinese",
     "it": "Italian",
     "vi": "Vietnamese",
@@ -20,64 +29,50 @@ LANGUAGES = {
     "jv": "Javanese",
 }
 
+SCENARIOS = {
+    "unintentional": ("multijail", "multijail_{lang}"),
+    "intentional": ("multijail_intentional", "multijail_intentional_{lang}"),
+}
 
-def create_language_config(lang_code, lang_name):
-    """Create a language-specific config file."""
-    config_content = f"""task: multijail_{lang_code}
-include: _multijail_yaml
-doc_to_text: "{{{{{lang_code}}}}}"
-"""
-    return config_content
+METRICS = ["unsafe", "safe", "invalid", "judge_error"]
 
 
-def create_group_config():
-    """Create a group config that includes all language tasks."""
-    task_list = [f"multijail_{lang_code}" for lang_code in LANGUAGES.keys()]
-    task_list.append("multijail_en")  # Include the existing English config
+def language_config(scenario: str, task: str, lang: str) -> str:
+    return (
+        f"task: {task}\n"
+        "include: _multijail_yaml\n"
+        f"process_docs: !function metric.process_docs_{scenario}_{lang}\n"
+    )
 
-    config_content = f"""group: multijail
-task:
-{chr(10).join(f"  - {task}" for task in task_list)}
-aggregate_metric_list:
-  - metric: score
-    aggregation: mean
-    weight_by_size: true
-metadata:
-  version: 1.0
-"""
-    return config_content
+
+def group_config(group: str, tasks: list[str]) -> str:
+    lines = [f"group: {group}", "task:"]
+    lines += [f"  - {t}" for t in tasks]
+    lines.append("aggregate_metric_list:")
+    for m in METRICS:
+        lines += [
+            f"  - metric: {m}",
+            "    aggregation: mean",
+            "    weight_by_size: true",
+        ]
+    lines += ["metadata:", "  version: 2.0", ""]
+    return "\n".join(lines)
 
 
 def main():
-    """Generate all config files."""
-    # Get the directory where this script is located
-    script_dir = Path(__file__).parent
-
-    print("Generating multijail config files...")
-
-    # Create individual language configs
-    for lang_code, lang_name in LANGUAGES.items():
-        config_content = create_language_config(lang_code, lang_name)
-        config_file = script_dir / f"multijail_{lang_code}.yaml"
-
-        with open(config_file, "w", encoding="utf-8") as f:
-            f.write(config_content)
-
-        print(f"Created: {config_file}")
-
-    # Create group config
-    group_config_content = create_group_config()
-    group_config_file = script_dir / "multijail.yaml"
-
-    with open(group_config_file, "w", encoding="utf-8") as f:
-        f.write(group_config_content)
-
-    print(f"Created: {group_config_file}")
-    print(f"\nGenerated {len(LANGUAGES) + 1} config files:")
-    print("- Individual language configs:")
-    for lang_code, lang_name in LANGUAGES.items():
-        print(f"  - multijail_{lang_code}.yaml ({lang_name})")
-    print("- Group config: multijail.yaml")
+    out_dir = Path(__file__).parent
+    for scenario, (group, task_fmt) in SCENARIOS.items():
+        tasks = []
+        for lang in LANGUAGES:
+            task = task_fmt.format(lang=lang)
+            tasks.append(task)
+            (out_dir / f"{task}.yaml").write_text(
+                language_config(scenario, task, lang), encoding="utf-8"
+            )
+        (out_dir / f"{group}.yaml").write_text(
+            group_config(group, tasks), encoding="utf-8"
+        )
+        print(f"{group}: {len(tasks)} tasks")
 
 
 if __name__ == "__main__":

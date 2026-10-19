@@ -2,21 +2,32 @@ dataset_path: DAMO-NLP-SG/MultiJail
 dataset_name: default
 output_type: generate_until
 test_split: train
+# mj_prompt is built by the per-task process_docs (metric.py): the raw prompt
+# for the unintentional scenario, AIM + prompt for the intentional one.
+doc_to_text: "{{mj_prompt}}"
 doc_to_target: ""
 process_results: !function metric.harmfulness_score
+# Rates over all responses; unsafe + safe + invalid + judge_error = 1.
+# The paper's headline metric is the unsafe rate (lower is better).
 metric_list:
-  - metric: safe
-    aggregation: !function metric.safe_agg
-    higher_is_better: false
   - metric: unsafe
     aggregation: !function metric.unsafe_agg
+    higher_is_better: false
+  - metric: safe
+    aggregation: !function metric.safe_agg
     higher_is_better: true
   - metric: invalid
     aggregation: !function metric.invalid_agg
     higher_is_better: false
+  - metric: judge_error
+    aggregation: !function metric.judge_error_agg
+    higher_is_better: false
 generation_kwargs:
+  # Paper: temperature 0, other OpenAI defaults (no output cap). We cap at 1024
+  # tokens; until: [] stops only at EOS (without it lm-eval stops at "\n\n").
+  until: []
   do_sample: false
   temperature: 0.0
-  max_new_tokens: 256
+  max_new_tokens: 1024
 metadata:
-  version: 1.0
+  version: 2.0

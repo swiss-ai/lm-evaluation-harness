@@ -1,0 +1,3 @@
+task: multijail_intentional_jv
+include: _multijail_yaml
+process_docs: !function metric.process_docs_intentional_jv
