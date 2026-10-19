@@ -56,6 +56,7 @@ JUDGE_ENV = "LINGUASAFE_JUDGE_MODEL"
 REJECT_JUDGE_ENV = "LINGUASAFE_REJECT_JUDGE_MODEL"  # defaults to LINGUASAFE_JUDGE_MODEL
 JUDGE_MAX_TOKENS = int(os.getenv("LINGUASAFE_JUDGE_MAX_TOKENS", "10"))
 JUDGE_WORKERS = int(os.getenv("LINGUASAFE_JUDGE_WORKERS", "16"))
+JUDGE_MAX_RETRIES = int(os.getenv("LINGUASAFE_JUDGE_MAX_RETRIES", "10"))
 
 # Official judge prompts (linguasafe/eval.py @ fd54717). The official LLM client also
 # sends the system prompt "You are a helpful assistant." with every request.
@@ -82,8 +83,9 @@ def _judge_model(kind: str) -> str:
 # ============================================================================
 
 
-def _call_judge(prompt: str, kind: str, max_retries: int = 10):
+def _call_judge(prompt: str, kind: str, max_retries: int | None = None):
     """Return (raw_text, model_name); raw_text is None after repeated failure."""
+    max_retries = max_retries or JUDGE_MAX_RETRIES
     model = None
     for attempt in range(max_retries):
         try:
