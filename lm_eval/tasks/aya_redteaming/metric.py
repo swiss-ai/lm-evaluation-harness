@@ -19,15 +19,17 @@ Metrics (all fractions in [0, 1]):
                              unparseable answer). These samples are left out of the
                              rates above. They are never counted as safe.
 
-Harness note: every ``!function metric.x`` reference re-executes this file as a
-fresh module, so the judge cache and the one-off connectivity check live in a
-process-wide state object registered in ``sys.modules``.
+Harness note: the judge cache and the one-off connectivity check live in a
+process-wide state object registered in ``sys.modules``. That way they survive a
+re-execution of this file (the task loader reloads it when its mtime changes, and
+the legacy ``utils.import_function`` path re-executes it for every reference).
 """
 
 import concurrent.futures
 import json
 import math
 import os
+import random
 import re
 import sys
 import threading
@@ -100,11 +102,30 @@ def _judge_model() -> str:
     )
 
 
+def _retry_after_seconds(resp, default):
+    """Seconds to wait after a 429, from the Retry-After header or the error text."""
+    header = resp.headers.get("Retry-After")
+    if header and header.strip().isdigit():
+        return int(header.strip())
+    m = re.search(r"retry after (\d+) seconds", resp.text or "", flags=re.IGNORECASE)
+    return int(m.group(1)) if m else default
+
+
 def try_remote_generate(
-    prompt, temperature=0.0, max_tokens=512, max_retries=JUDGE_MAX_RETRIES
+    prompt,
+    temperature=0.0,
+    max_tokens=512,
+    max_retries=JUDGE_MAX_RETRIES,
+    accept_rate_limited=False,
 ):
-    """Query the judge on the SwissAI API. Returns the text, or None after all retries."""
+    """Query the judge on the SwissAI API. Returns the text, or None after all retries.
+
+    On HTTP 429 the wait follows the server's Retry-After hint. With
+    ``accept_rate_limited`` a 429 counts as success (returns ""): the endpoint is
+    reachable and the key is valid, which is all the startup check needs.
+    """
     for attempt in range(max_retries):
+        wait = min(2**attempt, 60)
         try:
             model = _judge_model()
             headers = {
@@ -132,6 +153,11 @@ def try_remote_generate(
                 if content is not None:
                     return content
                 print(f"Attempt {attempt + 1}/{max_retries}: judge returned no content")
+            elif resp.status_code == 429:
+                if accept_rate_limited:
+                    return ""
+                wait = min(_retry_after_seconds(resp, 60), 120) + random.uniform(0, 5)
+                print(f"Attempt {attempt + 1}/{max_retries}: rate limited (429)")
             else:
                 print(
                     f"Attempt {attempt + 1}/{max_retries}: status {resp.status_code}: {resp.text}"
@@ -141,8 +167,7 @@ def try_remote_generate(
             print(f"Attempt {attempt + 1}/{max_retries}: {e}")
 
         if attempt < max_retries - 1:
-            wait = min(2**attempt, 60)
-            print(f"Retrying in {wait}s...")
+            print(f"Retrying in {wait:.0f}s...")
             time.sleep(wait)
 
     print(f"Failed after {max_retries} attempts")
@@ -154,7 +179,9 @@ def _check_judge_once():
     with _STATE.lock:
         if _STATE.checked or os.getenv("AYA_REDTEAMING_SKIP_JUDGE_CHECK"):
             return
-        test = try_remote_generate("hello there", max_tokens=5)
+        test = try_remote_generate(
+            "hello there", max_tokens=5, accept_rate_limited=True
+        )
         if test is None:
             raise RuntimeError(
                 "Remote generation failed, cannot connect to the model API. Please check your connection and API key."
