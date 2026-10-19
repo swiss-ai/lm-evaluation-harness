@@ -107290,6 +107290,186 @@
       "tags": [],
       "yaml_path": "polyglotoxicitypromptsllama/small/polyglotoxicitypromptsllama_small_spanish.yaml"
     },
+    "polyglotoxicitypromptsllama_v2_small": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/polyglotoxicitypromptsllama_v2_small.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_arabic": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_arabic.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_chinese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_chinese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_czech": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_czech.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_dutch": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_dutch.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_english": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_english.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_french": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_french.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_german": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_german.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_hindi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_hindi.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_indonesian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_indonesian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_italian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_italian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_japanese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_japanese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_korean": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_korean.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_polish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_polish.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_portuguese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_portuguese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_russian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_russian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_spanish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_spanish.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_small_swedish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_small/polyglotoxicitypromptsllama_v2_small_swedish.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/polyglotoxicitypromptsllama_v2_wildchat.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_arabic": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_arabic.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_chinese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_chinese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_czech": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_czech.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_dutch": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_dutch.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_english": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_english.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_french": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_french.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_german": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_german.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_hindi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_hindi.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_indonesian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_indonesian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_italian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_italian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_japanese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_japanese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_korean": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_korean.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_polish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_polish.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_portuguese": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_portuguese.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_russian": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_russian.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_spanish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_spanish.yaml"
+    },
+    "polyglotoxicitypromptsllama_v2_wildchat_swedish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "polyglotoxicitypromptsllama/v2_wildchat/polyglotoxicitypromptsllama_v2_wildchat_swedish.yaml"
+    },
     "polyglotoxicitypromptsllama_wildchat": {
       "kind": "GROUP",
       "tags": [],
@@ -118799,6 +118979,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16178,
+  "entry_count": 16214,
   "schema_version": 1
 }
