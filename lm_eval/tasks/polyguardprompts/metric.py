@@ -37,6 +37,7 @@ JUDGE_ENV_VAR = "POLYGUARDPROMPTS_JUDGE_MODEL"
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 MAX_WORKERS = int(os.getenv("POLYGUARDPROMPTS_JUDGE_WORKERS", "16"))
+MAX_RETRIES = int(os.getenv("POLYGUARDPROMPTS_JUDGE_MAX_RETRIES", "30"))
 JUDGE_MAX_TOKENS = 100  # official: SamplingParams(temperature=0.0, max_tokens=100)
 
 # Verbatim from github.com/kpriyanshu256/polyguard batch_inference.py (d28a9f7).
@@ -164,8 +165,9 @@ def parse_llama_guard(text: str | None) -> dict:
 _CONTEXT_TOO_LONG = object()
 
 
-def _post(model: str, messages: list, max_tokens: int, max_retries: int = 10):
+def _post(model: str, messages: list, max_tokens: int, max_retries: int = MAX_RETRIES):
     for attempt in range(max_retries):
+        wait = min(2**attempt, 60)
         try:
             payload = {
                 "model": model,
@@ -186,6 +188,12 @@ def _post(model: str, messages: list, max_tokens: int, max_retries: int = 10):
             if resp.status_code == 200:
                 content = resp.json()["choices"][0]["message"]["content"]
                 return content if content is not None else ""
+            if resp.status_code == 429:
+                # Shared per-key limit: honour Retry-After instead of backoff.
+                try:
+                    wait = max(1.0, float(resp.headers.get("Retry-After", wait)))
+                except ValueError:
+                    pass
             if resp.status_code == 400 and "context length" in resp.text.lower():
                 return _CONTEXT_TOO_LONG
             eval_logger.warning(
@@ -197,7 +205,7 @@ def _post(model: str, messages: list, max_tokens: int, max_retries: int = 10):
                 f"polyguardprompts judge attempt {attempt + 1}/{max_retries}: {e}"
             )
         if attempt < max_retries - 1:
-            time.sleep(min(2**attempt, 60))
+            time.sleep(wait)
     eval_logger.error(f"polyguardprompts judge failed after {max_retries} attempts")
     return None
 
