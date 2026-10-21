@@ -29,7 +29,7 @@ task:
   - include_base_44_malay
   - include_base_44_malayalam
   - include_base_44_nepali
-  - include_base_44_north macedonian
+  - include_base_44_north_macedonian
   - include_base_44_persian
   - include_base_44_polish
   - include_base_44_portuguese
@@ -41,6 +41,7 @@ task:
   - include_base_44_telugu
   - include_base_44_turkish
   - include_base_44_ukrainian
+  - include_base_44_urdu
   - include_base_44_uzbek
   - include_base_44_vietnamese
 aggregate_metric_list:

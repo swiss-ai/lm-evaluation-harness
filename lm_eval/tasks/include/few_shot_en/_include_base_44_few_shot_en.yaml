@@ -29,7 +29,7 @@ task:
   - include_base_44_malay_few_shot_en
   - include_base_44_malayalam_few_shot_en
   - include_base_44_nepali_few_shot_en
-  - include_base_44_north macedonian_few_shot_en
+  - include_base_44_north_macedonian_few_shot_en
   - include_base_44_persian_few_shot_en
   - include_base_44_polish_few_shot_en
   - include_base_44_portuguese_few_shot_en
