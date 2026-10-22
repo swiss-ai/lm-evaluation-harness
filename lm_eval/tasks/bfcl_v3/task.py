@@ -101,6 +101,21 @@ def _flatten_messages(messages: list[dict]) -> str:
     return "\n".join(rendered)
 
 
+def _merge_consecutive_roles(messages: list[dict]) -> list[dict]:
+    """Join back-to-back messages of the same role (e.g. execution results followed
+    by the next user turn), which strictly alternating chat templates reject."""
+    merged = []
+    for message in messages:
+        if merged and merged[-1]["role"] == message["role"]:
+            merged[-1] = {
+                "role": message["role"],
+                "content": f"{merged[-1]['content']}\n\n{message['content']}",
+            }
+        else:
+            merged.append(dict(message))
+    return merged
+
+
 def _language_hint(category: str) -> str:
     if category == "java":
         return " Note that the provided function is in Java 8 SDK syntax."
@@ -691,6 +706,10 @@ class BFCLV3Task(ConfigurableTask):
             if APERTUS_ASSISTANT_END not in arguments["until"]:
                 arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
             arguments["max_gen_toks"] = max(arguments["max_gen_toks"], 2048)
+        elif "\nUser:" not in arguments["until"]:
+            # Untemplated prompts are a User:/Assistant: transcript; stop before the
+            # model writes the next (invented) user or execution-results message.
+            arguments["until"] = [*arguments["until"], "\nUser:"]
         return Instance(
             request_type=self.OUTPUT_TYPE,
             doc=doc,
@@ -834,12 +853,20 @@ class BFCLV3Task(ConfigurableTask):
 
         functions = _prompt_functions(state["functions"], self.bfcl_category)
         function_text = json.dumps(functions, ensure_ascii=False)
-        return (
+        system_prompt = (
             f"{DEFAULT_MULTI_TURN_SYSTEM_PROMPT_WITHOUT_FUNC_DOC}\n"
             f"Here is a list of functions in JSON format that you can invoke.\n"
-            f"{function_text}\n\n"
-            f"{_flatten_messages(state['history'])}\nAssistant:"
+            f"{function_text}"
         )
+        if state.get("apply_chat_template") and state.get("chat_template"):
+            # Render every step as a real conversation; a flat User:/Assistant:
+            # transcript makes chat models continue it with invented tool results.
+            return state["chat_template"](
+                _merge_consecutive_roles(
+                    [{"role": "system", "content": system_prompt}, *state["history"]]
+                )
+            )
+        return f"{system_prompt}\n\n{_flatten_messages(state['history'])}\nAssistant:"
 
     def _decode(
         self, text: str, doc: dict | None = None, *, strict: bool = True
