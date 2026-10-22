@@ -101,11 +101,15 @@ def _flatten_messages(messages: list[dict]) -> str:
     return "\n".join(rendered)
 
 
-def _merge_consecutive_roles(messages: list[dict]) -> list[dict]:
-    """Join back-to-back messages of the same role (e.g. execution results followed
-    by the next user turn), which strictly alternating chat templates reject."""
+def _chat_template_messages(messages: list[dict]) -> list[dict]:
+    """Make the history acceptable to strict chat templates (e.g. mistral-common):
+    drop empty assistant replies, which they reject, and join back-to-back
+    messages of the same role (e.g. execution results followed by the next user
+    turn), which strictly alternating templates reject."""
     merged = []
     for message in messages:
+        if message["role"] == "assistant" and not str(message["content"]).strip():
+            continue
         if merged and merged[-1]["role"] == message["role"]:
             merged[-1] = {
                 "role": message["role"],
@@ -862,7 +866,7 @@ class BFCLV3Task(ConfigurableTask):
             # Render every step as a real conversation; a flat User:/Assistant:
             # transcript makes chat models continue it with invented tool results.
             return state["chat_template"](
-                _merge_consecutive_roles(
+                _chat_template_messages(
                     [{"role": "system", "content": system_prompt}, *state["history"]]
                 )
             )

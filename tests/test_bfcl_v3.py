@@ -549,3 +549,24 @@ def test_bfcl_v3_apertus_construct_requests_has_no_user_stop():
     _, gen_kwargs = task.construct_requests(doc, "ctx").arguments
 
     assert "\nUser:" not in gen_kwargs["until"]
+
+
+def test_bfcl_v3_multi_turn_drops_empty_assistant_replies_for_chat_template():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.append(messages) or "",
+    )
+    task.multiturn_next_request(state)
+    task.multiturn_consume_response(state, "")
+
+    task.multiturn_next_request(state)
+
+    assert all(m["content"].strip() for m in seen[-1] if m["role"] == "assistant")
+    roles = [m["role"] for m in seen[-1]]
+    assert all(a != b for a, b in itertools.pairwise(roles))
