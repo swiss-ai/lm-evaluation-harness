@@ -2558,7 +2558,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_amh.yaml"
     },
@@ -4219,7 +4219,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_eng.yaml"
     },
@@ -4259,7 +4259,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_ewe.yaml"
     },
@@ -4299,7 +4299,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_fra.yaml"
     },
@@ -4339,7 +4339,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_hau.yaml"
     },
@@ -4379,7 +4379,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_ibo.yaml"
     },
@@ -4419,7 +4419,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_kin.yaml"
     },
@@ -4459,7 +4459,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_lin.yaml"
     },
@@ -4499,7 +4499,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_lug.yaml"
     },
@@ -4539,7 +4539,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_orm.yaml"
     },
@@ -4579,7 +4579,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_sna.yaml"
     },
@@ -4619,7 +4619,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_sot.yaml"
     },
@@ -4659,7 +4659,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_swa.yaml"
     },
@@ -4792,42 +4792,48 @@
       "kind": "TAG",
       "tags": [
         "afrimgsm_amh_prompt_1",
-        "afrimgsm_amh_prompt_2",
         "afrimgsm_eng_prompt_1",
-        "afrimgsm_eng_prompt_2",
         "afrimgsm_ewe_prompt_1",
-        "afrimgsm_ewe_prompt_2",
         "afrimgsm_fra_prompt_1",
-        "afrimgsm_fra_prompt_2",
         "afrimgsm_hau_prompt_1",
-        "afrimgsm_hau_prompt_2",
         "afrimgsm_ibo_prompt_1",
-        "afrimgsm_ibo_prompt_2",
         "afrimgsm_kin_prompt_1",
-        "afrimgsm_kin_prompt_2",
         "afrimgsm_lin_prompt_1",
-        "afrimgsm_lin_prompt_2",
         "afrimgsm_lug_prompt_1",
-        "afrimgsm_lug_prompt_2",
         "afrimgsm_orm_prompt_1",
-        "afrimgsm_orm_prompt_2",
         "afrimgsm_sna_prompt_1",
-        "afrimgsm_sna_prompt_2",
         "afrimgsm_sot_prompt_1",
-        "afrimgsm_sot_prompt_2",
         "afrimgsm_swa_prompt_1",
-        "afrimgsm_swa_prompt_2",
         "afrimgsm_twi_prompt_1",
-        "afrimgsm_twi_prompt_2",
         "afrimgsm_vai_prompt_1",
-        "afrimgsm_vai_prompt_2",
         "afrimgsm_wol_prompt_1",
-        "afrimgsm_wol_prompt_2",
         "afrimgsm_xho_prompt_1",
-        "afrimgsm_xho_prompt_2",
         "afrimgsm_yor_prompt_1",
+        "afrimgsm_zul_prompt_1"
+      ],
+      "yaml_path": null
+    },
+    "afrimgsm_tasks_prompt_2": {
+      "kind": "TAG",
+      "tags": [
+        "afrimgsm_amh_prompt_2",
+        "afrimgsm_eng_prompt_2",
+        "afrimgsm_ewe_prompt_2",
+        "afrimgsm_fra_prompt_2",
+        "afrimgsm_hau_prompt_2",
+        "afrimgsm_ibo_prompt_2",
+        "afrimgsm_kin_prompt_2",
+        "afrimgsm_lin_prompt_2",
+        "afrimgsm_lug_prompt_2",
+        "afrimgsm_orm_prompt_2",
+        "afrimgsm_sna_prompt_2",
+        "afrimgsm_sot_prompt_2",
+        "afrimgsm_swa_prompt_2",
+        "afrimgsm_twi_prompt_2",
+        "afrimgsm_vai_prompt_2",
+        "afrimgsm_wol_prompt_2",
+        "afrimgsm_xho_prompt_2",
         "afrimgsm_yor_prompt_2",
-        "afrimgsm_zul_prompt_1",
         "afrimgsm_zul_prompt_2"
       ],
       "yaml_path": null
@@ -5711,7 +5717,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_twi.yaml"
     },
@@ -5751,7 +5757,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_vai.yaml"
     },
@@ -5791,7 +5797,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_wol.yaml"
     },
@@ -5831,7 +5837,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_xho.yaml"
     },
@@ -5871,7 +5877,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_yor.yaml"
     },
@@ -5911,7 +5917,7 @@
       "kind": "TASK",
       "tags": [
         "afrimgsm_tasks",
-        "afrimgsm_tasks_prompt_1"
+        "afrimgsm_tasks_prompt_2"
       ],
       "yaml_path": "afrimgsm/direct/prompt_2/afrimgsm_zul.yaml"
     },
@@ -9413,24 +9419,7 @@
         "afrixnli_manual_direct_wol",
         "afrixnli_manual_direct_xho",
         "afrixnli_manual_direct_yor",
-        "afrixnli_manual_direct_zul",
-        "afrixnli_manual_translate_amh",
-        "afrixnli_manual_translate_ewe",
-        "afrixnli_manual_translate_fra",
-        "afrixnli_manual_translate_hau",
-        "afrixnli_manual_translate_ibo",
-        "afrixnli_manual_translate_kin",
-        "afrixnli_manual_translate_lin",
-        "afrixnli_manual_translate_lug",
-        "afrixnli_manual_translate_orm",
-        "afrixnli_manual_translate_sna",
-        "afrixnli_manual_translate_sot",
-        "afrixnli_manual_translate_swa",
-        "afrixnli_manual_translate_twi",
-        "afrixnli_manual_translate_wol",
-        "afrixnli_manual_translate_xho",
-        "afrixnli_manual_translate_yor",
-        "afrixnli_manual_translate_zul"
+        "afrixnli_manual_direct_zul"
       ],
       "yaml_path": null
     },
@@ -9578,11 +9567,34 @@
       ],
       "yaml_path": "afrixnli/lai prompt/direct/afrixnli_manual_direct_zul.yaml"
     },
+    "afrixnli_manual_translate": {
+      "kind": "TAG",
+      "tags": [
+        "afrixnli_manual_translate_amh",
+        "afrixnli_manual_translate_ewe",
+        "afrixnli_manual_translate_fra",
+        "afrixnli_manual_translate_hau",
+        "afrixnli_manual_translate_ibo",
+        "afrixnli_manual_translate_kin",
+        "afrixnli_manual_translate_lin",
+        "afrixnli_manual_translate_lug",
+        "afrixnli_manual_translate_orm",
+        "afrixnli_manual_translate_sna",
+        "afrixnli_manual_translate_sot",
+        "afrixnli_manual_translate_swa",
+        "afrixnli_manual_translate_twi",
+        "afrixnli_manual_translate_wol",
+        "afrixnli_manual_translate_xho",
+        "afrixnli_manual_translate_yor",
+        "afrixnli_manual_translate_zul"
+      ],
+      "yaml_path": null
+    },
     "afrixnli_manual_translate_amh": {
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_amh.yaml"
     },
@@ -9590,7 +9602,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_ewe.yaml"
     },
@@ -9598,7 +9610,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_fra.yaml"
     },
@@ -9606,7 +9618,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_hau.yaml"
     },
@@ -9614,7 +9626,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_ibo.yaml"
     },
@@ -9622,7 +9634,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_kin.yaml"
     },
@@ -9630,7 +9642,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_lin.yaml"
     },
@@ -9638,7 +9650,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_lug.yaml"
     },
@@ -9646,7 +9658,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_orm.yaml"
     },
@@ -9654,7 +9666,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_sna.yaml"
     },
@@ -9662,7 +9674,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_sot.yaml"
     },
@@ -9670,7 +9682,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_swa.yaml"
     },
@@ -9678,7 +9690,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_twi.yaml"
     },
@@ -9686,7 +9698,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_wol.yaml"
     },
@@ -9694,7 +9706,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_xho.yaml"
     },
@@ -9702,7 +9714,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_yor.yaml"
     },
@@ -9710,7 +9722,7 @@
       "kind": "TASK",
       "tags": [
         "afrixnli",
-        "afrixnli_manual_direct"
+        "afrixnli_manual_translate"
       ],
       "yaml_path": "afrixnli/lai prompt/translate/afrixnli_manual_translate_zul.yaml"
     },
@@ -118799,6 +118811,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16178,
+  "entry_count": 16180,
   "schema_version": 1
 }
