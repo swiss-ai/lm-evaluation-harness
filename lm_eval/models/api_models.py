@@ -502,13 +502,14 @@ class TemplateAPI(TemplateLM):
             )
         # Past this point the server renders the template, so the arguments would be
         # dropped silently; refuse instead of scoring a different prompt than asked for.
-        if self.chat_template_args:
+        if self.chat_template_args or kwargs:
             raise ValueError(
-                "chat_template_args (including enable_thinking) need the chat template "
-                "rendered client-side with a Hugging Face tokenizer, e.g. local-completions "
-                "with tokenizer_backend=huggingface. Here the server renders it (a "
+                "chat_template_args (including enable_thinking) and task template "
+                "arguments (e.g. tools) need the chat template rendered client-side with "
+                "a Hugging Face tokenizer, e.g. local-completions with "
+                "tokenizer_backend=huggingface. Here the server renders it (a "
                 "chat-completions model, or no local tokenizer), so they can't be applied: "
-                f"{sorted(self.chat_template_args)}"
+                f"{sorted({**self.chat_template_args, **kwargs})}"
             )
         if self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history
