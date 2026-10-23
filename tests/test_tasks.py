@@ -1,3 +1,4 @@
+import json
 import os
 from itertools import islice
 from typing import cast
@@ -13,7 +14,22 @@ from .utils import new_tasks
 
 datasets.config.HF_DATASETS_TRUST_REMOTE_CODE = True
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
 # Default Task
+class _ChatMessages(str):
+    """What a chat-completions model's apply_chat_template returns (cf. JsonChatStr):
+    the messages as JSON, readable through ``.prompt``."""
+
+    @property
+    def prompt(self) -> str:
+        return str(self)
+
+
+def _chat_model_template(messages, add_generation_prompt=True, **kwargs):
+    return _ChatMessages(json.dumps(messages))
+
+
 TASKS = ["arc_easy"]
 
 
@@ -141,8 +157,17 @@ class BaseTasks:
         # system prompt would otherwise become a plain-text prefix — so the
         # rollout driver (and thus request-building) enforces it.
         apply_chat_template = task_class.OUTPUT_TYPE == "multi_turn_generate"
+        chat_template = None
+        if (task_class.config.metadata or {}).get("requires_chat_model"):
+            # Tasks that only work with a chat-completions model (e.g. tools sent in
+            # the request) get its template: the messages themselves, not text.
+            apply_chat_template, chat_template = True, _chat_model_template
         task_class.build_all_requests(
-            rank=1, limit=limit, world_size=1, apply_chat_template=apply_chat_template
+            rank=1,
+            limit=limit,
+            world_size=1,
+            apply_chat_template=apply_chat_template,
+            chat_template=chat_template,
         )
         assert task_class.instances is not None
 

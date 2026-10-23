@@ -23,6 +23,7 @@ def load_changed_files(file_path: str) -> list[str]:
 # if the config task is a list, it's a group config.
 def parser(full_path: list[str]) -> list[str]:
     _output = set()
+    members: dict[str, list[str]] = {}
     for x in full_path:
         if x.endswith(".yaml") and os.path.exists(x):
             config = load_yaml(x, resolve_func=False)
@@ -30,6 +31,19 @@ def parser(full_path: list[str]) -> list[str]:
                 _output.add(config["task"])
             elif isinstance(config["task"], list):
                 _output.add(config["group"])
+                members[config["group"]] = [
+                    t for t in config["task"] if isinstance(t, str)
+                ]
+    # A changed group loads its members itself; loading a member again next to it
+    # fails as a duplicate task, so drop everything a changed group already covers.
+    covered: set[str] = set()
+    pending = [m for group in _output & members.keys() for m in members[group]]
+    while pending:
+        name = pending.pop()
+        if name not in covered:
+            covered.add(name)
+            pending.extend(members.get(name, []))
+    _output -= covered
     # Sorted (not list(set)) so the parametrization order is deterministic:
     # under `pytest -n=auto` every xdist worker must collect tasks in the same
     # order, else collection mismatches ("Different tests were collected").

@@ -28,6 +28,9 @@ MAXIMUM_STEP_LIMIT = 20
 APERTUS_TOOL_PREFIX = "<|tools_prefix|>"
 APERTUS_TOOL_SUFFIX = "<|tools_suffix|>"
 APERTUS_ASSISTANT_END = "<|assistant_end|>"
+# Must match lm_eval.models.openai_completions.TOOL_CALLS_MARKER (not imported, so
+# loading the task needs no API-model dependencies).
+TOOL_CALLS_MARKER = "<|lm_eval_tool_calls|>"
 
 MULTI_TURN_FUNC_DOC_FILE_MAPPING = {
     "GorillaFileSystem": "gorilla_file_system.json",
@@ -240,9 +243,12 @@ def _apertus_template_default(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def _json_schema(schema: Any) -> Any:
+def _json_schema(schema: Any, *, stringify_defaults: bool = True) -> Any:
+    def convert(item: Any) -> Any:
+        return _json_schema(item, stringify_defaults=stringify_defaults)
+
     if isinstance(schema, list):
-        return [_json_schema(item) for item in schema if item is not None]
+        return [convert(item) for item in schema if item is not None]
     if not isinstance(schema, dict):
         return schema
     converted = {}
@@ -250,17 +256,20 @@ def _json_schema(schema: Any) -> Any:
         if value is None:
             continue
         if key == "default":
-            converted[key] = _apertus_template_default(_json_schema(value))
+            default = convert(value)
+            converted[key] = (
+                _apertus_template_default(default) if stringify_defaults else default
+            )
             continue
         if key == "type" and isinstance(value, str):
             converted[key] = _json_schema_type(value)
         elif key in {"properties", "$defs", "definitions"} and isinstance(value, dict):
-            converted[key] = {name: _json_schema(item) for name, item in value.items()}
+            converted[key] = {name: convert(item) for name, item in value.items()}
         elif key == "items":
-            converted[key] = _json_schema(value)
+            converted[key] = convert(value)
         else:
             converted[key] = (
-                _json_schema(value) if isinstance(value, (dict, list)) else value
+                convert(value) if isinstance(value, (dict, list)) else value
             )
     return converted
 
@@ -272,6 +281,88 @@ def _apertus_tools(functions: list[dict], category: str) -> list[dict]:
         tool["parameters"] = _json_schema(tool.get("parameters") or {})
         tools.append(tool)
     return tools
+
+
+def _fc_name(name: str) -> str:
+    # Tool names must match ^[a-zA-Z0-9_-]+$ on OpenAI-style APIs (BFCL's FC
+    # handlers make the same substitution, e.g. spotify.play -> spotify_play).
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+
+
+def _fc_tools(functions: list[dict], category: str) -> list[dict]:
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": _fc_name(function["name"]),
+                "description": function.get("description", ""),
+                "parameters": _json_schema(
+                    function.get("parameters") or {}, stringify_defaults=False
+                ),
+            },
+        }
+        for function in _prompt_functions(functions, category)
+    ]
+
+
+_FC_REQUIRES_CHAT_MODEL = (
+    "bfcl_v3_fc tasks send the functions in the request's tools field and read "
+    "tool_calls back, so they need a chat-completions model "
+    "(e.g. local-chat-completions) with --apply_chat_template."
+)
+
+
+def _require_chat_messages(prompt: Any) -> Any:
+    # A chat-completions model returns the messages (JsonChatStr), not a rendered
+    # string; a string means the template ran client-side and tools can't be sent.
+    if not hasattr(prompt, "prompt"):
+        raise ValueError(_FC_REQUIRES_CHAT_MODEL)
+    return prompt
+
+
+def _with_system_instruction(
+    messages: list[dict], system_instruction: str | None
+) -> list[dict]:
+    if not system_instruction:
+        return list(messages)
+    if messages and messages[0].get("role") == "system":
+        first = {
+            **messages[0],
+            "content": f"{system_instruction}\n\n{messages[0].get('content', '')}",
+        }
+        return [first, *messages[1:]]
+    return [{"role": "system", "content": system_instruction}, *messages]
+
+
+def _fc_gen_kwargs(gen_kwargs: dict, functions: list[dict], category: str) -> dict:
+    # A JSON string, not a list: the API model groups requests by gen_kwargs value.
+    return {**gen_kwargs, "tools": json.dumps(_fc_tools(functions, category))}
+
+
+def _split_tool_calls(text: str) -> tuple[str, list[dict]]:
+    """A chat response's text and its structured tool calls (see TOOL_CALLS_MARKER)."""
+    content, marker, payload = (text or "").partition(TOOL_CALLS_MARKER)
+    if not marker:
+        return content, []
+    calls = json.loads(payload)
+    return content, calls if isinstance(calls, list) else []
+
+
+def _fc_calls(tool_calls: list[dict], functions: list[dict]) -> list[dict]:
+    """Structured tool calls as BFCL's canonical [{name: {arg: value}}]. Malformed
+    arguments raise, which scores the response as unparsable."""
+    original_names = {_fc_name(f["name"]): f["name"] for f in functions}
+    calls = []
+    for tool_call in tool_calls:
+        function = tool_call.get("function") or {}
+        name = original_names.get(function.get("name"), function.get("name"))
+        arguments = function.get("arguments") or {}
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments) if arguments.strip() else {}
+        if not isinstance(arguments, dict):
+            raise TypeError(f"tool call arguments are not an object: {arguments!r}")
+        calls.append({name: arguments})
+    return calls
 
 
 def _apertus_messages(
@@ -658,6 +749,16 @@ class BFCLV3Task(ConfigurableTask):
         chat_template=None,
         gen_prefix: str | None = None,
     ):
+        if self.bfcl_tool_format == "fc":
+            if not (apply_chat_template and chat_template):
+                raise ValueError(_FC_REQUIRES_CHAT_MODEL)
+            if _is_multi_turn(self.bfcl_category):
+                return system_instruction or ""
+            return _require_chat_messages(
+                chat_template(
+                    _with_system_instruction(doc["question"][0], system_instruction)
+                )
+            )
         if self.bfcl_tool_format == "apertus":
             if not (apply_chat_template and chat_template):
                 raise ValueError(
@@ -692,8 +793,9 @@ class BFCLV3Task(ConfigurableTask):
     def doc_to_text(self, doc):
         raw_functions = doc.get("function", [])
         messages = doc["question"][0]
-        if self.bfcl_tool_format == "apertus":
-            return _flatten_messages(messages)
+        if self.bfcl_tool_format in ("apertus", "fc"):
+            # Logging only: these formats build their prompt from the messages.
+            return _flatten_messages(messages).rstrip()
 
         functions = _prompt_functions(raw_functions, self.bfcl_category)
         function_text = json.dumps(functions, ensure_ascii=False)
@@ -723,6 +825,15 @@ class BFCLV3Task(ConfigurableTask):
             if APERTUS_ASSISTANT_END not in arguments["until"]:
                 arguments["until"] = [APERTUS_ASSISTANT_END, *arguments["until"]]
             arguments["max_gen_toks"] = max(arguments["max_gen_toks"], 2048)
+        elif self.bfcl_tool_format == "fc":
+            # Calls come back structured; a "\n\n" stop would only cut the text
+            # before them (and could end generation before the call).
+            arguments["until"] = [stop for stop in arguments["until"] if stop != "\n\n"]
+            arguments["max_gen_toks"] = max(arguments["max_gen_toks"], 2048)
+            if not _is_multi_turn(self.bfcl_category):
+                arguments = _fc_gen_kwargs(
+                    arguments, doc.get("function", []), self.bfcl_category
+                )
         elif "\nUser:" not in arguments["until"]:
             # Untemplated prompts are a User:/Assistant: transcript; stop before the
             # model writes the next (invented) user or execution-results message.
@@ -776,10 +887,19 @@ class BFCLV3Task(ConfigurableTask):
         self._ensure_turn_started(state)
         if state["done"]:
             return None
-        return self._render_multiturn_prompt(state), deepcopy(state["gen_kwargs"])
+        gen_kwargs = deepcopy(state["gen_kwargs"])
+        if self.bfcl_tool_format == "fc":
+            # Per step: miss_func turns add the held-out functions.
+            gen_kwargs = _fc_gen_kwargs(
+                gen_kwargs, state["functions"], self.bfcl_category
+            )
+        return self._render_multiturn_prompt(state), gen_kwargs
 
     def multiturn_consume_response(self, state: dict, response: str) -> None:
         if state["done"]:
+            return
+        if self.bfcl_tool_format == "fc":
+            self._consume_fc_response(state, response)
             return
         state["history"].append({"role": "assistant", "content": response})
         state["raw_responses"][-1].append(response)
@@ -809,6 +929,39 @@ class BFCLV3Task(ConfigurableTask):
         if len(state["raw_responses"][-1]) >= MAXIMUM_STEP_LIMIT:
             self._finish_turn(state)
 
+    def _consume_fc_response(self, state: dict, response: str) -> None:
+        state["raw_responses"][-1].append(response)
+        try:
+            content, tool_calls = _split_tool_calls(response)
+            decoded = _canonical_calls_to_python_call_strings(
+                _fc_calls(tool_calls, state["functions"])
+            )
+        except Exception:  # noqa: BLE001 - malformed calls are a failed turn.
+            content, tool_calls, decoded = response, [], []
+
+        if not decoded:
+            state["history"].append({"role": "assistant", "content": content})
+            self._finish_turn(state)
+            return
+
+        state["decoded_responses"][-1].append(decoded)
+        execution_results, _ = execute_multi_turn_func_call(
+            decoded,
+            instances=state["instances"],
+            long_context="long_context" in self.bfcl_category,
+        )
+        state["execution_results"][-1].append(execution_results)
+        # The calls and one tool message per call, linked by id, as the API expects.
+        state["history"].append(
+            {"role": "assistant", "content": content, "tool_calls": tool_calls}
+        )
+        state["history"].extend(
+            {"role": "tool", "tool_call_id": tool_call.get("id"), "content": result}
+            for tool_call, result in zip(tool_calls, execution_results, strict=True)
+        )
+        if len(state["raw_responses"][-1]) >= MAXIMUM_STEP_LIMIT:
+            self._finish_turn(state)
+
     def multiturn_result(self, state: dict) -> dict:
         return {
             "raw_responses": state["raw_responses"],
@@ -827,14 +980,15 @@ class BFCLV3Task(ConfigurableTask):
             )
             if holdout_functions is not None:
                 state["functions"].extend(holdout_functions)
-                messages = [
-                    {
-                        "role": "user",
-                        "content": json.dumps(holdout_functions, ensure_ascii=False)
+                # In FC mode the new functions arrive in the request's tools.
+                content = DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC
+                if self.bfcl_tool_format != "fc":
+                    content = (
+                        json.dumps(holdout_functions, ensure_ascii=False)
                         + "\n"
-                        + DEFAULT_USER_PROMPT_FOR_ADDITIONAL_FUNCTION_FC,
-                    }
-                ]
+                        + content
+                    )
+                messages = [{"role": "user", "content": content}]
             if not messages:
                 state["turn_idx"] += 1
                 continue
@@ -851,6 +1005,16 @@ class BFCLV3Task(ConfigurableTask):
             state["done"] = True
 
     def _render_multiturn_prompt(self, state: dict) -> str:
+        if self.bfcl_tool_format == "fc":
+            if not (state.get("apply_chat_template") and state.get("chat_template")):
+                raise ValueError(_FC_REQUIRES_CHAT_MODEL)
+            return _require_chat_messages(
+                state["chat_template"](
+                    _with_system_instruction(
+                        state["history"], state.get("system_instruction")
+                    )
+                )
+            )
         if self.bfcl_tool_format == "apertus":
             if not (state.get("apply_chat_template") and state.get("chat_template")):
                 raise ValueError(
@@ -888,6 +1052,12 @@ class BFCLV3Task(ConfigurableTask):
     def _decode(
         self, text: str, doc: dict | None = None, *, strict: bool = True
     ) -> list[dict]:
+        if self.bfcl_tool_format == "fc":
+            functions = (doc or {}).get("function", [])
+            _, tool_calls = _split_tool_calls(text)
+            return _coerce_apertus_calls_for_language(
+                _fc_calls(tool_calls, functions), functions, self.bfcl_language
+            )
         if self.bfcl_tool_format == "apertus":
             calls = _parse_apertus_calls(text, strict=strict)
             return _coerce_apertus_calls_for_language(

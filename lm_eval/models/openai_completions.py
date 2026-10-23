@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from functools import cached_property
@@ -5,11 +6,15 @@ from operator import itemgetter
 from typing import Any
 
 from lm_eval.api.registry import register_model
-from lm_eval.models.api_models import TemplateAPI
+from lm_eval.models.api_models import JsonChatStr, TemplateAPI
 from lm_eval.models.utils import handle_stop_sequences
 
 
 eval_logger = logging.getLogger(__name__)
+
+# Separates a chat response's text from its structured tool calls (JSON) in the
+# string generate_until returns; tasks that send "tools" split on it.
+TOOL_CALLS_MARKER = "<|lm_eval_tool_calls|>"
 
 
 @register_model("local-completions")
@@ -237,10 +242,17 @@ class LocalChatCompletion(LocalCompletionsAPI):
         # Always needs list[dict] messages (see _create_payload's assert
         # below) -- never take LocalCompletionsAPI's plain-string override,
         # which would break the assert here regardless of tokenizer_backend.
-        # The server renders the template, so TemplateAPI refuses extra kwargs.
-        return TemplateAPI.apply_chat_template(
-            self, chat_history, add_generation_prompt, **kwargs
-        )
+        # The server renders the template: chat_template_args travel with each
+        # request as chat_template_kwargs (see _create_payload), and a closing
+        # assistant message is continued there. Task template kwargs (e.g. tools)
+        # can't be applied here; tasks send tools as a generation kwarg instead.
+        if kwargs:
+            raise ValueError(
+                "Task template arguments need the chat template rendered "
+                "client-side; the chat-completions server renders it, so they "
+                f"can't be applied: {sorted(kwargs)}"
+            )
+        return JsonChatStr(json.dumps(chat_history, ensure_ascii=False))
 
     def _create_payload(
         self,
@@ -267,7 +279,12 @@ class LocalChatCompletion(LocalCompletionsAPI):
         stop = handle_stop_sequences(gen_kwargs.pop("until", None), eos)
         if not isinstance(stop, (list, tuple)):
             stop = [stop]
-        return {
+        # Tasks pass tools as a JSON string: gen_kwargs are grouped by value, and a
+        # list of dicts isn't hashable (requests with different tools would merge).
+        tools = gen_kwargs.pop("tools", None)
+        if isinstance(tools, str):
+            tools = json.loads(tools)
+        payload = {
             "messages": messages,
             "model": self.model,
             "max_tokens": max_tokens,
@@ -276,9 +293,19 @@ class LocalChatCompletion(LocalCompletionsAPI):
             "seed": seed,
             **gen_kwargs,
         }
+        if tools:
+            payload["tools"] = tools
+        if self.chat_template_args:
+            # e.g. enable_thinking / reasoning_effort; vLLM and SGLang apply them
+            # when rendering the template.
+            payload["chat_template_kwargs"] = dict(self.chat_template_args)
+        if messages and messages[-1].get("role") == "assistant":
+            # gen_prefix: continue the assistant's started answer (vLLM/SGLang).
+            payload["add_generation_prompt"] = False
+            payload["continue_final_message"] = True
+        return payload
 
-    @staticmethod
-    def parse_generations(outputs: dict | list[dict], **kwargs) -> list[str]:
+    def parse_generations(self, outputs: dict | list[dict], **kwargs) -> list[str]:
         res = []
         if not isinstance(outputs, list):
             outputs = [outputs]
@@ -286,7 +313,7 @@ class LocalChatCompletion(LocalCompletionsAPI):
             try:
                 tmp = [None] * len(out["choices"])
                 for choices in out["choices"]:
-                    tmp[choices["index"]] = choices["message"]["content"]
+                    tmp[choices["index"]] = self._message_text(choices["message"])
             except (IndexError, KeyError, TypeError) as e:
                 # account for cases that generation is blocked by content filter,
                 # which is common for Azure OpenAI Service,
@@ -295,6 +322,28 @@ class LocalChatCompletion(LocalCompletionsAPI):
                 tmp = [""]
             res = res + tmp
         return res
+
+    def _message_text(self, message: dict) -> str | None:
+        """The response message as one string. The server returns reasoning in its
+        own field; with a reasoning close configured it is put back in front of the
+        answer between the markers, so the usual strip and thinking metrics apply.
+        Reasoning without any answer is left unclosed: the server's parser puts all
+        of an unclosed reasoning there, which completions would score as is.
+        Structured tool calls follow TOOL_CALLS_MARKER as JSON."""
+        text = message.get("content")
+        reasoning = message.get("reasoning") or message.get("reasoning_content")
+        if reasoning and self.think_end_token:
+            text = (
+                f"{self.think_start_token or ''}{reasoning}{self.think_end_token}{text}"
+                if text or message.get("tool_calls")
+                else f"{self.think_start_token or ''}{reasoning}"
+            )
+        if message.get("tool_calls"):
+            text = (
+                f"{text or ''}{TOOL_CALLS_MARKER}"
+                f"{json.dumps(message['tool_calls'], ensure_ascii=False)}"
+            )
+        return text
 
     def tok_encode(
         self,
@@ -396,6 +445,12 @@ class OpenAIChatCompletion(LocalChatCompletion):
         assert type(messages) is not str, (
             "chat-completions require the --apply_chat_template flag."
         )
+        if self.chat_template_args:
+            # OpenAI's API takes no chat_template_kwargs; refuse rather than drop.
+            raise ValueError(
+                "chat_template_args (including enable_thinking) can't be applied "
+                f"through OpenAI's chat API: {sorted(self.chat_template_args)}"
+            )
         gen_kwargs.pop("do_sample", False)
         if "max_tokens" in gen_kwargs:
             max_tokens = gen_kwargs.pop("max_tokens")
