@@ -137,10 +137,9 @@ def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     assert prompt == "templated"
@@ -163,10 +162,9 @@ def test_bfcl_v3_apertus_fewshot_context_uses_custom_system_instruction():
         num_fewshot=0,
         system_instruction="Use tools carefully.",
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     assert seen["messages"][0]["content"]["text"] == "Use tools carefully."
@@ -181,10 +179,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
@@ -198,10 +195,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
     assert properties["networkId"]["default"] == "[]"
@@ -212,10 +208,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
     assert properties["auth"]["default"] == "[]"
@@ -238,10 +233,10 @@ def test_bfcl_v3_apertus_multi_turn_uses_tool_chat_template():
         ctx="",
         gen_kwargs={},
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated-multiturn",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs})
+            or "templated-multiturn"
+        ),
     )
 
     prompt, _ = task.multiturn_next_request(state)
@@ -483,8 +478,9 @@ def test_bfcl_v3_multi_turn_uses_chat_template_on_every_step():
         ctx="",
         gen_kwargs={},
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.append(messages)
-        or "templated-multiturn",
+        chat_template=lambda messages, **kwargs: (
+            seen.append(messages) or "templated-multiturn"
+        ),
     )
 
     prompt, _ = task.multiturn_next_request(state)

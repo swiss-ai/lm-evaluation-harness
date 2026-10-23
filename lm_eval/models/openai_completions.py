@@ -93,7 +93,9 @@ class LocalCompletionsAPI(TemplateAPI):
                 **self.chat_template_args,
                 **kwargs,
             )
-        return super().apply_chat_template(chat_history, add_generation_prompt, **kwargs)
+        return super().apply_chat_template(
+            chat_history, add_generation_prompt, **kwargs
+        )
 
     def _create_payload(
         self,
