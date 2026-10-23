@@ -570,3 +570,31 @@ def test_bfcl_v3_multi_turn_drops_empty_assistant_replies_for_chat_template():
     assert all(m["content"].strip() for m in seen[-1] if m["role"] == "assistant")
     roles = [m["role"] for m in seen[-1]]
     assert all(a != b for a, b in itertools.pairwise(roles))
+
+
+def test_bfcl_v3_apertus_folds_doc_system_message_into_system_prompt():
+    task = _make_apertus_task("live_simple")
+    doc = {
+        "id": "live_simple_x",
+        "question": [
+            [
+                {"role": "system", "content": "Doc system rules."},
+                {"role": "user", "content": "hi"},
+            ]
+        ],
+        "function": [],
+    }
+    seen = {}
+
+    task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        system_instruction="Base instruction.",
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(messages=messages) or "",
+    )
+
+    assert [m["role"] for m in seen["messages"]] == ["system", "user"]
+    assert seen["messages"][0]["content"]["text"] == (
+        "Base instruction.\n\nDoc system rules."
+    )

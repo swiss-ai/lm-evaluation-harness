@@ -281,12 +281,25 @@ def _apertus_messages(
     multi_turn: bool,
     system_instruction: str | None = None,
 ) -> list[dict]:
+    # Some live BFCL entries carry their own system message. The Apertus template
+    # accepts a system message only first, so fold those into the one system
+    # prompt (as the BFCL reference does) instead of sending a second one.
+    system_parts = [system_instruction or APERTUS_SYSTEM_PROMPT]
+    system_parts += [
+        _message_content_to_text(message.get("content", ""))
+        for message in messages
+        if message.get("role") == "system"
+    ]
     return [
         {
             "role": "system",
-            "content": {"text": system_instruction or APERTUS_SYSTEM_PROMPT},
+            "content": {"text": "\n\n".join(part for part in system_parts if part)},
         },
-        *[_apertus_message(message) for message in messages],
+        *[
+            _apertus_message(message)
+            for message in messages
+            if message.get("role") != "system"
+        ],
     ]
 
 
