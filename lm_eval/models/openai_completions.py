@@ -59,7 +59,10 @@ class LocalCompletionsAPI(TemplateAPI):
         )
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ):
         # The /v1/completions endpoint takes a flat string prompt, never a
         # messages array -- so whenever a local HF tokenizer is available we
@@ -78,6 +81,9 @@ class LocalCompletionsAPI(TemplateAPI):
         # score against a different template than what real inference
         # traffic sees. They match as long as serving wasn't given an
         # explicit template override.
+        #
+        # Extra kwargs come from tasks that render tool schemas into the prompt
+        # (e.g. bfcl_v3_apertus passes tools=[...]).
         if self.tokenizer_backend == "huggingface":
             return self.tokenizer.apply_chat_template(
                 chat_history,
@@ -85,8 +91,11 @@ class LocalCompletionsAPI(TemplateAPI):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
+                **kwargs,
             )
-        return super().apply_chat_template(chat_history, add_generation_prompt)
+        return super().apply_chat_template(
+            chat_history, add_generation_prompt, **kwargs
+        )
 
     def _create_payload(
         self,
@@ -220,13 +229,17 @@ class LocalChatCompletion(LocalCompletionsAPI):
             self._batch_size = 1
 
     def apply_chat_template(
-        self, chat_history: list[dict[str, str]], add_generation_prompt: bool = True
+        self,
+        chat_history: list[dict[str, str]],
+        add_generation_prompt: bool = True,
+        **kwargs,
     ):
         # Always needs list[dict] messages (see _create_payload's assert
         # below) -- never take LocalCompletionsAPI's plain-string override,
         # which would break the assert here regardless of tokenizer_backend.
+        # The server renders the template, so TemplateAPI refuses extra kwargs.
         return TemplateAPI.apply_chat_template(
-            self, chat_history, add_generation_prompt
+            self, chat_history, add_generation_prompt, **kwargs
         )
 
     def _create_payload(

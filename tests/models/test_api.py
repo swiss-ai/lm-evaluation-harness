@@ -482,6 +482,24 @@ def test_chat_template_args_refused_when_server_renders_template():
         model.apply_chat_template([{"role": "user", "content": "hi"}])
 
 
+def test_local_completions_passes_task_template_kwargs_to_tokenizer():
+    model = _completions_with_tokenizer()
+    tools = [{"type": "function", "function": {"name": "f"}}]
+
+    model.apply_chat_template([{"role": "user", "content": "hi"}], tools=tools)
+
+    assert model.tokenizer.calls[0]["tools"] == tools
+
+
+def test_task_template_kwargs_refused_when_server_renders_template():
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    model = LocalChatCompletion(base_url="http://test-url.com", model="test-model")
+
+    with pytest.raises(ValueError, match=r"\['tools'\]"):
+        model.apply_chat_template([{"role": "user", "content": "hi"}], tools=[{}])
+
+
 @pytest.mark.parametrize("enable_thinking", [True, False])
 def test_local_completions_folds_enable_thinking_into_template_args(enable_thinking):
     model = _completions_with_tokenizer(
