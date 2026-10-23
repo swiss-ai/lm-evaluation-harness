@@ -6,3 +6,4 @@ metadata:
   bfcl_category: parallel_multiple
   bfcl_language: Python
   bfcl_tool_format: apertus
+  requires_chat_template: true
