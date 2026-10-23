@@ -158,9 +158,14 @@ class BaseTasks:
         # rollout driver (and thus request-building) enforces it.
         apply_chat_template = task_class.OUTPUT_TYPE == "multi_turn_generate"
         chat_template = None
-        if (task_class.config.metadata or {}).get("requires_chat_model"):
+        metadata = task_class.config.metadata or {}
+        if metadata.get("requires_chat_model") or metadata.get(
+            "requires_chat_template"
+        ):
             # Tasks that only work with a chat-completions model (e.g. tools sent in
             # the request) get its template: the messages themselves, not text.
+            # Tasks that render their prompt through a chat template take the same
+            # stand-in (it accepts template kwargs such as tools).
             apply_chat_template, chat_template = True, _chat_model_template
         task_class.build_all_requests(
             rank=1,

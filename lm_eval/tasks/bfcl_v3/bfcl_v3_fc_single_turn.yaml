@@ -1,6 +1,7 @@
 group: bfcl_v3_fc_single_turn
 task:
   - bfcl_v3_fc_simple
+  - bfcl_v3_fc_irrelevance
   - bfcl_v3_fc_parallel
   - bfcl_v3_fc_multiple
   - bfcl_v3_fc_parallel_multiple

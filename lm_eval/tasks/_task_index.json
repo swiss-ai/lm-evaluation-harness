@@ -19565,6 +19565,11 @@
       "tags": [],
       "yaml_path": "bfcl_v3/bfcl_v3_apertus.yaml"
     },
+    "bfcl_v3_apertus_irrelevance": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_apertus_irrelevance.yaml"
+    },
     "bfcl_v3_apertus_java": {
       "kind": "PY_TASK",
       "tags": [],
@@ -19659,6 +19664,11 @@
       "kind": "GROUP",
       "tags": [],
       "yaml_path": "bfcl_v3/bfcl_v3_fc.yaml"
+    },
+    "bfcl_v3_fc_irrelevance": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_irrelevance.yaml"
     },
     "bfcl_v3_fc_java": {
       "kind": "PY_TASK",
@@ -118906,6 +118916,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16199,
+  "entry_count": 16201,
   "schema_version": 1
 }
