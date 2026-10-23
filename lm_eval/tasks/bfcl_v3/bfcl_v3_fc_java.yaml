@@ -6,3 +6,4 @@ metadata:
   bfcl_category: java
   bfcl_language: Java
   bfcl_tool_format: fc
+  requires_chat_model: true

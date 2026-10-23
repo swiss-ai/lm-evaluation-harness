@@ -794,7 +794,8 @@ class BFCLV3Task(ConfigurableTask):
         raw_functions = doc.get("function", [])
         messages = doc["question"][0]
         if self.bfcl_tool_format in ("apertus", "fc"):
-            return _flatten_messages(messages)
+            # Logging only: these formats build their prompt from the messages.
+            return _flatten_messages(messages).rstrip()
 
         functions = _prompt_functions(raw_functions, self.bfcl_category)
         function_text = json.dumps(functions, ensure_ascii=False)

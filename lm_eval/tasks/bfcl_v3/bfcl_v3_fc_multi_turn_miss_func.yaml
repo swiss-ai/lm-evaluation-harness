@@ -7,3 +7,4 @@ metadata:
   bfcl_category: multi_turn_miss_func
   bfcl_language: Python
   bfcl_tool_format: fc
+  requires_chat_model: true

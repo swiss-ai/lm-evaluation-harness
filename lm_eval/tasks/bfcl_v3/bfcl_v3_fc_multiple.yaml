@@ -6,3 +6,4 @@ metadata:
   bfcl_category: multiple
   bfcl_language: Python
   bfcl_tool_format: fc
+  requires_chat_model: true
