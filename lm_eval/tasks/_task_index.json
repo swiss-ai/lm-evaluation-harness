@@ -19655,6 +19655,101 @@
       "tags": [],
       "yaml_path": "bfcl_v3/bfcl_v3_apertus_single_turn.yaml"
     },
+    "bfcl_v3_fc": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc.yaml"
+    },
+    "bfcl_v3_fc_java": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_java.yaml"
+    },
+    "bfcl_v3_fc_javascript": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_javascript.yaml"
+    },
+    "bfcl_v3_fc_live_irrelevance": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_irrelevance.yaml"
+    },
+    "bfcl_v3_fc_live_multiple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_multiple.yaml"
+    },
+    "bfcl_v3_fc_live_parallel": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_parallel.yaml"
+    },
+    "bfcl_v3_fc_live_parallel_multiple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_parallel_multiple.yaml"
+    },
+    "bfcl_v3_fc_live_relevance": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_relevance.yaml"
+    },
+    "bfcl_v3_fc_live_simple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_live_simple.yaml"
+    },
+    "bfcl_v3_fc_multi_turn": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multi_turn.yaml"
+    },
+    "bfcl_v3_fc_multi_turn_base": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multi_turn_base.yaml"
+    },
+    "bfcl_v3_fc_multi_turn_long_context": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multi_turn_long_context.yaml"
+    },
+    "bfcl_v3_fc_multi_turn_miss_func": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multi_turn_miss_func.yaml"
+    },
+    "bfcl_v3_fc_multi_turn_miss_param": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multi_turn_miss_param.yaml"
+    },
+    "bfcl_v3_fc_multiple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_multiple.yaml"
+    },
+    "bfcl_v3_fc_parallel": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_parallel.yaml"
+    },
+    "bfcl_v3_fc_parallel_multiple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_parallel_multiple.yaml"
+    },
+    "bfcl_v3_fc_simple": {
+      "kind": "PY_TASK",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_simple.yaml"
+    },
+    "bfcl_v3_fc_single_turn": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "bfcl_v3/bfcl_v3_fc_single_turn.yaml"
+    },
     "bfcl_v3_irrelevance": {
       "kind": "PY_TASK",
       "tags": [],
@@ -118811,6 +118906,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16180,
+  "entry_count": 16199,
   "schema_version": 1
 }

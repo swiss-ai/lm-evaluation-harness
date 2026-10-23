@@ -1,0 +1,4 @@
+group: bfcl_v3_fc
+task:
+  - bfcl_v3_fc_single_turn
+  - bfcl_v3_fc_multi_turn

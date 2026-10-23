@@ -469,17 +469,121 @@ def test_local_completions_without_chat_template_args_is_unchanged():
     assert "reasoning_effort" not in model.tokenizer.calls[0]
 
 
-def test_chat_template_args_refused_when_server_renders_template():
+def _chat_model(**kwargs):
     from lm_eval.models.openai_completions import LocalChatCompletion
 
-    model = LocalChatCompletion(
-        base_url="http://test-url.com",
-        model="test-model",
-        chat_template_args={"reasoning_effort": "high"},
+    return LocalChatCompletion(
+        base_url="http://test-url.com", model="test-model", **kwargs
+    )
+
+
+def _chat_payload(model, messages, **gen_kwargs):
+    import json
+
+    prompt = model.apply_chat_template(messages)
+    return model._create_payload(
+        json.loads(prompt.prompt), generate=True, gen_kwargs=dict(gen_kwargs)
+    )
+
+
+def test_chat_template_args_travel_as_chat_template_kwargs():
+    model = _chat_model(chat_template_args={"reasoning_effort": "high"})
+
+    payload = _chat_payload(model, [{"role": "user", "content": "hi"}])
+
+    assert payload["chat_template_kwargs"] == {"reasoning_effort": "high"}
+
+
+def test_chat_payload_without_template_args_has_no_chat_template_kwargs():
+    payload = _chat_payload(_chat_model(), [{"role": "user", "content": "hi"}])
+
+    assert "chat_template_kwargs" not in payload
+    assert "continue_final_message" not in payload
+
+
+def test_chat_payload_sends_tools_from_json_gen_kwarg():
+    tools = [{"type": "function", "function": {"name": "f", "parameters": {}}}]
+    import json
+
+    payload = _chat_payload(
+        _chat_model(),
+        [{"role": "user", "content": "hi"}],
+        tools=json.dumps(tools),
+    )
+
+    assert payload["tools"] == tools
+
+
+def test_chat_payload_continues_a_closing_assistant_message():
+    payload = _chat_payload(
+        _chat_model(),
+        [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "Answer:"},
+        ],
+    )
+
+    assert payload["continue_final_message"] is True
+    assert payload["add_generation_prompt"] is False
+
+
+def test_chat_parse_generations_appends_tool_calls_after_marker():
+    import json
+
+    from lm_eval.models.openai_completions import TOOL_CALLS_MARKER
+
+    calls = [{"id": "c1", "function": {"name": "f", "arguments": "{}"}}]
+    out = {
+        "choices": [{"index": 0, "message": {"content": "Sure.", "tool_calls": calls}}]
+    }
+
+    (text,) = _chat_model().parse_generations(out)
+
+    assert text == "Sure." + TOOL_CALLS_MARKER + json.dumps(calls)
+
+
+def test_chat_parse_generations_puts_reasoning_between_think_markers():
+    model = _chat_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    out = {
+        "choices": [
+            {"index": 0, "message": {"content": "391", "reasoning": "17*23=391"}}
+        ]
+    }
+
+    assert model.parse_generations(out) == ["<think>17*23=391</think>391"]
+
+
+def test_chat_parse_generations_leaves_answerless_reasoning_unclosed():
+    # The server's parser puts an unclosed reasoning entirely in the reasoning field.
+    model = _chat_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    out = {
+        "choices": [{"index": 0, "message": {"content": None, "reasoning": "17*23 is"}}]
+    }
+
+    assert model.parse_generations(out) == ["<think>17*23 is"]
+
+
+def test_chat_parse_generations_drops_reasoning_without_think_markers():
+    out = {
+        "choices": [
+            {"index": 0, "message": {"content": "391", "reasoning": "17*23=391"}}
+        ]
+    }
+
+    assert _chat_model().parse_generations(out) == ["391"]
+
+
+def test_openai_chat_refuses_chat_template_args():
+    from lm_eval.models.openai_completions import OpenAIChatCompletion
+
+    model = OpenAIChatCompletion(
+        model="gpt-x", chat_template_args={"reasoning_effort": "high"}
     )
 
     with pytest.raises(ValueError, match="chat_template_args"):
-        model.apply_chat_template([{"role": "user", "content": "hi"}])
+        model._create_payload(
+            [{"role": "user", "content": "hi"}], generate=True, gen_kwargs={}
+        )
 
 
 def test_local_completions_passes_task_template_kwargs_to_tokenizer():
@@ -513,15 +617,12 @@ def test_local_completions_folds_enable_thinking_into_template_args(enable_think
     assert model.tokenizer.calls[0]["reasoning_effort"] == "low"
 
 
-def test_enable_thinking_alone_refused_when_server_renders_template():
-    from lm_eval.models.openai_completions import LocalChatCompletion
+def test_enable_thinking_travels_as_chat_template_kwargs():
+    model = _chat_model(enable_thinking=False)
 
-    model = LocalChatCompletion(
-        base_url="http://test-url.com", model="test-model", enable_thinking=False
-    )
+    payload = _chat_payload(model, [{"role": "user", "content": "hi"}])
 
-    with pytest.raises(ValueError, match=r"enable_thinking"):
-        model.apply_chat_template([{"role": "user", "content": "hi"}])
+    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
 
 
 def _thinking_api(**kwargs):
