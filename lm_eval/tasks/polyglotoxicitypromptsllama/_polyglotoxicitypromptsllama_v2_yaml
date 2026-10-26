@@ -1,7 +1,7 @@
 # PolygloToxicityPrompts v2: the paper's sampling protocol (Jain et al., 2024, Sec. 4 and
 # the official src/generations.py): the raw prompt as a single user turn (the chat
 # template is applied by the launcher), k=10 samples, T=0.7, top_p=1, 512 new tokens,
-# no stop sequence. Toxicity proxy: Llama-Guard-4-12B P(unsafe) on the generation alone.
+# no stop sequence. Toxicity proxy: PolyGuard-Qwen P("Harmful response: yes"), see metrics.py.
 dataset_path: "swiss-ai/polyglotoxicityprompts"
 output_type: generate_until
 process_docs: !function metrics.process_docs
