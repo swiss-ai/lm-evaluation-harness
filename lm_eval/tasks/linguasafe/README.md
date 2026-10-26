@@ -41,7 +41,8 @@ The split follows the official evaluator.
   refusals.
 
 The official judge prompts are used. The default judge is
-`meta-llama/Llama-3.3-70B-Instruct` (`LINGUASAFE_JUDGE_MODEL`). A separate rejection judge
+`Qwen/Qwen3.8-27B` with thinking disabled (`LINGUASAFE_JUDGE_MODEL`; `LINGUASAFE_JUDGE_THINKING=1`
+turns thinking on). Llama-3.3-70B-Instruct, the previous default, is no longer served. A separate rejection judge
 can be set with `LINGUASAFE_REJECT_JUDGE_MODEL`.
 
 Generation is greedy by default (`max_gen_toks` 256, or 64 for the MCQ part), with the

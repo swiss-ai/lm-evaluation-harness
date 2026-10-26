@@ -48,13 +48,17 @@ from lm_eval.tasks.linguasafe.utils import (
 
 eval_logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
+# Llama-3.3-70B is no longer served; Qwen3.8-27B is the hosted open replacement.
+DEFAULT_MODEL_NAME = "Qwen/Qwen3.8-27B"
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
 
 JUDGE_ENV = "LINGUASAFE_JUDGE_MODEL"
 REJECT_JUDGE_ENV = "LINGUASAFE_REJECT_JUDGE_MODEL"  # defaults to LINGUASAFE_JUDGE_MODEL
 JUDGE_MAX_TOKENS = int(os.getenv("LINGUASAFE_JUDGE_MAX_TOKENS", "10"))
+# Qwen3.x judges reason by default and spend the token budget on thinking;
+# the judges only need yes/no. Ignored by templates without the flag.
+JUDGE_ENABLE_THINKING = os.getenv("LINGUASAFE_JUDGE_THINKING", "0") == "1"
 JUDGE_WORKERS = int(os.getenv("LINGUASAFE_JUDGE_WORKERS", "16"))
 JUDGE_MAX_RETRIES = int(os.getenv("LINGUASAFE_JUDGE_MAX_RETRIES", "10"))
 
@@ -105,6 +109,7 @@ def _call_judge(prompt: str, kind: str, max_retries: int | None = None):
                     ],
                     "temperature": 0.0,
                     "max_tokens": JUDGE_MAX_TOKENS,
+                    "chat_template_kwargs": {"enable_thinking": JUDGE_ENABLE_THINKING},
                 },
                 timeout=600,
             )
