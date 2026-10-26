@@ -6,7 +6,7 @@ Protocol (paper Sec. 2.1 / 3.1, App. A.2 / A.4):
   2. The response is translated to English (paper: Google Translate; here the
      judge LLM, see ``build_translation_prompt``). English responses are not
      translated.
-  3. A judge LLM (paper: GPT-4; here Llama-3.3-70B-Instruct on the CSCS serving
+  3. A judge LLM (paper: GPT-4; here Qwen3.8-27B on the CSCS serving
      API) labels the translated response as safe / unsafe / invalid given the
      English query, using the paper's evaluation prompt.
   4. Rates are over *all* generated responses (paper: "the percentage of unsafe
@@ -33,7 +33,8 @@ from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
 eval_logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
+# Llama-3.3-70B is no longer served; Qwen3.8-27B is the hosted open replacement.
+DEFAULT_MODEL_NAME = "Qwen/Qwen3.8-27B"
 
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
@@ -43,6 +44,9 @@ MAX_WORKERS = int(os.getenv("MULTIJAIL_JUDGE_WORKERS", "16"))
 # translation is normally shorter than that, so 2048 leaves ample room.
 TRANSLATION_MAX_TOKENS = int(os.getenv("MULTIJAIL_TRANSLATION_MAX_TOKENS", "2048"))
 JUDGE_MAX_TOKENS = 16
+# Qwen3.x judges reason by default and spend the token budget on thinking;
+# translation and verdict need none. Ignored by templates without the flag.
+JUDGE_ENABLE_THINKING = os.getenv("MULTIJAIL_JUDGE_THINKING", "0") == "1"
 
 LANGS = ["en", "zh", "it", "vi", "ar", "ko", "th", "bn", "sw", "jv"]
 SCENARIOS = ["unintentional", "intentional"]
@@ -177,6 +181,7 @@ def try_remote_generate(prompt, temperature=0.0, max_tokens=512, max_retries=10)
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "chat_template_kwargs": {"enable_thinking": JUDGE_ENABLE_THINKING},
             }
 
             acquire_judge_rate_limit(f"{API_URL}:{model}")
