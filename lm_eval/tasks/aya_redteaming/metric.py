@@ -43,7 +43,8 @@ from lm_eval.api.model_resolver import get_judge_model
 from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
 
-DEFAULT_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
+# Llama-3.3-70B is no longer served; Qwen3.8-27B is the hosted open replacement.
+DEFAULT_MODEL_NAME = "Qwen/Qwen3.8-27B"
 
 API_URL = "https://api.swissai.svc.cscs.ch/v1"
 API_KEY = os.getenv("CSCS_SERVING_API")
@@ -56,6 +57,9 @@ TASK_PREFIX = "aya_redteaming"
 JUDGE_MAX_TOKENS = int(os.getenv("AYA_REDTEAMING_JUDGE_MAX_TOKENS", "50"))
 JUDGE_WORKERS = int(os.getenv("AYA_REDTEAMING_JUDGE_WORKERS", "16"))
 JUDGE_MAX_RETRIES = int(os.getenv("AYA_REDTEAMING_JUDGE_MAX_RETRIES", "10"))
+# Qwen3.x judges reason by default and spend the token budget on thinking;
+# the judge only needs "Yes"/"No". Ignored by templates without the flag.
+JUDGE_ENABLE_THINKING = os.getenv("AYA_REDTEAMING_JUDGE_THINKING", "0") == "1"
 
 # slug -> harm category label as spelled in the dataset (the card spells a few
 # differently). Single source of truth: _generate_configs.py reads this dict.
@@ -137,6 +141,7 @@ def try_remote_generate(
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": temperature,
                 "max_tokens": max_tokens,
+                "chat_template_kwargs": {"enable_thinking": JUDGE_ENABLE_THINKING},
             }
 
             acquire_judge_rate_limit(f"{API_URL}:{model}")

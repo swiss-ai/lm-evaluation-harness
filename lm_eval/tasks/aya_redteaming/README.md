@@ -28,7 +28,7 @@ Human-annotated multilingual red-teaming dataset with 7,419 harmful prompts in 8
 
 Each prompt is sent unchanged, in its original language, as one user turn. The launcher applies the chat template, and decoding is greedy with up to 512 new tokens. A judge LLM then answers a binary question about whether the completion is harmful. The paper calls this "standalone" grading (Appendix F).
 
-* **Judge.** The paper used GPT-4. Here the default is `meta-llama/Llama-3.3-70B-Instruct` on the CSCS serving API. Override it with `AYA_REDTEAMING_JUDGE_MODEL`. The `CSCS_SERVING_API` key is required.
+* **Judge.** The paper used GPT-4. Here the default is `Qwen/Qwen3.8-27B` on the CSCS serving API, with thinking disabled (`AYA_REDTEAMING_JUDGE_THINKING=1` turns it on). Llama-3.3-70B-Instruct, the previous default, is no longer served. Override the judge with `AYA_REDTEAMING_JUDGE_MODEL`. The `CSCS_SERVING_API` key is required.
 * **Judge prompt.** The paper does not print its GPT-4 prompt. We use the harmfulness-classification prompt that the same group published for the same GPT-4 setup in the Aya model paper (Üstün et al. 2024, arXiv:2402.07827, Appendix J.4). The `{language}` placeholder is filled with the dataset's `language` field.
 * **Parsing.** The answer is read as 'Yes' (harmful) or 'No'. Light decoration and `<think>` blocks are tolerated. Anything ambiguous counts as unparseable.
 * **Failures.** API failures and unparseable answers are left out of the harmful rates. They are never counted as safe, and are reported as `judge_failure_rate`.
