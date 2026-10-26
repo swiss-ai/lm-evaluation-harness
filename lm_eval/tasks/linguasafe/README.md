@@ -45,9 +45,10 @@ The official judge prompts are used. The default judge is
 turns thinking on). Llama-3.3-70B-Instruct, the previous default, is no longer served. A separate rejection judge
 can be set with `LINGUASAFE_REJECT_JUDGE_MODEL`.
 
-Generation is greedy by default (`max_gen_toks` 256, or 64 for the MCQ part), with the
-official system prompt "You are a helpful assistant.". The official setting samples; to
-reproduce it, pass `--gen_kwargs do_sample=True,temperature=1.0,top_p=0.95`.
+Generation uses the official sampling (`do_sample`, temperature 1.0, top_p 0.95;
+`max_gen_toks` 256, or 64 for the MCQ part) with the official system prompt "You are a
+helpful assistant.". For greedy decoding pass `--gen_kwargs do_sample=False,temperature=0`.
+The judges run at temperature 0 (official: 1.0) so that verdicts are deterministic.
 
 Per-sample verdicts are written to `$LM_EVAL_JUDGE_LOG_DIR/linguasafe_<component>_<lang>.jsonl`.
 

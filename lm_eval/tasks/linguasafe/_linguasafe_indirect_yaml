@@ -23,10 +23,10 @@ metric_list:
     higher_is_better: false
 generation_kwargs:
   until: []
-  # Greedy by default (reproducible per-sample verdicts). Official setting:
-  # --gen_kwargs do_sample=True,temperature=1.0,top_p=0.95
-  do_sample: false
-  temperature: 0.0
+  # Official LinguaSafe sampling (linguasafe/eval.py @ fd54717).
+  do_sample: true
+  temperature: 1.0
+  top_p: 0.95
   max_gen_toks: 256
 metadata:
   version: 1.0
