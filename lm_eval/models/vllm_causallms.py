@@ -96,8 +96,9 @@ class VLLM(TemplateLM):
         data_parallel_size: int = 1,
         lora_local_path: str | None = None,
         # VLLM: enable thinking tags in the prompt. Chat-template argument only; it does
-        # not affect the strip, token auto-detection or the thinking metrics.
-        enable_thinking: bool = True,
+        # not affect the strip, token auto-detection or the thinking metrics. None (the
+        # default) keeps the template's own default, as for hf.
+        enable_thinking: bool | None = None,
         chat_template_args: dict | None = None,
         chat_template_path: str | None = None,
         strip_system_boilerplate: bool = False,
@@ -230,9 +231,9 @@ class VLLM(TemplateLM):
         )
 
         self.chat_template_args = chat_template_args
-        self.enable_thinking = self.chat_template_args.pop(
-            "enable_thinking", enable_thinking
-        )
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
+        self.enable_thinking = self.chat_template_args.get("enable_thinking")
         # Auto-detect the open/close tokens from the chat template when not forced (and
         # only when `autodetect_think_tokens`). Fails loud if the template declares
         # reasoning tokens but the close can't be resolved. The strip then runs iff a
@@ -380,7 +381,6 @@ class VLLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 chat_template=self.hf_chat_template,
-                enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
                 **kwargs,
             )
@@ -394,7 +394,6 @@ class VLLM(TemplateLM):
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 chat_template=self.hf_chat_template,
-                enable_thinking=self.enable_thinking,
                 **self.chat_template_args,
                 **kwargs,
             )

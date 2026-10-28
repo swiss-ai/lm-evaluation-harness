@@ -31,6 +31,11 @@ with contextlib.suppress(ModuleNotFoundError):
     import sglang as sgl
 
 
+def _sglang_device_type(device: str | None) -> str | None:
+    """Drop a device index: SGLang takes a device type ("cuda"), not "cuda:0"."""
+    return device.split(":", 1)[0] if device else device
+
+
 @register_model("sglang")
 class SGLangLM(TemplateLM):
     _DEFAULT_MAX_LENGTH = 2048
@@ -41,7 +46,7 @@ class SGLangLM(TemplateLM):
         # batch args from lm-eval interface:  https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/interface.md
         batch_size: str | int = 1,
         max_batch_size=None,
-        max_model_len: int = None,
+        max_model_len: int | None = None,
         max_gen_toks: int = 256,
         add_bos_token: bool | None = False,
         ########## SGlang native args ##########
@@ -63,6 +68,9 @@ class SGLangLM(TemplateLM):
         prefix_token_id: int | None = None,
         chat_template_args: dict | None = None,
         chat_template_path: str | None = None,
+        # chat-template switch, folded into chat_template_args as for hf; None keeps the
+        # template default. Must be a named parameter: `**kwargs` goes to `sgl.Engine`.
+        enable_thinking: bool | None = None,
         # End marker for thinking tags - splits to get response after this token (if provided).
         think_end_token: str | None = None,
         # Start marker for thinking tags - used for the thinking-format metric. Auto-
@@ -86,7 +94,10 @@ class SGLangLM(TemplateLM):
                 "Please install sglang via official document here:https://docs.sglang.ai/start/install.html#install-sglang"
             )
 
-        assert "cuda" in device or device is None, "SGLang only supports CUDA"
+        assert device is None or "cuda" in device, "SGLang only supports CUDA"
+        # The CLI's default device is "cuda:0"; SGLang crashes at startup on anything
+        # but a bare device type, and places the model on GPUs itself from tp/dp_size.
+        device = _sglang_device_type(device)
         assert context_length is None or max_model_len is None, (
             "Either context_length or max_model_len may be provided, but not both"
         )
@@ -133,6 +144,9 @@ class SGLangLM(TemplateLM):
             strip=False,
             chat_template_path=chat_template_path,
         )
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
+        self.enable_thinking = self.chat_template_args.get("enable_thinking")
         # Auto-detect open/close tokens from the chat template when opted in and not
         # forced. When on, fails loud if the template declares reasoning tokens but the
         # close can't be resolved; pass `think_end_token=` or drop the opt-in to escape.
@@ -164,6 +178,18 @@ class SGLangLM(TemplateLM):
                 "Found 'gemma' in model name, a BOS token will be used as Gemma series models underperform without it."
             )
         self.custom_prefix_token_id = prefix_token_id
+
+    def loglikelihood(
+        self, requests: list[Instance], disable_tqdm: bool = False
+    ) -> list[tuple[float, bool]]:
+        if self.enable_thinking:
+            task_names = {req.task_name for req in requests if req.task_name}
+            raise ValueError(
+                f"enable_thinking=True is not compatible with loglikelihood tasks. "
+                f"Please use generative tasks only when using `enable_thinking=True`. "
+                f"Triggered by task(s): {', '.join(sorted(task_names))}"
+            )
+        return super().loglikelihood(requests, disable_tqdm=disable_tqdm)
 
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False
@@ -289,7 +315,7 @@ class SGLangLM(TemplateLM):
                     # add EOS token to stop sequences
                     until = handle_stop_sequences(kwargs.pop("until", None), eos=eos)
                 else:
-                    raise ValueError(
+                    raise ValueError(  # noqa: TRY004
                         f"Expected `kwargs` to be of type `dict` but got {type(gen_kwargs)}"
                     )
                 if "max_gen_toks" in kwargs.keys():
@@ -355,7 +381,7 @@ class SGLangLM(TemplateLM):
 
     def _model_generate(
         self,
-        requests: list[list[int]] = None,
+        requests: list[list[int]] | None = None,
         generate: bool = False,
         sampling_params: list[dict] | dict | None = None,
         return_logprob: bool = False,
@@ -364,7 +390,7 @@ class SGLangLM(TemplateLM):
     ):
         # check sglang sampling parameters: https://github.com/sgl-project/sglang/blob/main/python/sglang/srt/sampling/sampling_params.py#L21  and https://docs.sglang.ai/references/sampling_params.html.
         if not generate:
-            sampling_params = sampling_params if sampling_params else {}
+            sampling_params = sampling_params or {}
             sampling_params.update(
                 {
                     "temperature": 0,
@@ -415,7 +441,7 @@ class SGLangLM(TemplateLM):
     def tok_encode(
         self,
         string: str | list[str],
-        left_truncate_len: int = None,
+        left_truncate_len: int | None = None,
         add_special_tokens: bool = False,
         truncation: bool = False,
     ) -> list[int] | list[list[int]]:
@@ -450,7 +476,6 @@ class SGLangLM(TemplateLM):
         Returns:
             str: The name of the model's tokenizer and/or chat template.
         """
-        pass
 
     def chat_template(self, chat_template: bool | str = False) -> str:
         """
@@ -471,7 +496,6 @@ class SGLangLM(TemplateLM):
         Returns:
             str: The selected chat template in Jinja format.
         """
-        pass
 
     def apply_chat_template(
         self,

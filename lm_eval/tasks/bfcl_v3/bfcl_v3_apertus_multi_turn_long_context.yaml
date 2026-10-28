@@ -15,3 +15,4 @@ metadata:
   bfcl_category: multi_turn_long_context
   bfcl_language: Python
   bfcl_tool_format: apertus
+  requires_chat_template: true

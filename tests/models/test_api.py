@@ -427,3 +427,412 @@ def test_localchatcompletion_remote_tokenizer_unauthenticated(monkeypatch):
     assert captured["verify_certificate"] is False
     assert captured["ca_cert_path"] is None
     assert captured["auth_token"] is None
+
+
+class _RecordingTokenizer:
+    """Stands in for an HF tokenizer and records the template kwargs it is given."""
+
+    def __init__(self):
+        self.calls = []
+
+    def apply_chat_template(self, chat_history, **kwargs):
+        self.calls.append(kwargs)
+        effort = kwargs.get("reasoning_effort", "medium")
+        return f"Reasoning: {effort}\n" + chat_history[-1]["content"]
+
+
+def _completions_with_tokenizer(**kwargs):
+    model = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        **kwargs,
+    )
+    model.tokenizer_backend = "huggingface"
+    model.tokenizer = _RecordingTokenizer()
+    return model
+
+
+def test_local_completions_renders_chat_template_args():
+    model = _completions_with_tokenizer(chat_template_args={"reasoning_effort": "high"})
+    chat = [{"role": "user", "content": "What is 2+2?"}]
+
+    assert model.apply_chat_template(chat) == "Reasoning: high\nWhat is 2+2?"
+    assert model.tokenizer.calls[0]["reasoning_effort"] == "high"
+
+
+def test_local_completions_without_chat_template_args_is_unchanged():
+    model = _completions_with_tokenizer()
+    chat = [{"role": "user", "content": "What is 2+2?"}]
+
+    assert model.apply_chat_template(chat) == "Reasoning: medium\nWhat is 2+2?"
+    assert "reasoning_effort" not in model.tokenizer.calls[0]
+
+
+def _chat_model(**kwargs):
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    return LocalChatCompletion(
+        base_url="http://test-url.com", model="test-model", **kwargs
+    )
+
+
+def _chat_payload(model, messages, **gen_kwargs):
+    import json
+
+    prompt = model.apply_chat_template(messages)
+    return model._create_payload(
+        json.loads(prompt.prompt), generate=True, gen_kwargs=dict(gen_kwargs)
+    )
+
+
+def test_chat_template_args_travel_as_chat_template_kwargs():
+    model = _chat_model(chat_template_args={"reasoning_effort": "high"})
+
+    payload = _chat_payload(model, [{"role": "user", "content": "hi"}])
+
+    assert payload["chat_template_kwargs"] == {"reasoning_effort": "high"}
+
+
+def test_chat_payload_without_template_args_has_no_chat_template_kwargs():
+    payload = _chat_payload(_chat_model(), [{"role": "user", "content": "hi"}])
+
+    assert "chat_template_kwargs" not in payload
+    assert "continue_final_message" not in payload
+
+
+def test_chat_payload_sends_tools_from_json_gen_kwarg():
+    tools = [{"type": "function", "function": {"name": "f", "parameters": {}}}]
+    import json
+
+    payload = _chat_payload(
+        _chat_model(),
+        [{"role": "user", "content": "hi"}],
+        tools=json.dumps(tools),
+    )
+
+    assert payload["tools"] == tools
+
+
+def test_chat_payload_continues_a_closing_assistant_message():
+    payload = _chat_payload(
+        _chat_model(),
+        [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "Answer:"},
+        ],
+    )
+
+    assert payload["continue_final_message"] is True
+    assert payload["add_generation_prompt"] is False
+
+
+def test_chat_parse_generations_appends_tool_calls_after_marker():
+    import json
+
+    from lm_eval.models.openai_completions import TOOL_CALLS_MARKER
+
+    calls = [{"id": "c1", "function": {"name": "f", "arguments": "{}"}}]
+    out = {
+        "choices": [{"index": 0, "message": {"content": "Sure.", "tool_calls": calls}}]
+    }
+
+    (text,) = _chat_model().parse_generations(out)
+
+    assert text == "Sure." + TOOL_CALLS_MARKER + json.dumps(calls)
+
+
+def test_chat_parse_generations_puts_reasoning_between_think_markers():
+    model = _chat_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    out = {
+        "choices": [
+            {"index": 0, "message": {"content": "391", "reasoning": "17*23=391"}}
+        ]
+    }
+
+    assert model.parse_generations(out) == ["<think>17*23=391</think>391"]
+
+
+def test_chat_parse_generations_leaves_answerless_reasoning_unclosed():
+    # The server's parser puts an unclosed reasoning entirely in the reasoning field.
+    model = _chat_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    out = {
+        "choices": [{"index": 0, "message": {"content": None, "reasoning": "17*23 is"}}]
+    }
+
+    assert model.parse_generations(out) == ["<think>17*23 is"]
+
+
+def test_chat_parse_generations_drops_reasoning_without_think_markers():
+    out = {
+        "choices": [
+            {"index": 0, "message": {"content": "391", "reasoning": "17*23=391"}}
+        ]
+    }
+
+    assert _chat_model().parse_generations(out) == ["391"]
+
+
+def test_openai_chat_refuses_chat_template_args():
+    from lm_eval.models.openai_completions import OpenAIChatCompletion
+
+    model = OpenAIChatCompletion(
+        model="gpt-x", chat_template_args={"reasoning_effort": "high"}
+    )
+
+    with pytest.raises(ValueError, match="chat_template_args"):
+        model._create_payload(
+            [{"role": "user", "content": "hi"}], generate=True, gen_kwargs={}
+        )
+
+
+def test_local_completions_passes_task_template_kwargs_to_tokenizer():
+    model = _completions_with_tokenizer()
+    tools = [{"type": "function", "function": {"name": "f"}}]
+
+    model.apply_chat_template([{"role": "user", "content": "hi"}], tools=tools)
+
+    assert model.tokenizer.calls[0]["tools"] == tools
+
+
+def test_task_template_kwargs_refused_when_server_renders_template():
+    from lm_eval.models.openai_completions import LocalChatCompletion
+
+    model = LocalChatCompletion(base_url="http://test-url.com", model="test-model")
+
+    with pytest.raises(ValueError, match=r"\['tools'\]"):
+        model.apply_chat_template([{"role": "user", "content": "hi"}], tools=[{}])
+
+
+@pytest.mark.parametrize("enable_thinking", [True, False])
+def test_local_completions_folds_enable_thinking_into_template_args(enable_thinking):
+    model = _completions_with_tokenizer(
+        enable_thinking=enable_thinking,
+        chat_template_args={"reasoning_effort": "low"},
+    )
+
+    model.apply_chat_template([{"role": "user", "content": "hi"}])
+
+    assert model.tokenizer.calls[0]["enable_thinking"] is enable_thinking
+    assert model.tokenizer.calls[0]["reasoning_effort"] == "low"
+
+
+def test_enable_thinking_travels_as_chat_template_kwargs():
+    model = _chat_model(enable_thinking=False)
+
+    payload = _chat_payload(model, [{"role": "user", "content": "hi"}])
+
+    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def _thinking_api(**kwargs):
+    return LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        **kwargs,
+    )
+
+
+def _generate(model, text, until, finish_reason=None):
+    from lm_eval.api.instance import Instance
+
+    instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("Question: Janet has 16 eggs...\nAnswer:", {"until": until}),
+        idx=0,
+    )
+    sent: list[dict] = []
+
+    def model_call(messages, generate=True, gen_kwargs=None, **_):
+        sent.append(
+            model._create_payload(messages, generate=True, gen_kwargs=gen_kwargs)
+        )
+        choice = {"index": 0, "text": text}
+        if finish_reason is not None:
+            choice["finish_reason"] = finish_reason
+        return {"choices": [choice]}
+
+    with patch.object(model, "model_call", side_effect=model_call):
+        result = model.generate_until([instance])
+    return result, instance, sent
+
+
+REASONING = (
+    "<think>\nAnalyze. Question: Janet has 16 eggs, eats 3, bakes 4.\n\nSo 9 * 2 = 18.\n</think>\n\n"
+    "The answer is 18.\nQuestion: next one"
+)
+
+
+def test_api_thinking_holds_stops_back_and_strips_the_reasoning():
+    model = _thinking_api(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    result, instance, sent = _generate(model, REASONING, ["Question:", "\n\n"])
+
+    # the task stops don't go to the server (they'd cut into the reasoning)...
+    assert "Question:" not in sent[0]["stop"] and "\n\n" not in sent[0]["stop"]
+    # ...and apply to the answer once the reasoning is stripped
+    assert result == ["The answer is 18.\n"]
+    info = instance.length_info[0]
+    assert info["thinking_format_correct"] == 1
+    assert info["thinking_length_chars"] > 0
+
+
+def test_api_without_think_tokens_is_unchanged():
+    model = _thinking_api()
+    result, instance, sent = _generate(model, "The answer is 18.", ["Question:"])
+    assert sent[0]["stop"][0] == "Question:"
+    assert result == ["The answer is 18."]
+    assert "skip_special_tokens" not in sent[0]
+    assert "thinking_length_chars" not in instance.length_info[0]
+
+
+@pytest.mark.parametrize(("reason", "flag"), [("length", 1), ("stop", 0)])
+def test_api_records_whether_the_server_hit_the_token_budget(reason, flag):
+    model = _thinking_api(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    result, instance, _ = _generate(
+        model, REASONING, ["Question:"], finish_reason=reason
+    )
+    assert instance.length_info[0]["generation_truncated"] == flag
+    # the reasoning is still stripped; the answer is a plain string to the task
+    assert result == ["The answer is 18.\n"]
+
+
+def test_api_without_a_finish_reason_records_no_truncation_flag():
+    _, instance, _ = _generate(_thinking_api(), "The answer is 18.", ["Question:"])
+    assert "generation_truncated" not in instance.length_info[0]
+
+
+def test_concurrent_answers_carry_their_finish_reason(api):
+    from lm_eval.models.api_models import with_finish_reasons
+
+    outputs = {
+        "choices": [
+            {"index": 1, "text": "b", "finish_reason": "length"},
+            {"index": 0, "text": "a", "finish_reason": "stop"},
+        ]
+    }
+    tagged = with_finish_reasons(api.parse_generations(outputs), outputs)
+    assert tagged == ["a", "b"]
+    assert [t.finish_reason for t in tagged] == ["stop", "length"]
+    # a response that doesn't line up one choice per text is left untouched
+    assert with_finish_reasons(["a"], {"choices": []}) == ["a"]
+
+
+def test_api_keeps_special_tokens_when_the_markers_are_special():
+    model = _thinking_api(think_end_token="<|channel|>final<|message|>")  # noqa: S106
+    model.keep_special_tokens = (
+        True  # as derived from a tokenizer where they're special
+    )
+    _, _, sent = _generate(
+        model, "analysis ... <|channel|>final<|message|>18", ["Question:"]
+    )
+    assert sent[0]["skip_special_tokens"] is False
+
+
+def test_special_tokens_are_read_from_the_tokenizer():
+    from types import SimpleNamespace
+
+    from lm_eval.models.api_models import _special_tokens
+
+    class Added:
+        def __init__(self, text, special):
+            self.text, self.special = text, special
+
+        def __str__(self):
+            return self.text
+
+    tokenizer = SimpleNamespace(
+        all_special_tokens=["<|return|>"],
+        added_tokens_decoder={
+            1: Added("<|channel|>", True),
+            2: Added("<think>", False),
+        },
+    )
+    assert _special_tokens(tokenizer) == {"<|return|>", "<|channel|>"}
+    assert _special_tokens(None) == set()
+
+
+def test_request_progress_reports_about_every_five_percent(caplog):
+    import logging
+
+    from lm_eval.models.api_models import _RequestProgress
+
+    progress = _RequestProgress("generate_until", 240)
+    with caplog.at_level(logging.INFO, logger="lm_eval.models.api_models"):
+        for _ in range(240):
+            progress.add(1)
+    lines = [
+        r.getMessage() for r in caplog.records if "requests done" in r.getMessage()
+    ]
+    assert len(lines) == 20  # every 12 of 240
+    assert lines[0].startswith("generate_until: 12/240 requests done (")
+    assert lines[-1].startswith("generate_until: 240/240 requests done (")
+
+
+def test_concurrent_requests_log_progress_and_retries(api, caplog):
+    import logging
+
+    calls = {"n": 0}
+
+    async def amodel_call(*, messages, **_):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("transient")  # first call is retried
+        return ["answer"] * len(messages)
+
+    api._concurrent = 4
+    with (
+        patch.object(api, "amodel_call", side_effect=amodel_call),
+        caplog.at_level(logging.INFO, logger="lm_eval.models.api_models"),
+    ):
+        results = asyncio.run(
+            api.get_batched_requests(
+                [f"prompt {i}" for i in range(5)],
+                [None] * 5,
+                generate=True,
+                gen_kwargs={},
+            )
+        )
+    assert [r for batch in results for r in batch] == ["answer"] * 5
+    lines = [
+        r.getMessage() for r in caplog.records if "requests done" in r.getMessage()
+    ]
+    assert lines[-1].startswith("generate_until: 5/5 requests done (")
+    assert lines[-1].endswith("1 retries so far)")
+
+
+def _echo_choice(token_logprobs):
+    return {
+        "index": 0,
+        "logprobs": {
+            "token_logprobs": token_logprobs,
+            "top_logprobs": [None] + [{"x": lp} for lp in token_logprobs[1:]],
+        },
+    }
+
+
+def test_parse_logprobs_scores_only_the_continuation():
+    # context [1, 2, 3], continuation [4, 5], then the one generated token
+    out = {"choices": [_echo_choice([None, -1.0, -2.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(
+        out, tokens=[[1, 2, 3, 4, 5]], ctxlens=[3]
+    )
+    assert logprob == -7.0
+
+
+def test_parse_logprobs_ignores_an_extra_server_bos():
+    # The server tokenized one more token at the start (its own BOS before the
+    # chat template's) than the local tokenizer that counted ctxlen: the score
+    # must still cover exactly the continuation, not the last context token.
+    out = {"choices": [_echo_choice([None, -0.5, -1.0, -2.0, -30.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(
+        out, tokens=[[1, 2, 3, 99, 4, 5]], ctxlens=[4]
+    )
+    assert logprob == -7.0
+
+
+def test_parse_logprobs_without_tokens_slices_from_ctxlen():
+    out = {"choices": [_echo_choice([None, -1.0, -2.0, -3.0, -4.0, -9.0])]}
+    [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(out, ctxlens=[3])
+    assert logprob == -7.0

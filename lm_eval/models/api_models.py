@@ -5,6 +5,7 @@ import itertools
 import json
 import logging
 import os
+import time
 from collections.abc import Awaitable, Callable, Iterable
 from functools import cached_property
 from typing import (
@@ -32,7 +33,17 @@ from lm_eval import utils
 from lm_eval.api.instance import Instance
 from lm_eval.api.model import TemplateLM
 from lm_eval.api.rate_limiter import get_rate_limiter
-from lm_eval.models.utils import Collator, chunks, configure_pad_token
+from lm_eval.models.utils import (
+    Collator,
+    attach_length_info,
+    build_length_info,
+    chunks,
+    configure_pad_token,
+    detect_open_prefilled,
+    postprocess_generated_text,
+    resolve_think_tokens,
+    resolve_track_thinking_metrics,
+)
 
 
 if TYPE_CHECKING:
@@ -46,9 +57,98 @@ LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = os.environ.get(
     "LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER", ""
 )
 
+
+class Generation(str):
+    """A generated text that remembers why the server stopped generating it.
+
+    ``finish_reason`` is the OpenAI-style value ("stop", "length", ...) or None when
+    the response didn't carry one. Behaves as a plain ``str`` everywhere else; read
+    back in generate_until as the per-response ``generation_truncated`` flag.
+    """
+
+    finish_reason: str | None = None
+
+
+def parse_finish_reasons(outputs: Any) -> list[str | None]:
+    """Each choice's ``finish_reason``, in the order ``parse_generations`` returns
+    the texts (by choice index, across a batch of responses). Never raises."""
+    reasons: list[str | None] = []
+    for out in outputs if isinstance(outputs, list) else [outputs]:
+        try:
+            choices = out["choices"]
+            tmp: list[str | None] = [None] * len(choices)
+            for pos, choice in enumerate(choices):
+                tmp[choice.get("index", pos)] = choice.get("finish_reason")
+        except (IndexError, KeyError, TypeError, AttributeError):
+            tmp = [None]
+        reasons.extend(tmp)
+    return reasons
+
+
+def with_finish_reasons(texts: list[str], outputs: Any) -> list[str]:
+    """``texts`` as ``Generation``s carrying their choice's finish_reason; unchanged
+    when the response shape doesn't line up one choice per text."""
+    reasons = parse_finish_reasons(outputs)
+    if len(reasons) != len(texts):
+        return texts
+    tagged = []
+    for text, reason in zip(texts, reasons):
+        gen = Generation(text)
+        gen.finish_reason = reason
+        tagged.append(gen)
+    return tagged
+
+
+def truncation_info(text: Any) -> dict:
+    """``generation_truncated`` = 1 when the server stopped at the token budget
+    (finish_reason "length"), 0 when it stopped on its own; empty when unknown."""
+    reason = getattr(text, "finish_reason", None)
+    if reason is None:
+        return {}
+    return {"generation_truncated": int(reason == "length")}
+
+
 eval_logger = logging.getLogger(__name__)
 
 LogLikelihoodInputs = tuple[tuple[str, str], list[int], list[int]]
+
+
+class _RequestProgress:
+    """Logs how many concurrent API requests have finished, about every 5%: they're
+    awaited together, so a long run would otherwise show nothing until all are done."""
+
+    def __init__(self, label: str, total: int, steps: int = 20) -> None:
+        self.label, self.total = label, total
+        self.finished = self.retries = 0
+        self.step = max(1, -(-total // steps))
+        self.next_report = self.step
+        self.started = time.monotonic()
+
+    def retried(self) -> None:
+        self.retries += 1
+
+    def add(self, n: int) -> None:
+        self.finished += n
+        if self.finished < self.next_report and self.finished < self.total:
+            return
+        self.next_report = (self.finished // self.step + 1) * self.step
+        minutes, seconds = divmod(int(time.monotonic() - self.started), 60)
+        eval_logger.info(
+            f"{self.label}: {self.finished}/{self.total} requests done "
+            f"({minutes}m{seconds:02d}s, {self.retries} retries so far)"
+        )
+
+
+def _special_tokens(tokenizer) -> set[str]:
+    """The strings a server's detokenizer treats as special (skip_special_tokens)."""
+    tokens: set[str] = set()
+    if tokenizer is None:
+        return tokens
+    tokens |= set(getattr(tokenizer, "all_special_tokens", None) or [])
+    for token in (getattr(tokenizer, "added_tokens_decoder", None) or {}).values():
+        if getattr(token, "special", False):
+            tokens.add(str(token))
+    return {t for t in tokens if t}
 
 
 # utility class to keep track of json encoded chats
@@ -142,6 +242,22 @@ class TemplateAPI(TemplateLM):
         timeout: int = 300,
         header: dict[str, str] | None = None,
         max_images: int = 1,
+        # extra keyword arguments for the chat template, e.g. {"reasoning_effort": "high"};
+        # only used where the template is rendered client-side with an HF tokenizer
+        chat_template_args: dict[str, Any] | None = None,
+        # chat-template switch, folded into chat_template_args as for hf; None keeps the
+        # template default
+        enable_thinking: bool | None = None,
+        # Reasoning handling, as on vllm/sglang: with a close token known, task stop
+        # sequences are held back while the model reasons, the reasoning is stripped
+        # before scoring and the thinking metrics are recorded. The open token feeds the
+        # format metric. Auto-detected from the chat template only with
+        # `autodetect_think_tokens` (needs the HF tokenizer).
+        think_end_token: str | None = None,
+        think_start_token: str | None = None,
+        autodetect_think_tokens: bool = False,
+        # force the thinking metrics on/off; None = on iff a close token is known
+        track_thinking_metrics: bool | None = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -204,6 +320,9 @@ class TemplateAPI(TemplateLM):
         self._eos_string = eos_string
         self.timeout = int(timeout)
         self.max_images = int(max_images)
+        self.chat_template_args = dict(chat_template_args or {})
+        if enable_thinking is not None:
+            self.chat_template_args["enable_thinking"] = enable_thinking
 
         eval_logger.info(f"Using tokenizer {self.tokenizer_backend}")
         if self.tokenizer_backend is None:
@@ -262,6 +381,29 @@ class TemplateAPI(TemplateLM):
                     revision=revision,
                     use_fast=use_fast_tokenizer,
                 )
+
+        hf_tokenizer = (
+            self.tokenizer if self.tokenizer_backend == "huggingface" else None
+        )
+        self.think_start_token, self.think_end_token = resolve_think_tokens(
+            getattr(hf_tokenizer, "chat_template", None),
+            autodetect_think_tokens,
+            think_start_token,
+            think_end_token,
+        )
+        self.think_open_prefilled = hf_tokenizer is not None and detect_open_prefilled(
+            self.apply_chat_template, self.think_start_token
+        )
+        self.track_thinking_metrics = resolve_track_thinking_metrics(
+            track_thinking_metrics, self.think_end_token
+        )
+        # Servers drop special tokens from the text they return; reasoning markers made
+        # of them (gpt-oss's <|channel|>...<|message|>) would never be found. Ask to keep
+        # them then (vLLM and SGLang take skip_special_tokens).
+        self.keep_special_tokens = any(
+            marker and any(tok in marker for tok in _special_tokens(hf_tokenizer))
+            for marker in (self.think_start_token, self.think_end_token)
+        )
 
     @abc.abstractmethod
     def _create_payload(
@@ -355,9 +497,21 @@ class TemplateAPI(TemplateLM):
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
+                **self.chat_template_args,
                 **kwargs,
             )
-        elif self.tokenizer_backend == "remote" and self.tokenized_requests:
+        # Past this point the server renders the template, so the arguments would be
+        # dropped silently; refuse instead of scoring a different prompt than asked for.
+        if self.chat_template_args or kwargs:
+            raise ValueError(
+                "chat_template_args (including enable_thinking) and task template "
+                "arguments (e.g. tools) need the chat template rendered client-side with "
+                "a Hugging Face tokenizer, e.g. local-completions with "
+                "tokenizer_backend=huggingface. Here the server renders it (a "
+                "chat-completions model, or no local tokenizer), so they can't be applied: "
+                f"{sorted({**self.chat_template_args, **kwargs})}"
+            )
+        if self.tokenizer_backend == "remote" and self.tokenized_requests:
             return chat_history
         else:
             # bit of a hack. We'll load back before sending to the API
@@ -567,8 +721,11 @@ class TemplateAPI(TemplateLM):
                     answers.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
                 else:
                     answers.append(a)
+            if generate:
+                answers = with_finish_reasons(answers, outputs)
 
-            if cache_keys:
+            # A thinking generation is cached once stripped (generate_until).
+            if cache_keys and not (generate and self.think_end_token):
                 for res, cache in zip(answers, cache_keys):
                     self.cache_hook.add_partial(cache_method, cache, res)
             return answers
@@ -617,6 +774,14 @@ class TemplateAPI(TemplateLM):
         ctxlens = ctxlens or [None] * len(requests)
         conn = TCPConnector(limit=self._concurrent, ssl=self.verify_certificate)
         sem = asyncio.Semaphore(self._concurrent)
+        progress = _RequestProgress(
+            "generate_until" if generate else "loglikelihood", len(requests)
+        )
+
+        def _before_sleep(retry_state) -> None:
+            progress.retried()
+            eval_logger.info(f"Retry attempt {retry_state.attempt_number}")
+
         async with ClientSession(
             connector=conn, timeout=ClientTimeout(total=self.timeout)
         ) as session:
@@ -624,13 +789,16 @@ class TemplateAPI(TemplateLM):
                 stop=stop_after_attempt(self.max_retries),
                 wait=wait_exponential(multiplier=0.5, min=1, max=10),
                 reraise=True,
-                before_sleep=lambda retry_state: eval_logger.info(
-                    f"Retry attempt {retry_state.attempt_number}"
-                ),
+                before_sleep=_before_sleep,
             )(self.amodel_call)
             # Create tasks for each batch of request
-            tasks = [
-                asyncio.create_task(
+            tasks = []
+            for message, cache_key, ctxlen in zip(
+                chunks(requests, n=self._batch_size),
+                chunks(cache_keys, n=self._batch_size),
+                chunks(ctxlens, n=self._batch_size),
+            ):
+                task = asyncio.create_task(
                     retry_(
                         session=session,
                         sem=sem,
@@ -641,12 +809,9 @@ class TemplateAPI(TemplateLM):
                         **kwargs,
                     )
                 )
-                for message, cache_key, ctxlen in zip(
-                    chunks(requests, n=self._batch_size),
-                    chunks(cache_keys, n=self._batch_size),
-                    chunks(ctxlens, n=self._batch_size),
-                )
-            ]
+                size = len(message)
+                task.add_done_callback(lambda _, n=size: progress.add(n))
+                tasks.append(task)
 
             # Wait for every task before returning/raising -- gather()
             # propagating on the first failure would exit this `async with`
@@ -722,10 +887,21 @@ class TemplateAPI(TemplateLM):
 
         return re_ord.get_original(res)
 
+    def _sent_gen_kwargs(self, gen_kwargs: dict) -> dict:
+        """The generation kwargs sent to the server. With a reasoning close known, the
+        task's stop sequences stay behind: they often occur inside the reasoning (e.g.
+        gsm8k's "Question:"), and would cut it off before any answer. They're applied
+        after the reasoning is stripped (see generate_until), as on vllm/sglang."""
+        gen_kwargs = copy.deepcopy(gen_kwargs)
+        if self.think_end_token:
+            gen_kwargs["until"] = []
+        return gen_kwargs
+
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
         res = []
+        instances = requests
 
         def _collate_gen(_requests):
             # sort by the length of the non-tokenized contexts
@@ -803,14 +979,14 @@ class TemplateAPI(TemplateLM):
                 )(self.model_call)(
                     messages=req,
                     generate=True,
-                    gen_kwargs=copy.deepcopy(all_gen_kwargs[0]),
+                    gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                 )
-                for generated_text, context in zip(
-                    self.parse_generations(
-                        outputs=outputs,
-                        contexts=contexts,
-                    ),
-                    contexts,
+                generated = self.parse_generations(outputs=outputs, contexts=contexts)
+                reasons = parse_finish_reasons(outputs)
+                if len(reasons) != len(generated):
+                    reasons = [None] * len(generated)
+                for generated_text, context, reason in zip(
+                    generated, contexts, reasons
                 ):
                     # Always append to res to maintain the correct number of items
                     # even if generation failed (generated_text is None)
@@ -819,12 +995,18 @@ class TemplateAPI(TemplateLM):
                             f"API returned null content. Content filled with `LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER = {LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER}`. Check reasoning_content field or generation limits."
                         )
                         # Patch "None" answer with consistent value (async and sync calls)
-                        res.append(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER)
+                        res.append(Generation(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER))
                     else:
-                        res.append(generated_text)
+                        res.append(Generation(generated_text))
+                    res[-1].finish_reason = reason
 
-                    # partial caching only for successful generations
-                    if generated_text is not None and context is not None:
+                    # partial caching only for successful generations; a thinking
+                    # generation is cached once stripped (below)
+                    if (
+                        generated_text is not None
+                        and context is not None
+                        and not self.think_end_token
+                    ):
                         self.cache_hook.add_partial(
                             "generate_until",
                             (context, all_gen_kwargs[0]),
@@ -856,14 +1038,47 @@ class TemplateAPI(TemplateLM):
                             req,
                             cache_keys=[(ctx, all_gen_kwargs[0]) for ctx in contexts],
                             generate=True,
-                            gen_kwargs=copy.deepcopy(all_gen_kwargs[0]),
+                            gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                         )
                     )
                 )
                 # Append results to res list
                 res.extend(results)
 
-        return re_ord.get_original(res)
+        res = re_ord.get_original(res)
+        # Per-response length and thinking-format info on the raw generation, as on
+        # vllm/sglang (thinking_* only with a close token known).
+        hf_tokenizer = (
+            self.tokenizer if self.tokenizer_backend == "huggingface" else None
+        )
+        attach_length_info(
+            instances,
+            [
+                build_length_info(
+                    text,
+                    think_start_token=self.think_start_token,
+                    think_end_token=self.think_end_token,
+                    tokenizer=hf_tokenizer,
+                    open_prefilled=self.think_open_prefilled,
+                    track_thinking_metrics=self.track_thinking_metrics,
+                )
+                | truncation_info(text)
+                for text in res
+            ],
+        )
+        if self.think_end_token:
+            # Strip the reasoning, then apply the task stops held back from the server.
+            res = [
+                postprocess_generated_text(
+                    text, instance.args[1].get("until"), self.think_end_token
+                )
+                for text, instance in zip(res, instances, strict=True)
+            ]
+            for text, instance in zip(res, instances, strict=True):
+                self.cache_hook.add_partial(
+                    "generate_until", (instance.args[0], instance.args[1]), text
+                )
+        return res
 
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False

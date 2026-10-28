@@ -429,7 +429,7 @@ class TestCheckSystemBoilerplate:
 class TestGetTemplateSpecialTokens:
     def test_union_of_special_and_added(self):
         class Tok:
-            all_special_tokens = ["<s>", "</s>"]
+            all_special_tokens = ("<s>", "</s>")
 
             def get_added_vocab(self):
                 return {"<|start_header_id|>": 1, "</s>": 2}
@@ -442,13 +442,13 @@ class TestGetTemplateSpecialTokens:
 
     def test_missing_get_added_vocab_is_tolerated(self):
         class Tok:
-            all_special_tokens = ["<s>"]
+            all_special_tokens = ("<s>",)
 
         assert get_template_special_tokens(Tok()) == {"<s>"}
 
     def test_get_added_vocab_error_is_tolerated(self):
         class Tok:
-            all_special_tokens = ["<s>"]
+            all_special_tokens = ("<s>",)
 
             def get_added_vocab(self):
                 raise RuntimeError("unsupported tokenizer")
@@ -742,15 +742,15 @@ class TestComputeGenerationLengthInfo:
 
 class TestDetectOpenPrefilled:
     def test_prefill_template_detected(self):
-        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|><think>"  # noqa: E731
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|><think>"
         assert detect_open_prefilled(render, OPEN_T) is True
 
     def test_non_prefill_template_not_detected(self):
-        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|>"  # noqa: E731
+        render = lambda h, add_generation_prompt=True: "<|user|>x<|assistant|>"
         assert detect_open_prefilled(render, OPEN_T) is False
 
     def test_no_open_token_is_false(self):
-        render = lambda h, add_generation_prompt=True: "<think>"  # noqa: E731
+        render = lambda h, add_generation_prompt=True: "<think>"
         assert detect_open_prefilled(render, None) is False
 
     def test_render_failure_is_false(self):
@@ -1018,3 +1018,19 @@ class TestTruncateBeforeStops:
         assert truncate_before_stops(text, ["\n\n"]) == postprocess_generated_text(
             text, ["\n\n"], None
         )
+
+
+def test_postprocess_strips_the_reasoning_before_applying_the_stops():
+    # a task stop inside the reasoning must not cut the answer off
+    generation = (
+        "<think>Analyze. Question: x\n\ny</think>\n\nThe answer is 18.\nQuestion: next"
+    )
+    assert (
+        postprocess_generated_text(generation, ["Question:", "\n\n"], "</think>")
+        == "The answer is 18.\n"
+    )
+    # no close: the stops apply to the whole text, as before
+    assert (
+        postprocess_generated_text("18\nQuestion: next", ["Question:"], "</think>")
+        == "18\n"
+    )

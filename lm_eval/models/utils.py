@@ -15,6 +15,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from typing_extensions import TypedDict
 
 from lm_eval.utils import maybe_warn, warning_once
@@ -759,7 +760,7 @@ def check_system_boilerplate(
     ]
     try:
         rendered = render_fn(demo)
-    except Exception:
+    except Exception:  # noqa: BLE001
         # Template doesn't support a system role (or errored) — can't assess.
         return
 
@@ -1176,12 +1177,14 @@ def postprocess_generated_text(
 
     Returns:
         str: The processed generation - text before stop sequences and after thinking sections.
-    """
-    generation = truncate_before_stops(generation, stop)
-    if think_end_token:
-        generation = generation.split(think_end_token)[-1].lstrip()
 
-    return generation
+    The thinking section is dropped before the stops apply: a task stop such as
+    ``"Question:"`` or ``"\n\n"`` often occurs inside the reasoning, and truncating there
+    first would lose the answer and score a fragment of the reasoning instead.
+    """
+    if think_end_token and think_end_token in generation:
+        generation = generation.rsplit(think_end_token, 1)[-1].lstrip()
+    return truncate_before_stops(generation, stop)
 
 
 def compute_generation_length_info(

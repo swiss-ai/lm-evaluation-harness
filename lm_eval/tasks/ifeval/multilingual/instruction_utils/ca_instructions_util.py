@@ -21,8 +21,15 @@
 import random
 import re
 
+import langdetect
 import spacy
 from iso639 import Lang
+
+
+# langdetect (used by the language and case checks) seeds every detection
+# from os.urandom unless the factory seed is set, so borderline texts can
+# flip between runs. Fix it so identical responses always get identical scores.
+langdetect.DetectorFactory.seed = 0
 
 
 WORD_LIST = [

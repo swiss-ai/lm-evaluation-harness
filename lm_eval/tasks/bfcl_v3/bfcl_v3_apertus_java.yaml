@@ -6,3 +6,4 @@ metadata:
   bfcl_category: java
   bfcl_language: Java
   bfcl_tool_format: apertus
+  requires_chat_template: true

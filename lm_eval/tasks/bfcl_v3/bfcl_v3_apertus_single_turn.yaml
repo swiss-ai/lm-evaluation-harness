@@ -1,6 +1,7 @@
 group: bfcl_v3_apertus_single_turn
 task:
   - bfcl_v3_apertus_simple
+  - bfcl_v3_apertus_irrelevance
   - bfcl_v3_apertus_parallel
   - bfcl_v3_apertus_multiple
   - bfcl_v3_apertus_parallel_multiple

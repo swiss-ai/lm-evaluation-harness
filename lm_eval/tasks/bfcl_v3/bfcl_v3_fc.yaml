@@ -1,0 +1,8 @@
+group: bfcl_v3_fc
+task:
+  - bfcl_v3_fc_single_turn
+  - bfcl_v3_fc_multi_turn
+aggregate_metric_list:
+  - metric: acc
+    aggregation: mean
+    weight_by_size: true

@@ -1,3 +1,6 @@
+import itertools
+import json
+
 import pytest
 
 from lm_eval.tasks import TaskManager
@@ -135,10 +138,9 @@ def test_bfcl_v3_apertus_fewshot_context_uses_tool_chat_template():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     assert prompt == "templated"
@@ -161,10 +163,9 @@ def test_bfcl_v3_apertus_fewshot_context_uses_custom_system_instruction():
         num_fewshot=0,
         system_instruction="Use tools carefully.",
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     assert seen["messages"][0]["content"]["text"] == "Use tools carefully."
@@ -179,10 +180,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
 
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
@@ -196,10 +196,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
     assert properties["networkId"]["default"] == "[]"
@@ -210,10 +209,9 @@ def test_bfcl_v3_apertus_fewshot_context_strips_null_tool_fields():
         doc,
         num_fewshot=0,
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs}) or "templated"
+        ),
     )
     properties = seen["kwargs"]["tools"][0]["parameters"]["properties"]
     assert properties["auth"]["default"] == "[]"
@@ -236,10 +234,10 @@ def test_bfcl_v3_apertus_multi_turn_uses_tool_chat_template():
         ctx="",
         gen_kwargs={},
         apply_chat_template=True,
-        chat_template=lambda messages, **kwargs: seen.update(
-            {"messages": messages, "kwargs": kwargs}
-        )
-        or "templated-multiturn",
+        chat_template=lambda messages, **kwargs: (
+            seen.update({"messages": messages, "kwargs": kwargs})
+            or "templated-multiturn"
+        ),
     )
 
     prompt, _ = task.multiturn_next_request(state)
@@ -470,3 +468,322 @@ def test_bfcl_v3_apertus_multi_turn_decodes_to_executable_calls():
     )
 
     assert decoded == ["cd(folder='document')", "mkdir(dir_name='temp')"]
+
+
+def test_bfcl_v3_multi_turn_uses_chat_template_on_every_step():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: (
+            seen.append(messages) or "templated-multiturn"
+        ),
+    )
+
+    prompt, _ = task.multiturn_next_request(state)
+    assert prompt == "templated-multiturn"
+    assert [m["role"] for m in seen[-1]] == ["system", "user"]
+    assert "Here is a list of functions" in seen[-1][0]["content"]
+
+    task.multiturn_consume_response(state, "[pwd()]")
+    prompt, _ = task.multiturn_next_request(state)
+    assert prompt == "templated-multiturn"
+    assert [m["role"] for m in seen[-1]] == ["system", "user", "assistant", "user"]
+    assert seen[-1][2]["content"] == "[pwd()]"
+    assert seen[-1][3]["content"].startswith("Execution results:")
+
+
+def test_bfcl_v3_multi_turn_merges_back_to_back_user_messages():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.append(messages) or "",
+    )
+    task.multiturn_next_request(state)
+    state["history"].append({"role": "user", "content": "next turn"})
+
+    task.multiturn_next_request(state)
+
+    roles = [m["role"] for m in seen[-1]]
+    assert all(a != b for a, b in itertools.pairwise(roles))
+    assert seen[-1][-1]["content"].endswith("\n\nnext turn")
+
+
+def test_bfcl_v3_multi_turn_without_chat_template_keeps_transcript():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    state = task.init_multiturn_state(doc, ctx="", gen_kwargs={})
+
+    prompt, _ = task.multiturn_next_request(state)
+
+    assert prompt.startswith("You are an expert in composing functions.")
+    assert "\n\nUser: " in prompt
+    assert prompt.endswith("\nAssistant:")
+
+
+def test_bfcl_v3_construct_requests_stops_before_next_user_message():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+
+    _, gen_kwargs = task.construct_requests(doc, "ctx").arguments
+
+    assert gen_kwargs["until"] == ["\n\n", "\nUser:"]
+
+
+def test_bfcl_v3_apertus_construct_requests_has_no_user_stop():
+    task = _make_apertus_task("multi_turn_base")
+    doc = task.test_docs()[0]
+
+    _, gen_kwargs = task.construct_requests(doc, "ctx").arguments
+
+    assert "\nUser:" not in gen_kwargs["until"]
+
+
+def test_bfcl_v3_multi_turn_drops_empty_assistant_replies_for_chat_template():
+    task = _make_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.append(messages) or "",
+    )
+    task.multiturn_next_request(state)
+    task.multiturn_consume_response(state, "")
+
+    task.multiturn_next_request(state)
+
+    assert all(m["content"].strip() for m in seen[-1] if m["role"] == "assistant")
+    roles = [m["role"] for m in seen[-1]]
+    assert all(a != b for a, b in itertools.pairwise(roles))
+
+
+def test_bfcl_v3_apertus_folds_doc_system_message_into_system_prompt():
+    task = _make_apertus_task("live_simple")
+    doc = {
+        "id": "live_simple_x",
+        "question": [
+            [
+                {"role": "system", "content": "Doc system rules."},
+                {"role": "user", "content": "hi"},
+            ]
+        ],
+        "function": [],
+    }
+    seen = {}
+
+    task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        system_instruction="Base instruction.",
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: seen.update(messages=messages) or "",
+    )
+
+    assert [m["role"] for m in seen["messages"]] == ["system", "user"]
+    assert seen["messages"][0]["content"]["text"] == (
+        "Base instruction.\n\nDoc system rules."
+    )
+
+
+def _make_fc_task(category="simple", language="Python"):
+    task = _make_apertus_task(category, language)
+    task.bfcl_tool_format = "fc"
+    return task
+
+
+class _ChatPrompt(str):
+    """Stands in for JsonChatStr: what a chat-completions model's template returns."""
+
+    @property
+    def prompt(self):
+        return str(self)
+
+
+def _fc_response(*calls, content=""):
+    from lm_eval.tasks.bfcl_v3.task import TOOL_CALLS_MARKER
+
+    tool_calls = [
+        {
+            "id": f"call{i}",
+            "type": "function",
+            "function": {"name": name, "arguments": json.dumps(args)},
+        }
+        for i, (name, args) in enumerate(calls)
+    ]
+    return content + TOOL_CALLS_MARKER + json.dumps(tool_calls)
+
+
+def test_bfcl_v3_fc_marker_matches_chat_model():
+    from lm_eval.models.openai_completions import (
+        TOOL_CALLS_MARKER as MODEL_MARKER,
+    )
+    from lm_eval.tasks.bfcl_v3.task import TOOL_CALLS_MARKER
+
+    assert TOOL_CALLS_MARKER == MODEL_MARKER
+
+
+def test_bfcl_v3_fc_fewshot_context_sends_messages_only():
+    task = _make_fc_task("simple")
+    doc = task.test_docs()[0]
+    seen = {}
+
+    prompt = task.fewshot_context(
+        doc,
+        num_fewshot=0,
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: (
+            seen.update(messages=messages, kwargs=kwargs) or _ChatPrompt("msgs")
+        ),
+    )
+
+    assert prompt == "msgs"
+    assert seen["messages"] == doc["question"][0]
+    assert seen["kwargs"] == {}
+
+
+def test_bfcl_v3_fc_refuses_a_completions_model():
+    task = _make_fc_task("simple")
+    doc = task.test_docs()[0]
+
+    with pytest.raises(ValueError, match="chat-completions model"):
+        task.fewshot_context(
+            doc,
+            num_fewshot=0,
+            apply_chat_template=True,
+            chat_template=lambda messages, **kwargs: "<s>rendered text",
+        )
+
+
+def test_bfcl_v3_fc_construct_requests_sends_tools_with_api_safe_names():
+    task = _make_fc_task("parallel")
+    doc = task.test_docs()[0]
+
+    _, gen_kwargs = task.construct_requests(doc, "ctx").arguments
+
+    tools = json.loads(gen_kwargs["tools"])
+    assert [tool["function"]["name"] for tool in tools] == ["spotify_play"]
+    assert tools[0]["function"]["parameters"]["type"] == "object"
+    assert "\n\n" not in gen_kwargs["until"]
+
+
+def test_bfcl_v3_fc_scores_tool_calls_and_maps_names_back():
+    task = _make_fc_task("parallel")
+    doc = task.test_docs()[0]
+    response = _fc_response(
+        ("spotify_play", {"artist": "Taylor Swift", "duration": 20}),
+        ("spotify_play", {"artist": "Maroon 5", "duration": 15}),
+    )
+
+    assert task.process_results(doc, [response])["acc"] == 1
+
+
+def test_bfcl_v3_fc_scores_simple_call():
+    task = _make_fc_task("simple")
+    doc = task.test_docs()[0]
+    response = _fc_response(("calculate_triangle_area", {"base": 10, "height": 5}))
+
+    assert task.process_results(doc, [response])["acc"] == 1
+
+
+def test_bfcl_v3_fc_text_without_tool_calls_scores_zero():
+    task = _make_fc_task("simple")
+    doc = task.test_docs()[0]
+
+    assert (
+        task.process_results(doc, ["[calculate_triangle_area(base=10, height=5)]"])[
+            "acc"
+        ]
+        == 0
+    )
+
+
+def test_bfcl_v3_fc_irrelevance_scores_absence_of_tool_calls():
+    task = _make_fc_task("irrelevance")
+    doc = task.test_docs()[0]
+
+    assert task.process_results(doc, ["I can't help with that."])["acc"] == 1
+
+
+def test_bfcl_v3_fc_java_scores_reference_call():
+    task = _make_fc_task("java", language="Java")
+    doc = task.test_docs()[0]
+    response = _fc_response(
+        (
+            "GeometryPresentation_createPresentation",
+            {"controller": "mapController", "parent": "mapArea"},
+        )
+    )
+
+    assert task.process_results(doc, [response])["acc"] == 1
+
+
+def test_bfcl_v3_fc_multi_turn_executes_calls_and_links_tool_messages():
+    task = _make_fc_task("multi_turn_base")
+    doc = task.test_docs()[0]
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={"until": [], "max_gen_toks": 2048},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: (
+            seen.append(messages) or _ChatPrompt("msgs")
+        ),
+    )
+
+    _, gen_kwargs = task.multiturn_next_request(state)
+    names = [tool["function"]["name"] for tool in json.loads(gen_kwargs["tools"])]
+    assert "cd" in names
+    assert [m["role"] for m in seen[-1]] == ["user"]
+
+    task.multiturn_consume_response(
+        state, _fc_response(("cd", {"folder": "document"}), content="Going there.")
+    )
+    task.multiturn_next_request(state)
+
+    assert [m["role"] for m in seen[-1]] == ["user", "assistant", "tool"]
+    assert seen[-1][1]["tool_calls"][0]["id"] == "call0"
+    assert seen[-1][2]["tool_call_id"] == "call0"
+    assert "document" in seen[-1][2]["content"]
+    assert state["decoded_responses"][0] == [["cd(folder='document')"]]
+
+    task.multiturn_consume_response(state, "Done.")
+    assert state["turn_idx"] == 1
+
+
+def test_bfcl_v3_fc_miss_func_sends_held_out_functions_as_tools():
+    task = _make_fc_task("multi_turn_miss_func")
+    doc = task.test_docs()[0]
+    held_out_turn = int(next(iter(doc["missed_function"])))
+    seen = []
+    state = task.init_multiturn_state(
+        doc,
+        ctx="",
+        gen_kwargs={},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: (
+            seen.append(messages) or _ChatPrompt("msgs")
+        ),
+    )
+    for _ in range(held_out_turn):
+        task.multiturn_next_request(state)
+        task.multiturn_consume_response(state, "No calls.")
+
+    _, gen_kwargs = task.multiturn_next_request(state)
+
+    held_out = doc["missed_function"][str(held_out_turn)]
+    names = {tool["function"]["name"] for tool in json.loads(gen_kwargs["tools"])}
+    assert {f["name"] for f in held_out} <= names
+    assert seen[-1][-1]["content"].startswith("I have updated some more functions")
