@@ -12,6 +12,8 @@ on:
 env:
   TQDM_DISABLE: "1"
   HF_HUB_DISABLE_PROGRESS_BARS: "1"
+  # humaneval/mbpp load the code_eval metric at import, which refuses to run without this
+  HF_ALLOW_CODE_EVAL: "1"
 
 # comment/edit out the above to stop/change the triggers
 jobs:
