@@ -116345,6 +116345,86 @@
       ],
       "yaml_path": "ulqa/ulut/ulut.yaml"
     },
+    "uncheatable_eval": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/_uncheatable_eval.yaml"
+    },
+    "uncheatable_eval_ao3_english": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_ao3_english.yaml"
+    },
+    "uncheatable_eval_ao3_nonenglish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_ao3_nonenglish.yaml"
+    },
+    "uncheatable_eval_arxiv_cs": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_arxiv_cs.yaml"
+    },
+    "uncheatable_eval_arxiv_math": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_arxiv_math.yaml"
+    },
+    "uncheatable_eval_arxiv_other": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_arxiv_other.yaml"
+    },
+    "uncheatable_eval_arxiv_physics": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_arxiv_physics.yaml"
+    },
+    "uncheatable_eval_bbc_news": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_bbc_news.yaml"
+    },
+    "uncheatable_eval_biorxiv_all": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_biorxiv_all.yaml"
+    },
+    "uncheatable_eval_github_cpp": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_github_cpp.yaml"
+    },
+    "uncheatable_eval_github_javascript": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_github_javascript.yaml"
+    },
+    "uncheatable_eval_github_markdown": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_github_markdown.yaml"
+    },
+    "uncheatable_eval_github_other": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_github_other.yaml"
+    },
+    "uncheatable_eval_github_python": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_github_python.yaml"
+    },
+    "uncheatable_eval_wikipedia_english": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_wikipedia_english.yaml"
+    },
+    "uncheatable_eval_wikipedia_nonenglish": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "uncheatable_eval/uncheatable_eval_wikipedia_nonenglish.yaml"
+    },
     "unfair_tos": {
       "kind": "PY_TASK",
       "tags": [],
@@ -118916,6 +118996,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16201,
+  "entry_count": 16217,
   "schema_version": 1
 }
