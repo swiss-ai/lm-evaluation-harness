@@ -38,12 +38,6 @@ import langdetect
 from lm_eval.tasks.ifeval import instructions_util
 
 
-# langdetect seeds every detection from os.urandom unless the factory seed is
-# set, so borderline texts can flip between runs. Fix it so identical
-# responses always get identical scores.
-langdetect.DetectorFactory.seed = 0
-
-
 logger = logging.getLogger(__name__)
 
 _InstructionArgsDtype = dict[str, int | str | Sequence[str]] | None

@@ -21,8 +21,15 @@ import re
 from importlib.metadata import version
 
 import immutabledict
+import langdetect
 import nltk
 from packaging.version import parse as parse_version
+
+
+# langdetect (used by the language and case checks) seeds every detection
+# from os.urandom unless the factory seed is set, so borderline texts can
+# flip between runs. Fix it so identical responses always get identical scores.
+langdetect.DetectorFactory.seed = 0
 
 
 # Downloading 'punkt' with nltk<3.9 has a remote code vuln.

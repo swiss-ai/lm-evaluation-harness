@@ -29,12 +29,6 @@ from lm_eval.tasks.ifeval.multilingual.instruction_utils import (
 )
 
 
-# langdetect seeds every detection from os.urandom unless the factory seed is
-# set, so borderline texts can flip between runs. Fix it so identical
-# responses always get identical scores.
-langdetect.DetectorFactory.seed = 0
-
-
 # The relational operation for comparison.
 _COMPARISON_RELATION = ("at least", "less than")
 
