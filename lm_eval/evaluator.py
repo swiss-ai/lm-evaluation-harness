@@ -4,7 +4,6 @@ import inspect
 import itertools
 import json
 import logging
-import os
 import random
 import time
 from collections import defaultdict
@@ -53,6 +52,18 @@ if TYPE_CHECKING:
     _NestedDict = dict[Group, dict[str, Task] | Group] | dict[str, Task]
 
 eval_logger = logging.getLogger(__name__)
+
+
+def _request_group_key(instance) -> tuple[str, str, int]:
+    """Identify requests that a model adapter may batch together."""
+    gen_kwargs = instance.args[1] if instance.request_type == "generate_until" else {}
+    serialized_kwargs = json.dumps(
+        gen_kwargs,
+        sort_keys=True,
+        default=handle_non_serializable,
+        separators=(",", ":"),
+    )
+    return instance.request_type, serialized_kwargs, instance.repeats or 1
 
 
 def _init_multiturn_state(task, doc, ctx, gen_kwargs, multiturn_kwargs):
@@ -221,7 +232,7 @@ def simple_evaluate(
     cache_requests: bool = False,
     rewrite_requests_cache: bool = False,
     delete_requests_cache: bool = False,
-    limit: int | float | None = None,
+    limit: float | None = None,
     samples: dict[str, list[int]] | None = None,
     bootstrap_iters: int = 100000,
     check_integrity: bool = False,
@@ -432,10 +443,9 @@ def simple_evaluate(
         eval_logger.info("Using pre-initialized model")
         lm = model
 
-    # Under TP launchers (torchrun) every rank reports lm.rank==0; fall back to
-    # LOCAL_RANK so each process gets its own cache db and only LOCAL_RANK==0
-    # performs final result aggregation / I/O.
-    cache_rank = lm.rank or int(os.environ.get("LOCAL_RANK", "0"))
+    is_main_process = lm.is_main_process
+    cache_rank = lm.cache_rank
+
     if use_cache is not None:
         eval_logger.info(
             f"Using cache at {use_cache + '_rank' + str(cache_rank) + '.db'}"
@@ -508,7 +518,7 @@ def simple_evaluate(
 
     # Rank 0 only — `simple_evaluate` runs on every rank under accelerate/DDP,
     # so guard to avoid one identical warning per process.
-    if getattr(lm, "rank", 0) == 0:
+    if is_main_process:
         _warn_if_system_prompt_authority_inactive(lm, loaded["tasks"])
 
     if check_integrity:
@@ -545,10 +555,7 @@ def simple_evaluate(
     if verbosity is not None:
         setup_logging(verbosity=verbosity)
 
-    # `lm.rank == 0` covers DP / single-process; `LOCAL_RANK == 0` covers TP
-    # (torchrun), where every rank reports rank==0 but only one process should
-    # build/return results so callers don't duplicate file writes.
-    if lm.rank == 0 and int(os.environ.get("LOCAL_RANK", "0")) == 0:
+    if is_main_process:
         if isinstance(model, str):
             model_name = model
         elif hasattr(model, "config") and hasattr(model.config, "_name_or_path"):
@@ -658,8 +665,8 @@ def evaluate(
         eval_logger.info(f"Evaluating examples for tasks {list(samples.keys())}")
     # tracks all Instances/requests a model must generate output on.
     requests = defaultdict(list)
-    # stores the amount to pad out reqs per req. type so that
-    # number of fwd passes per distributed rank is equal
+    # stores the amount to pad out reqs per req. type for ordinary distributed
+    # models. Adapters with cross-rank forward collectives are aligned below.
     padding_requests = defaultdict(int)
 
     # Initialize groups and tasks
@@ -704,6 +711,9 @@ def evaluate(
     # end validation check
 
     # Cache the limit arg.
+    requires_uniform_request_groups = getattr(
+        lm, "requires_uniform_request_groups", False
+    )
     limit_arg = limit
     limits = []
     for task_name, task in eval_tasks.items():
@@ -714,6 +724,7 @@ def evaluate(
             samples=samples.get(task_name, None) if samples is not None else samples,
             rank=lm.rank,
             world_size=lm.world_size,
+            cache_rank=lm.cache_rank,
             cache_requests=cache_requests,
             rewrite_requests_cache=rewrite_requests_cache,
             system_instruction=system_instruction,
@@ -731,12 +742,39 @@ def evaluate(
         )
         if write_out:
             print_writeout(task)
-        # aggregate Instances by LM method requested to get output.
-        for instance in task.instances:
-            reqtype = instance.request_type
-            requests[reqtype].append(instance)
+        if lm.world_size > 1 and requires_uniform_request_groups:
+            # EP ranks process different data shards but join the same model
+            # collectives. Align every task/generation group independently so
+            # regrouping inside generate_until cannot change the forward count.
+            local_groups = defaultdict(list)
+            for instance in task.instances:
+                local_groups[_request_group_key(instance)].append(instance)
 
-        if lm.world_size > 1:
+            gathered_groups = lm.all_gather_object(
+                {key: (len(group), group[-1]) for key, group in local_groups.items()}
+            )
+            group_keys = sorted(set(itertools.chain.from_iterable(gathered_groups)))
+            for group_key in group_keys:
+                local_group = local_groups[group_key]
+                group_size = max(
+                    groups.get(group_key, (0, None))[0] for groups in gathered_groups
+                )
+                # Here we use a real task instance to be able to create our paddings so they have the same rules (because we need each task to have things like the same amount of max gen toks)
+                padding_example = next(
+                    groups[group_key][1]
+                    for groups in gathered_groups
+                    if group_key in groups
+                )
+                requests[group_key[0]].extend(local_group)
+                requests[group_key[0]].extend(
+                    [padding_example] * (group_size - len(local_group))
+                )
+        else:
+            # Aggregate Instances by LM method requested to get output.
+            for instance in task.instances:
+                requests[instance.request_type].append(instance)
+
+        if lm.world_size > 1 and not requires_uniform_request_groups:
             import torch
 
             instances_rnk = torch.tensor(
@@ -755,12 +793,8 @@ def evaluate(
             padding_requests[reqtype] += numpad
 
     ### Run LM on inputs, get all outputs ###
-    # execute each type of request
-    # Iterative multi-turn rollout (output_type: multi_turn_generate): turn
-    # t+1's prompt contains turn t's response, so the task owns episode state
-    # and the driver issues regular `generate_until` calls one wave at a time.
-    # Pulled out of the standard dispatch loop below so the per-turn barrier
-    # is handled explicitly.
+    # Multi-turn requests need a barrier between each generated turn, so handle
+    # them outside the normal one-shot dispatch loop.
     multiturn_requests = requests.pop("multi_turn_generate", [])
     if multiturn_requests:
         eval_logger.info("Running multi_turn_generate requests")
@@ -774,7 +808,28 @@ def evaluate(
             else None,
         )
 
-    for reqtype, reqs in requests.items():
+    if lm.world_size > 1:
+        # Include reqtypes that only exist on other ranks so empty shards still enter.
+        gathered_reqtypes = lm.all_gather_object(
+            sorted(set(requests) | set(padding_requests))
+        )
+        all_reqtypes = sorted(set(itertools.chain.from_iterable(gathered_reqtypes)))
+        padding_examples = {}
+        for reqtype in all_reqtypes:
+            # Empty ranks need a real request shape for padding-only forward passes.
+            local_example = requests[reqtype][0] if len(requests[reqtype]) > 0 else None
+            gathered_examples = lm.all_gather_object(local_example)
+            padding_examples[reqtype] = next(
+                (example for example in gathered_examples if example is not None),
+                None,
+            )
+    else:
+        all_reqtypes = sorted(requests)
+        padding_examples = {}
+
+    # execute each type of request
+    for reqtype in all_reqtypes:
+        reqs = requests[reqtype]
         eval_logger.info(f"Running {reqtype} requests")
         # create `K` copies of each request `req` based off `K = req.repeats`
         cloned_reqs = []
@@ -782,8 +837,13 @@ def evaluate(
             cloned_reqs.extend([req] * req.repeats)
 
         if (lm.world_size > 1) and (padding_requests[reqtype] > 0):
+            padding_req = reqs[-1] if reqs else padding_examples[reqtype]
+            if padding_req is None:
+                raise ValueError(
+                    f"Could not find a padding request for distributed reqtype {reqtype}"
+                )
             for _ in range(padding_requests[reqtype]):
-                cloned_reqs.extend([req] * req.repeats)
+                cloned_reqs.extend([padding_req] * padding_req.repeats)
 
         # run requests through model
         resps = getattr(lm, reqtype)(cloned_reqs)
@@ -882,7 +942,7 @@ def evaluate(
                 for task_name, acc in eval_results_acc.items()
             }
             all_samples = lm.gather_object(rank_samples, dst=0)
-            if RANK == 0:
+            if lm.is_main_process:
                 for task_name, acc in eval_results_acc.items():
                     acc["logged_samples"] = list(
                         itertools.chain.from_iterable(
@@ -896,7 +956,7 @@ def evaluate(
             for task_name, acc in eval_results_acc.items()
         }
         all_metrics = lm.gather_object(rank_metrics, dst=0)
-        if RANK == 0:
+        if lm.is_main_process:
             for task_name, acc in eval_results_acc.items():
                 metric_keys = {
                     metric_key
@@ -911,7 +971,7 @@ def evaluate(
                         )
                     )
 
-    if RANK == 0:
+    if lm.is_main_process:
         res = _process_results(eval_results_acc, groups, bootstrap_iters)
 
         samples = None
@@ -920,6 +980,10 @@ def evaluate(
             if LMEVAL_HASHMM and hasattr(lm, "MULTIMODAL"):
                 samples = hash_dict_images(samples)
 
-        return res._to_eval_results(samples=samples)
+        results = res._to_eval_results(samples=samples)
+        model_metrics = lm.get_model_metrics()
+        if model_metrics:
+            results["model_metrics"] = model_metrics
+        return results
     else:
         return None

@@ -58577,6 +58577,11 @@
       "tags": [],
       "yaml_path": "humaneval/humaneval_plus.yaml"
     },
+    "humaneval_pretrained": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "humaneval/humaneval_pretrained.yaml"
+    },
     "humaneval_random_span_infilling": {
       "kind": "TASK",
       "tags": [],
@@ -118996,6 +119001,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16217,
+  "entry_count": 16218,
   "schema_version": 1
 }

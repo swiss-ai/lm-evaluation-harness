@@ -41,6 +41,8 @@ EvalResults = TypedDict(
         # Per-task list of per-document sample results.
         # Only present when log_samples is True.
         "samples": "dict[str, list[SampleResult]]",
+        # Metrics emitted by the model backend during evaluation.
+        "model_metrics": list[dict[str, Any]],
         # --- Metadata added by simple_evaluate() ---
         #
         # Model and execution configuration.

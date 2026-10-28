@@ -35,6 +35,9 @@ def pass_at_1(references: str | list[str], predictions: str | list[list[str]]) -
         references=references,
         predictions=predictions,
         k=[1],
+        num_workers=int(
+            os.environ.get("CODE_EVAL_NUM_WORKERS", str(num_workers(predictions)))
+        ),
     )[0]["pass@1"]
 
 
@@ -64,7 +67,9 @@ def pass_at_k_metric(
         references=references,
         predictions=predictions,
         k=k,
-        num_workers=num_workers(predictions),
+        num_workers=int(
+            os.environ.get("CODE_EVAL_NUM_WORKERS", str(num_workers(predictions)))
+        ),
     )[0]
 
 

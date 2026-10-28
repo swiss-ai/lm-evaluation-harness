@@ -267,7 +267,7 @@ class HFLM(TemplateLM):
                 # TP mode: skip Accelerator entirely, let transformers handle
                 # distribution via torchrun + device_mesh.
                 device_type = torch._C._get_accelerator().type
-                local_rank = int(os.environ.get("LOCAL_RANK", 0))
+                local_rank = int(os.environ.get("LOCAL_RANK", "0"))
                 self._device = torch.device(f"{device_type}:{local_rank}")
                 gpus = 0  # prevent later model.to(device) calls
 
@@ -578,7 +578,7 @@ class HFLM(TemplateLM):
                     self._device = torch.device(f"{accelerator.device}")
                     self.accelerator = accelerator
 
-                    self._rank = self.accelerator.local_process_index
+                    self._rank = self.accelerator.process_index
                     self._world_size = self.accelerator.num_processes
                 else:
                     # if we aren't launching via accelerate, ditch
@@ -608,8 +608,8 @@ class HFLM(TemplateLM):
         gpus: int | None = None,
     ) -> dict:
         """Returns the kwargs needed to apply `accelerate` in `AutoModel.from_pretrained`."""
-        num_local_processes = int(os.environ.get("LOCAL_WORLD_SIZE", 1))
-        num_machines = int(os.environ.get("WORLD_SIZE", 0)) // num_local_processes
+        num_local_processes = int(os.environ.get("LOCAL_WORLD_SIZE", "1"))
+        num_machines = int(os.environ.get("WORLD_SIZE", "0")) // num_local_processes
         if (
             num_machines == 0
             and hasattr(self, "accelerator")
@@ -2071,7 +2071,7 @@ class HFLM(TemplateLM):
             try:
                 model_info = HfApi().model_info(repo_id=pretrained, revision=revision)
                 return model_info.sha
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 eval_logger.debug(
                     f"Failed to get model SHA for {pretrained} at revision {revision}. Error: {e}"
                 )
