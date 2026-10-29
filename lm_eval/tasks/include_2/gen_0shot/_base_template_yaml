@@ -6,10 +6,9 @@ num_fewshot: 0
 doc_to_text: |-
   Question: {{ question | trim }}
   Choices:
-  (A) {{ choices[0] | trim }}
-  (B) {{ choices[1] | trim }}
-  (C) {{ choices[2] | trim }}
-  (D) {{ choices[3] | trim }}
+  {%- for choice in choices %}
+  ({{ "ABCD"[loop.index0] }}) {{ choice | trim }}
+  {%- endfor %}
   Answer with "The answer is (X)" where X is the correct letter choice.
 
 doc_to_target: answer
