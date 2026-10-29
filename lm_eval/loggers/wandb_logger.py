@@ -45,7 +45,7 @@ class WandbLogger:
             assert Version(wandb.__version__) >= Version("0.13.6")
             if Version(wandb.__version__) < Version("0.13.6"):
                 wandb.require("report-editing:v0")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- any import/version problem only disables reporting
             logger.warning(
                 "To use the wandb reporting functionality please install wandb>=0.13.6.\n"
                 "To install the latest version of wandb run `pip install wandb --upgrade`\n"
@@ -100,12 +100,12 @@ class WandbLogger:
 
     def _sanitize_results_dict(self) -> tuple[dict[str, str], dict[str, Any]]:
         """Sanitize the results dictionary."""
-        _results = copy.deepcopy(self.results.get("results", dict()))
+        _results = copy.deepcopy(self.results.get("results", {}))
 
         # Remove None from the metric string name
         tmp_results = copy.deepcopy(_results)
         for task_name in self.task_names:
-            task_result = tmp_results.get(task_name, dict())
+            task_result = tmp_results.get(task_name, {})
             for metric_name, metric_value in task_result.items():
                 _metric_name, removed = remove_none_pattern(metric_name)
                 if removed:
@@ -115,12 +115,12 @@ class WandbLogger:
         # remove string valued keys from the results dict
         wandb_summary = {}
         for task in self.task_names:
-            task_result = _results.get(task, dict())
+            task_result = _results.get(task, {})
             for metric_name, metric_value in task_result.items():
                 if isinstance(metric_value, str):
                     wandb_summary[f"{task}/{metric_name}"] = metric_value
 
-        for summary_metric, _summary_value in wandb_summary.items():
+        for summary_metric in wandb_summary:
             _task, _summary_metric = summary_metric.split("/")
             _results[_task].pop(_summary_metric)
 

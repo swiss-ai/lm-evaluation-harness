@@ -54,7 +54,7 @@ def _int_or_none_list_arg_type(
             f"Argument requires {max_len} integers or None, separated by '{split_char}'"
         )
     elif num_items != max_len:
-        logging.warning(
+        eval_logger.warning(
             f"Argument requires {max_len} integers or None, separated by '{split_char}'. "
             "Missing values will be filled with defaults."
         )

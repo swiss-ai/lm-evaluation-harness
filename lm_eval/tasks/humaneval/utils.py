@@ -4,13 +4,10 @@ import re
 import evaluate as hf_evaluate
 
 
-try:
-    compute_ = hf_evaluate.load("code_eval")
-    test_cases = ["assert add(2, 3)==5"]
-    candidates = [["def add(a,b): return a*b"]]
-    results = compute_.compute(references=test_cases, predictions=candidates, k=[1])
-except Exception as e:
-    raise e
+compute_ = hf_evaluate.load("code_eval")
+test_cases = ["assert add(2, 3)==5"]
+candidates = [["def add(a,b): return a*b"]]
+results = compute_.compute(references=test_cases, predictions=candidates, k=[1])
 
 
 def num_workers(predictions: list[list[str]]) -> int:
@@ -24,8 +21,9 @@ def num_workers(predictions: list[list[str]]) -> int:
     return max(4, min(candidates, os.cpu_count() or 4))
 
 
-def pass_at_k(references: list[str], predictions: list[list[str]], k: list[int] = None):
-    global compute_
+def pass_at_k(
+    references: list[str], predictions: list[list[str]], k: list[int] | None = None
+):
     assert k is not None
     if isinstance(k, int):
         k = [k]
