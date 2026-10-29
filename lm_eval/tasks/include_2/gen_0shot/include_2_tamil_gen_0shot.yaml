@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: tamil
+task: include_2_tamil_gen_0shot

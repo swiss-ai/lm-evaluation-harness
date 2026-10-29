@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: danish
+task: include_2_danish_gen_0shot

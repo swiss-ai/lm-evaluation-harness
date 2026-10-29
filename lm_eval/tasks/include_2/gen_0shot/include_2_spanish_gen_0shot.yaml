@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: spanish
+task: include_2_spanish_gen_0shot

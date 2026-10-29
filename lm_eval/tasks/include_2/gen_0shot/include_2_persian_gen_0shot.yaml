@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: persian
+task: include_2_persian_gen_0shot

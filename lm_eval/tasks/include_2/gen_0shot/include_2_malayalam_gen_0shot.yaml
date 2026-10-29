@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: malayalam
+task: include_2_malayalam_gen_0shot

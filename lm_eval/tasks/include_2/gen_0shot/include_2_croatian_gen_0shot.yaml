@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: croatian
+task: include_2_croatian_gen_0shot

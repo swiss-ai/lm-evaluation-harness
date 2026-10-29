@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: bulgarian
+task: include_2_bulgarian_gen_0shot

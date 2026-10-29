@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: twi
+task: include_2_twi_gen_0shot

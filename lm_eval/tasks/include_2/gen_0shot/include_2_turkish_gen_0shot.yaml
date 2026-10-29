@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: turkish
+task: include_2_turkish_gen_0shot

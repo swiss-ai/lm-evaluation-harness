@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: makhuwa
+task: include_2_makhuwa_gen_0shot

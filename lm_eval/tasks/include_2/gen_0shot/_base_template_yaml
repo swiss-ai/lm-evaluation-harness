@@ -1,0 +1,43 @@
+dataset_path: epfl-nlp/include-2.0
+test_split: test
+output_type: generate_until
+
+num_fewshot: 0
+doc_to_text: |-
+  Question: {{ question | trim }}
+  Choices:
+  (A) {{ choices[0] | trim }}
+  (B) {{ choices[1] | trim }}
+  (C) {{ choices[2] | trim }}
+  (D) {{ choices[3] | trim }}
+  Answer with "The answer is (X)" where X is the correct letter choice.
+
+doc_to_target: answer
+
+filter_list:
+  - name: "extract-answer"
+    filter:
+      - function: "ordered_regex"
+        regex_patterns:
+          - '[Tt]he answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he answer is:\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer is\s+\(?([A-D])\)?\b'
+          - 'answer is\s+\(?([A-D])\)?\b'
+          - '[Tt]he final answer:\s+\(?([A-D])\)?\b'
+          - '\(([A-D])\)'
+          - "([A-D])"
+        group_select: -1
+      - function: "take_first"
+
+generation_kwargs:
+  until:
+    - "</s>"
+    - "Question:"
+    - "<|im_end|>"
+  temperature: 0.0
+metric_list:
+  - metric: exact_match
+    aggregation: mean
+    higher_is_better: true
+metadata:
+  version: 1.0

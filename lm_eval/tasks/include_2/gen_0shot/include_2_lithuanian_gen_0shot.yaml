@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: lithuanian
+task: include_2_lithuanian_gen_0shot

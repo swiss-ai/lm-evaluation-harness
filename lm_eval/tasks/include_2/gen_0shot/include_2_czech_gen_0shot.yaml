@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: czech
+task: include_2_czech_gen_0shot

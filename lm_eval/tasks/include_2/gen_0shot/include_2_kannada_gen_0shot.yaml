@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: kannada
+task: include_2_kannada_gen_0shot
