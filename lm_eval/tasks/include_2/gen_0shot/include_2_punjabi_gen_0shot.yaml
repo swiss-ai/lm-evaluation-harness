@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: punjabi
+task: include_2_punjabi_gen_0shot

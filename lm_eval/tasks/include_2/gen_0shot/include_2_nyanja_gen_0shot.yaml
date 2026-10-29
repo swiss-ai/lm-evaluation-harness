@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: nyanja
+task: include_2_nyanja_gen_0shot

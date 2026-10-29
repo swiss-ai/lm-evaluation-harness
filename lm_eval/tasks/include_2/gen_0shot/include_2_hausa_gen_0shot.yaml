@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: hausa
+task: include_2_hausa_gen_0shot

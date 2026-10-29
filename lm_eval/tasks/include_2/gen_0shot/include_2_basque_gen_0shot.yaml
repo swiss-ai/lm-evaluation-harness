@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: basque
+task: include_2_basque_gen_0shot

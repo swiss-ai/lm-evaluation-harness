@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: oriya
+task: include_2_oriya_gen_0shot

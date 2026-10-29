@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: ga
+task: include_2_ga_gen_0shot

@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: armenian
+task: include_2_armenian_gen_0shot

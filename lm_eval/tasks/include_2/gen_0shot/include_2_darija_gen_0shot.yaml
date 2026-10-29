@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: darija
+task: include_2_darija_gen_0shot

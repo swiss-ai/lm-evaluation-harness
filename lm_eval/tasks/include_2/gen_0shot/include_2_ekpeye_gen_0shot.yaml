@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: ekpeye
+task: include_2_ekpeye_gen_0shot

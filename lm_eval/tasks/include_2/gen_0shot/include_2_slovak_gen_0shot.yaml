@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: slovak
+task: include_2_slovak_gen_0shot

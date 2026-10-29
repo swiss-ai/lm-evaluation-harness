@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: igbo
+task: include_2_igbo_gen_0shot
