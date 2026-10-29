@@ -1083,8 +1083,10 @@ class TemplateAPI(TemplateLM):
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[float]:
-        loglikelihoods = []
+        all_windows = []
+        window_counts = []
 
+        # Flatten the windows of all documents, so we can evaluate all documents in parallel
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):
             rolling_token_windows = list(
                 map(
@@ -1101,16 +1103,25 @@ class TemplateAPI(TemplateLM):
 
             # TODO: Right now, we pass single EOT token to the Encoder and the full context to the decoder, in seq2seq case
             rolling_token_windows = [(None,) + x for x in rolling_token_windows]
+            all_windows.extend(rolling_token_windows)
 
-            string_nll = self._loglikelihood_tokens(
-                rolling_token_windows,
-                disable_tqdm=True,
+            window_counts.append(len(rolling_token_windows))
+
+        # Compute the loglikelihoods for all windows in parallel, then sum the scores for each document
+        window_scores = (
+            self._loglikelihood_tokens(all_windows, disable_tqdm=disable_tqdm)
+            if all_windows
+            else []
+        )
+
+        loglikelihoods = []
+        offset = 0
+        for request, window_count in zip(requests, window_counts, strict=True):
+            (string,) = request.args
+            string_nll = sum(
+                score for score, _ in window_scores[offset : offset + window_count]
             )
-
-            # discard is_greedy
-            string_nll = [x[0] for x in string_nll]
-
-            string_nll = sum(string_nll)
+            offset += window_count  # Go to the next document's windows
             loglikelihoods.append(string_nll)
 
             # cache this loglikelihood_rolling request
