@@ -154,9 +154,11 @@ def _with_reasoning(prepared: list[dict], replays: dict[int, list[str]]) -> list
 
 
 class _ScopedMessages(list):
-    """Decoded chat messages with the conversation scope of their request."""
+    """Decoded chat messages with the conversation scope and repeat index of their
+    request."""
 
     scope: tuple | None = None
+    repeat: int = 0
 
 
 def _first_choice(response: Any) -> dict | None:
@@ -260,6 +262,7 @@ class Apertus2Completions(LocalChatCompletion):
         # scope -> history digest -> stripped answer -> think payloads
         self._memory: dict[tuple, dict] = {}
         self._scopes: dict[int, tuple] = {}
+        self._repeats: dict[int, int] = {}
         self._artifact = str(tokenizer)
         self._bind_encoding(lib.load_encoding(tokenizer))
         self._policy = lib.MappingPolicy(
@@ -380,11 +383,17 @@ class Apertus2Completions(LocalChatCompletion):
         }
         active = set(self._scopes.values())
         self._memory = {s: m for s, m in self._memory.items() if s in active}
+        # Repeats of a document send the same context object; each gets its own
+        # seed, or a seeded server would return one sample for all of them.
+        self._repeats = {}
         return super().generate_until(requests, disable_tqdm)
 
     def create_message(self, messages, generate=False):
         decoded = _ScopedMessages(super().create_message(messages, generate))
-        decoded.scope = self._scopes.get(id(messages[0]))
+        key = id(messages[0])
+        decoded.scope = self._scopes.get(key)
+        decoded.repeat = self._repeats.get(key, 0)
+        self._repeats[key] = decoded.repeat + 1
         return decoded
 
     def _create_payload(
@@ -423,7 +432,7 @@ class Apertus2Completions(LocalChatCompletion):
             "prompt": request.prompt,
             "max_tokens": request.max_tokens,
             "temperature": temperature,
-            "seed": seed,
+            "seed": seed + getattr(messages, "repeat", 0),
             **gen_kwargs,
             "skip_special_tokens": False,
             "spaces_between_special_tokens": False,

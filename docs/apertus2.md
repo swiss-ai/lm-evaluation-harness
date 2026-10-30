@@ -30,6 +30,8 @@ lm_eval --model apertus2-completions \
 2. **Request.** `skip_special_tokens: false` preserves output framing;
    `return_token_ids: true` enables exact parsing. `stop_token_ids` holds the
    wait token. Apply task `until` strings after parsing to avoid cutting reasoning.
+   `seed` is the harness seed plus the repeat index, so repeats (`pass@k`,
+   `maj@k`) sample independently and reproducibly.
 3. **Response.** Parse think, reply, call and claim messages. Score only the
    reply, cut at the first task `until` string; append tool calls as OpenAI JSON
    after `TOOL_CALLS_MARKER`, matching `local-chat-completions`
@@ -171,7 +173,6 @@ result saving.
 - `--use_cache` keys ignore the model: use one cache path per model
   configuration (tokenizer, effort, prefill, masking, `max_model_len`,
   `replay_reasoning`).
-- Sampled repeats share the request `seed` (existing harness behaviour).
 
 ## Setup and tests
 

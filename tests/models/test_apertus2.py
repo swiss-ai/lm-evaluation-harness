@@ -736,6 +736,29 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
         assert f"<|out|>think<|hdr|>{think}<|/out|><|out|>reply<|hdr|>A" in prompt
 
 
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
+    # The evaluator sends a document's repeats (pass@k, maj@k) as one request
+    # object; a seeded server would return the same sample for all of them.
+    model = make(synthetic, num_concurrent=num_concurrent)
+    seeds = []
+
+    def server(payload):
+        seeds.append(payload["seed"])
+        return answer(model.encoding, lib.Reply(payload="A"))
+
+    async def server_async(session, payload):
+        return server(payload)
+
+    repeated, single = chat_request(QUESTION), chat_request(QUESTION, doc=1)
+    with (
+        patch.object(model, "_post", side_effect=server),
+        patch.object(model, "_apost", side_effect=server_async),
+    ):
+        model.generate_until([repeated] * 3 + [single])
+    assert sorted(seeds) == [1234, 1234, 1235, 1236]
+
+
 # End to end with in-memory tasks
 
 
