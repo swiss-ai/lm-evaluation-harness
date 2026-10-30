@@ -6,6 +6,7 @@ import getpass
 import json
 import logging
 import os
+import re
 import ssl
 import threading
 import urllib.request
@@ -124,6 +125,24 @@ def _select_hosted_model(
             "Multiple hosted judge models match %s: %s; using preferred model %s",
             configured_model,
             suffix_matches,
+            preferred_model,
+        )
+        return preferred_model
+
+    # A model launched by evals-svc / model-launch is served as
+    # "<user>/<model>-<12 hex of the run id>", so it never ends in "/<model>".
+    launched_matches = sorted(
+        model
+        for model in hosted_models
+        if re.fullmatch(rf"(?:[^/]+/)*{re.escape(base_model)}-[0-9a-f]{{12}}", model)
+    )
+    if len(launched_matches) == 1:
+        return launched_matches[0]
+    if len(launched_matches) > 1:
+        eval_logger.warning(
+            "Multiple launched judge models match %s: %s; using preferred model %s",
+            configured_model,
+            launched_matches,
             preferred_model,
         )
     return preferred_model
