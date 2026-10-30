@@ -139,3 +139,29 @@ def test_task_override_can_select_provider_scope(monkeypatch):
         )
         == f"CSCS-Inference/{MODEL}"
     )
+
+
+def test_discovery_matches_launched_model_with_run_id_suffix():
+    hosted = (
+        "CSCS-Inference/swiss-ai/Apertus-v1.5-8B",
+        "ymetz/cais/HarmBench-Llama-2-13b-cls-0123456789ab",
+    )
+
+    assert (
+        model_resolver._select_hosted_model(
+            "cais/HarmBench-Llama-2-13b-cls",
+            "ymetz/cais/HarmBench-Llama-2-13b-cls",
+            hosted,
+        )
+        == "ymetz/cais/HarmBench-Llama-2-13b-cls-0123456789ab"
+    )
+
+
+def test_launched_model_match_ignores_other_models_and_ambiguity():
+    base = "cais/HarmBench-Llama-2-13b-cls"
+    preferred = f"ymetz/{base}"
+    other = ("ymetz/cais/HarmBench-Llama-2-13b-cls-extra", "ymetz/other/model-0123456789ab")
+    two = (f"ymetz/{base}-0123456789ab", f"zed/{base}-ba9876543210")
+
+    assert model_resolver._select_hosted_model(base, preferred, other) == preferred
+    assert model_resolver._select_hosted_model(base, preferred, two) == preferred
