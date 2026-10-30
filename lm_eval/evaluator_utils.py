@@ -37,8 +37,12 @@ class ResultAcc(TypedDict):
 THINKING_FORMAT_PREFIX = "thinking_format_"
 RESPONSE_LENGTH_PREFIX = "response_length_"
 THINKING_LENGTH_PREFIX = "thinking_length_"
-# generation_truncated: the server stopped at the token budget (finish_reason "length").
+# generation_*: per-response backend values, e.g. generation_truncated (the server
+# stopped at the token budget, finish_reason "length").
 GENERATION_PREFIX = "generation_"
+# Promoted from Instance.length_info: always, or with include_length.
+ALWAYS_PROMOTED_PREFIXES = (THINKING_FORMAT_PREFIX, GENERATION_PREFIX)
+LENGTH_PREFIXES = (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
 
 
 def promote_generation_info_metrics(
@@ -49,8 +53,8 @@ def promote_generation_info_metrics(
     Backends attach one metadata dictionary per generated response to
     ``Instance.length_info``. Values are first averaged per document and then flow
     through the normal aggregation, group, logger, and distributed-result paths.
-    Thinking-format flags and ``generation_truncated`` are always promoted when
-    present; response/thinking lengths are opt-in.
+    Thinking-format flags and ``generation_*`` keys (e.g. ``generation_truncated``)
+    are always promoted when present; response/thinking lengths are opt-in.
 
     Standard requests may contain extra responses from distributed padding, so their
     metadata is capped at ``Instance.repeats``. Multi-turn placeholders deliberately
@@ -62,11 +66,9 @@ def promote_generation_info_metrics(
         return isinstance(value, (int, float)) and not isinstance(value, bool)
 
     def _is_promoted(key: str) -> bool:
-        if key.startswith((THINKING_FORMAT_PREFIX, GENERATION_PREFIX)):
+        if key.startswith(ALWAYS_PROMOTED_PREFIXES):
             return True
-        return include_length and key.startswith(
-            (RESPONSE_LENGTH_PREFIX, THINKING_LENGTH_PREFIX)
-        )
+        return include_length and key.startswith(LENGTH_PREFIXES)
 
     def _response_infos(instance: Any) -> list[dict]:
         infos = getattr(instance, "length_info", None) or []
@@ -248,10 +250,12 @@ def _compute_task_aggregations(
         try:
             agg_fn = task.aggregation()[metric]  # type: ignore[index]
         except KeyError:
-            # Arbitrary metric without a defined aggregation function
-            eval_logger.warning(
-                f"[{task.task_name}] No aggregation function defined for metric {metric}. Using mean."
-            )
+            # Don't warn for expected, task-independent generation metrics added by
+            # the backend; silently use their mean.
+            if not metric.startswith(ALWAYS_PROMOTED_PREFIXES + LENGTH_PREFIXES):
+                eval_logger.warning(
+                    f"[{task.task_name}] No aggregation function defined for metric {metric}. Using mean."
+                )
             agg_fn = mean
 
         metric_key = f"{metric},{filter_key}"

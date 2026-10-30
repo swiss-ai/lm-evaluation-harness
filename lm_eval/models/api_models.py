@@ -64,9 +64,12 @@ class Generation(str):
     ``finish_reason`` is the OpenAI-style value ("stop", "length", ...) or None when
     the response didn't carry one. Behaves as a plain ``str`` everywhere else; read
     back in generate_until as the per-response ``generation_truncated`` flag.
+    ``generation_info`` holds backend-specific per-response metadata that
+    generate_until merges last into the response's ``length_info``.
     """
 
     finish_reason: str | None = None
+    generation_info: dict | None = None
 
 
 def parse_finish_reasons(outputs: Any) -> list[str | None]:
@@ -93,7 +96,7 @@ def with_finish_reasons(texts: list[str], outputs: Any) -> list[str]:
         return texts
     tagged = []
     for text, reason in zip(texts, reasons):
-        gen = Generation(text)
+        gen = text if isinstance(text, Generation) else Generation(text)
         gen.finish_reason = reason
         tagged.append(gen)
     return tagged
@@ -619,6 +622,51 @@ class TemplateAPI(TemplateLM):
         elif self.tokenizer_backend == "remote":
             return self.tokenizer.batch_decode(tokens)
 
+    def _post(self, payload: dict) -> dict:
+        """POST one payload and return the decoded JSON response."""
+        if self._rate_limiter is not None:
+            self._rate_limiter.acquire()
+        response = requests.post(
+            self.base_url,
+            json=payload,
+            headers=self.header,
+            verify=self.verify_certificate,
+            timeout=self.timeout,
+        )
+        if not response.ok:
+            eval_logger.warning(
+                f"API request failed with error message: {response.text}. Retrying..."
+            )
+        response.raise_for_status()
+        return response.json()
+
+    async def _apost(self, session: ClientSession, payload: dict) -> dict:
+        """Async counterpart of ``_post``; raising lets the caller retry."""
+        if self._rate_limiter is not None:
+            await self._rate_limiter.acquire_async()
+        async with session.post(
+            self.base_url,
+            json=payload,
+            headers=self.header,
+        ) as response:
+            if not response.ok:
+                error_text = await response.text()
+                eval_logger.warning(
+                    f"API request failed! Status code: {response.status}, "
+                    f"Response text: {error_text}. Retrying..."
+                )
+            response.raise_for_status()
+            return await response.json()
+
+    def _send(self, payload: dict) -> dict:
+        """Response for one request payload. Subclasses may issue several requests
+        per generation and return one combined response."""
+        return self._post(payload)
+
+    async def _asend(self, session: ClientSession, payload: dict) -> dict:
+        """Async counterpart of ``_send``."""
+        return await self._apost(session, payload)
+
     def model_call(
         self,
         messages: list[list[int]] | list[str] | list[JsonChatStr],
@@ -630,28 +678,16 @@ class TemplateAPI(TemplateLM):
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         try:
-            if self._rate_limiter is not None:
-                self._rate_limiter.acquire()
-            response = requests.post(
-                self.base_url,
-                json=self._create_payload(
+            return self._send(
+                self._create_payload(
                     self.create_message(messages),
                     generate=generate,
                     gen_kwargs=gen_kwargs,
                     seed=self._seed,
                     eos=self.eos_string,
                     **kwargs,
-                ),
-                headers=self.header,
-                verify=self.verify_certificate,
-                timeout=self.timeout,
-            )
-            if not response.ok:
-                eval_logger.warning(
-                    f"API request failed with error message: {response.text}. Retrying..."
                 )
-            response.raise_for_status()
-            return response.json()
+            )
         except RetryError:
             eval_logger.error(
                 "API request failed after multiple retries. Please check the API status."
@@ -683,22 +719,7 @@ class TemplateAPI(TemplateLM):
         acquired = await sem.acquire()
         outputs = None
         try:
-            if self._rate_limiter is not None:
-                await self._rate_limiter.acquire_async()
-            async with session.post(
-                self.base_url,
-                json=payload,
-                headers=self.header,
-            ) as response:
-                if not response.ok:
-                    error_text = await response.text()
-                    eval_logger.warning(
-                        f"API request failed! Status code: {response.status}, "
-                        f"Response text: {error_text}. Retrying..."
-                    )
-                # raising exception will retry the request
-                response.raise_for_status()
-                outputs = await response.json()
+            outputs = await self._asend(session, payload)
             tmp_answers = (
                 self.parse_generations(
                     outputs=outputs,
@@ -996,8 +1017,12 @@ class TemplateAPI(TemplateLM):
                         )
                         # Patch "None" answer with consistent value (async and sync calls)
                         res.append(Generation(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER))
-                    else:
-                        res.append(Generation(generated_text))
+                    else:  # an existing Generation keeps its generation_info
+                        res.append(
+                            generated_text
+                            if isinstance(generated_text, Generation)
+                            else Generation(generated_text)
+                        )
                     res[-1].finish_reason = reason
 
                     # partial caching only for successful generations; a thinking
@@ -1063,6 +1088,7 @@ class TemplateAPI(TemplateLM):
                     track_thinking_metrics=self.track_thinking_metrics,
                 )
                 | truncation_info(text)
+                | (getattr(text, "generation_info", None) or {})
                 for text in res
             ],
         )

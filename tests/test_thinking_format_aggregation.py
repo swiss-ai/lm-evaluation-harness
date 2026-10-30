@@ -389,3 +389,20 @@ def test_truncation_flag_is_always_promoted():
     promote_generation_info_metrics(acc)
     assert acc["raw_metrics"][("generation_truncated", "none")] == [1.0, 0.0]
     assert ("response_length_chars", "none") not in acc["raw_metrics"]
+
+
+def test_promoted_metrics_aggregate_as_means_without_warning(caplog):
+    task = SimpleNamespace(task_name="test_task", aggregation=dict)
+    raw_metrics = {
+        ("generation_custom", "none"): [0, 1],
+        ("thinking_format_correct", "none"): [1, 1],
+        ("other_metric", "none"): [2, 4],
+    }
+    with caplog.at_level("WARNING"):
+        metrics, _ = _compute_task_aggregations(task, raw_metrics, bootstrap_iters=0)
+    assert metrics["generation_custom,none"] == 0.5
+    assert metrics["other_metric,none"] == 3
+    warned = [
+        r.getMessage() for r in caplog.records if "No aggregation" in r.getMessage()
+    ]
+    assert len(warned) == 1 and "other_metric" in warned[0]
