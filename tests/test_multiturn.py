@@ -112,6 +112,34 @@ def test_multi_turn_generate_batches_episode_waves():
     assert len(results["samples"]["toy_multiturn"][0]["length_info"][0]) == 2
 
 
+def test_multi_turn_episodes_are_numbered():
+    # Models that keep per-conversation state (apertus2 replay, seeds) tell a
+    # document's repeated episodes apart by this number.
+    seen = []
+
+    class EpisodeLM(ScriptedLM):
+        def generate_until(self, requests):
+            seen.append([request.episode for request in requests])
+            return super().generate_until(requests)
+
+    task = ToyMultiturnTask(
+        config={
+            "task": "toy_multiturn",
+            "output_type": "multi_turn_generate",
+            "test_split": "test",
+            "num_fewshot": 0,
+            "repeats": 2,
+            "metric_list": [{"metric": "acc", "aggregation": "mean"}],
+            "generation_kwargs": {"until": []},
+            "metadata": {"version": 1},
+        }
+    )
+    evaluate(
+        lm=EpisodeLM(), task_dict={"toy_multiturn": task}, limit=1, bootstrap_iters=0
+    )
+    assert seen == [[0, 1], [0, 1]]
+
+
 def test_simple_evaluate_applies_overrides_to_flat_multiturn_task_mapping():
     task = ToyMultiturnTask(
         config={

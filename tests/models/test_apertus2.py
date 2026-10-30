@@ -112,13 +112,14 @@ def make(artifact, **kwargs):
     )
 
 
-def chat_request(messages, task="task", doc=0, **gen_kwargs):
+def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
     return Instance(
         request_type="generate_until",
         doc={},
         arguments=(JsonChatStr(json.dumps(messages)), {"until": [], **gen_kwargs}),
         idx=0,
         metadata=(task, doc, 1),
+        episode=episode,
     )
 
 
@@ -158,7 +159,8 @@ def server_len(artifact, prompt):
 
 
 def run(model, instances, responses):
-    """Generate with a fake server answering each POST from ``responses``."""
+    """Generate with a fake server answering each POST from ``responses`` (a
+    response, an exception to raise, or a function of the payload)."""
     sent = []
     replies = iter(responses)
 
@@ -167,7 +169,7 @@ def run(model, instances, responses):
         reply = next(replies)
         if isinstance(reply, Exception):
             raise reply
-        return reply
+        return reply(payload) if callable(reply) else reply
 
     with patch.object(model, "_post", side_effect=post):
         result = model.generate_until(instances)
@@ -508,6 +510,7 @@ def test_after_think_prefill_continues_the_reply(synthetic, with_ids):
     assert sent[1]["prompt"].endswith(
         f"<|out|>think<|hdr|>B fits.<|/out|><|out|>reply<|hdr|>{PREFIX}"
     )
+    assert sent[1]["seed"] != sent[0]["seed"]  # no replay of the think's noise
     if with_ids:  # phase two stays within phase one's prompt + budget
         total = server_len(synthetic, sent[0]["prompt"]) + 200
         assert server_len(synthetic, sent[1]["prompt"]) + sent[1]["max_tokens"] == total
@@ -738,25 +741,72 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
 
 @pytest.mark.parametrize("num_concurrent", [1, 2])
 def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
-    # The evaluator sends a document's repeats (pass@k, maj@k) as one request
-    # object; a seeded server would return the same sample for all of them.
+    # A seeded server returns one sample for all of a document's repeats (pass@k,
+    # maj@k) unless each has its own seed: single-turn repeats are one request
+    # object, multi-turn episodes one each (numbered), and a retry keeps its seed.
     model = make(synthetic, num_concurrent=num_concurrent)
-    seeds = []
+    seeds, failed = [], []
 
     def server(payload):
+        if payload["seed"] == 1235 and not failed:
+            failed.append(payload["seed"])
+            raise ConnectionError("transient")
         seeds.append(payload["seed"])
         return answer(model.encoding, lib.Reply(payload="A"))
 
     async def server_async(session, payload):
         return server(payload)
 
-    repeated, single = chat_request(QUESTION), chat_request(QUESTION, doc=1)
+    repeated = chat_request(QUESTION)
+    episodes = [chat_request(QUESTION, doc=1, episode=k) for k in range(2)]
     with (
         patch.object(model, "_post", side_effect=server),
         patch.object(model, "_apost", side_effect=server_async),
     ):
-        model.generate_until([repeated] * 3 + [single])
-    assert sorted(seeds) == [1234, 1234, 1235, 1236]
+        model.generate_until(
+            [repeated] * 3 + episodes + [chat_request(QUESTION, doc=2)]
+        )
+    assert failed
+    assert sorted(seeds) == [1234, 1234, 1234, 1235, 1235, 1236]
+
+
+@pytest.mark.parametrize("shared", [False, True])
+def test_episodes_keep_their_own_reasoning(synthetic, shared):
+    # Multi-turn repeats of a document sample their own thinks; equal answers
+    # must not let one episode's think replace another's, even when a task sends
+    # one context object from every episode.
+    model = make(synthetic)
+
+    def server(payload):
+        think = lib.Think(payload=f"think {payload['seed']}")
+        return answer(model.encoding, think, lib.Reply(payload="A"))
+
+    def turn(messages):
+        requests = [chat_request(messages, episode=k) for k in range(2)]
+        if shared:
+            requests[1].arguments = requests[0].arguments
+        _, sent = run(model, requests, [server] * 2)
+        return sent
+
+    first = turn(QUESTION)
+    assert sorted(payload["seed"] for payload in first) == [1234, 1235]
+    follow = turn([*QUESTION, {"role": "assistant", "content": "A"}, *QUESTION])
+    for payload in follow:
+        assert f"think<|hdr|>think {payload['seed']}<|/out|>" in payload["prompt"]
+
+
+def test_task_seed_is_the_base_and_none_is_unseeded(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    seeded = chat_request(QUESTION, seed=7)
+    _, sent = run(model, [seeded] * 2, [answer(enc, lib.Reply(payload="A"))] * 2)
+    assert sorted(payload["seed"] for payload in sent) == [7, 8]
+    reply = enc.encode_text(" B.") + [enc.controls.output_end]
+    unseeded = chat_request(PREFILLED, until=["."], seed=None)
+    responses = [phase_one(enc), completion(enc, reply, stop=enc.controls.wait)]
+    result, sent = run(model, [unseeded], responses)
+    assert result == [" B"]  # the after_think continuation ran
+    assert [payload["seed"] for payload in sent] == [None, None]
 
 
 # End to end with in-memory tasks

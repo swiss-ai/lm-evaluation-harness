@@ -28,6 +28,9 @@ class Instance:
     # `generation_*` keys, aggregated by `evaluator_utils.promote_generation_info_metrics`
     # (non-numeric backend values such as `apertus2_*` strings are kept, not promoted).
     length_info: list = field(default_factory=list)
+    # Which of a multi-turn document's `repeats` episodes sent this request
+    # (evaluator.run_multi_turn_rollout); 0 otherwise.
+    episode: int = 0
 
     # initialized after init
     task_name: str | None = None

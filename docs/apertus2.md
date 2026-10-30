@@ -30,8 +30,11 @@ lm_eval --model apertus2-completions \
 2. **Request.** `skip_special_tokens: false` preserves output framing;
    `return_token_ids: true` enables exact parsing. `stop_token_ids` holds the
    wait token. Apply task `until` strings after parsing to avoid cutting reasoning.
-   `seed` is the harness seed plus the repeat index, so repeats (`pass@k`,
-   `maj@k`) sample independently and reproducibly.
+   `seed` is the harness seed (or the task's `seed` gen kwarg) plus the repeat
+   index (multi-turn: the episode; retries keep it), so repeats (`pass@k`,
+   `maj@k`) sample independently and reproducibly. An `after_think`
+   continuation adds a fixed offset, so it does not replay the think's sampling
+   noise. A task or `--gen_kwargs` `seed=None` sends unseeded requests.
 3. **Response.** Parse think, reply, call and claim messages. Score only the
    reply, cut at the first task `until` string; append tool calls as OpenAI JSON
    after `TOOL_CALLS_MARKER`, matching `local-chat-completions`
@@ -66,9 +69,10 @@ Policy"). Multi-turn tasks (e.g. `bfcl_v3_fc` multi-turn,
 restores its own reasoning:
 
 - After each response it remembers the response's thinks for that conversation
-  (task and document), keyed by the messages so far (system and developer
-  messages excluded) and the answer it returned (ignoring surrounding
-  whitespace). The memory is kept while the conversation goes on.
+  (task, document and episode of a repeated document), keyed by the messages so
+  far (system and developer messages excluded) and the answer it returned
+  (ignoring surrounding whitespace). The memory is kept while the conversation
+  goes on.
 - When that answer reappears in a later request of the conversation, each think
   is replayed as a think message before the answer's reply and calls. A think
   cut off by the token budget comes back closed; an empty answer is replayed as
@@ -166,9 +170,6 @@ result saving.
 - Replayed thinks precede the reply and calls of their response; a response
   that interleaved them is reordered. Replay lengthens prompts, so more
   requests may be clamped or skipped (e.g. BFCL long context).
-- Repeats of one document share the replay memory: when they reach the same
-  history with the same answer, the thinks stored last are replayed in all of
-  them.
 - Claims are dropped, not scored.
 - `--use_cache` keys ignore the model: use one cache path per model
   configuration (tokenizer, effort, prefill, masking, `max_model_len`,

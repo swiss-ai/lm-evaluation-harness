@@ -153,6 +153,10 @@ def _with_reasoning(prepared: list[dict], replays: dict[int, list[str]]) -> list
     return result
 
 
+# Above any repeat index, so phase-two seeds never meet phase-one seeds.
+_PHASE_TWO_SEED_OFFSET = 1 << 20
+
+
 class _ScopedMessages(list):
     """Decoded chat messages with the conversation scope and repeat index of their
     request."""
@@ -199,8 +203,8 @@ class _Request:
     prompt_ids: list[int] | None = None
     # After-think: no budget left after a closed think; no second request.
     out_of_budget: bool = False
-    # Reasoning replay: the conversation (task, document) and the digest of
-    # the request's messages.
+    # Reasoning replay: the conversation (task, document, episode) and the
+    # digest of the request's messages.
     scope: tuple | None = None
     history_digest: str | None = None
 
@@ -261,8 +265,8 @@ class Apertus2Completions(LocalChatCompletion):
         self.replay_reasoning = bool(replay_reasoning)
         # scope -> history digest -> stripped answer -> think payloads
         self._memory: dict[tuple, dict] = {}
-        self._scopes: dict[int, tuple] = {}
-        self._repeats: dict[int, int] = {}
+        self._pending: dict[int, list[tuple]] = {}
+        self._attempts: dict[int, tuple] = {}
         self._artifact = str(tokenizer)
         self._bind_encoding(lib.load_encoding(tokenizer))
         self._policy = lib.MappingPolicy(
@@ -373,27 +377,38 @@ class Apertus2Completions(LocalChatCompletion):
                     "literal_special_tokens=reject: a request contains "
                     "special-token text"
                 )
-        # Replay memory is per conversation (task, document); the context object
-        # reaches create_message unchanged and carries the scope there. Each
-        # multi-turn wave holds every ongoing conversation, so the others ended.
-        self._scopes = {
-            id(r.args[0]): (r.task_name, r.doc_id)
-            for r in requests
-            if r.task_name is not None
-        }
-        active = set(self._scopes.values())
+        # Each request's context object reaches create_message unchanged, which
+        # takes the next (scope, repeat) queued for it. The scope is the
+        # conversation (task, document, episode) for reasoning replay; the repeat
+        # offsets the seed, or a seeded server would return one sample for all
+        # repeats. Single-turn repeats send one object several times; the
+        # evaluator numbers multi-turn episodes. Requests sharing an object are
+        # sent in queue order only if they share gen kwargs (TemplateAPI groups
+        # by them), which holds for every task here. Each multi-turn wave holds
+        # every ongoing conversation, so the others ended.
+        self._pending = {}
+        for r in requests:
+            scope = None if r.task_name is None else (r.task_name, r.doc_id, r.episode)
+            pending = self._pending.setdefault(id(r.args[0]), [])
+            repeat = r.episode + sum(queued == scope for queued, _ in pending)
+            pending.append((scope, repeat))
+        active = {scope for queued in self._pending.values() for scope, _ in queued}
         self._memory = {s: m for s, m in self._memory.items() if s in active}
-        # Repeats of a document send the same context object; each gets its own
-        # seed, or a seeded server would return one sample for all of them.
-        self._repeats = {}
-        return super().generate_until(requests, disable_tqdm)
+        try:
+            return super().generate_until(requests, disable_tqdm)
+        finally:
+            self._attempts = {}
 
     def create_message(self, messages, generate=False):
         decoded = _ScopedMessages(super().create_message(messages, generate))
-        key = id(messages[0])
-        decoded.scope = self._scopes.get(key)
-        decoded.repeat = self._repeats.get(key, 0)
-        self._repeats[key] = decoded.repeat + 1
+        # A retry rebuilds the payload from the same list: keep its scope and
+        # repeat (and the list, so its id stays unique).
+        attempt = self._attempts.get(id(messages))
+        if attempt is None:
+            pending = self._pending.get(id(messages[0]))
+            attempt = (messages, *(pending.pop(0) if pending else (None, 0)))
+            self._attempts[id(messages)] = attempt
+        _, decoded.scope, decoded.repeat = attempt
         return decoded
 
     def _create_payload(
@@ -417,6 +432,10 @@ class Apertus2Completions(LocalChatCompletion):
             scope=getattr(messages, "scope", None),
         )
         temperature = gen_kwargs.pop("temperature", 0)
+        # A task's seed replaces the harness seed; None sends unseeded requests.
+        seed = gen_kwargs.pop("seed", seed)
+        if seed is not None:
+            seed += getattr(messages, "repeat", 0)
         try:
             self._prepare_request(request, list(messages), tools)
         except (self._lib.ApertusFormatError, ValueError) as error:
@@ -432,7 +451,7 @@ class Apertus2Completions(LocalChatCompletion):
             "prompt": request.prompt,
             "max_tokens": request.max_tokens,
             "temperature": temperature,
-            "seed": seed + getattr(messages, "repeat", 0),
+            "seed": seed,
             **gen_kwargs,
             "skip_special_tokens": False,
             "spaces_between_special_tokens": False,
@@ -607,6 +626,7 @@ class Apertus2Completions(LocalChatCompletion):
         if budget < 1:
             request.out_of_budget = True
             return None
+        seed = payload["seed"]
         # request.prompt stays the task prompt for logging.
         request.head, request.prompt_ids = head, prompt_ids
         return {
@@ -614,6 +634,8 @@ class Apertus2Completions(LocalChatCompletion):
             "prompt": prompt,
             "max_tokens": budget,
             "stop_token_ids": [self._wait],
+            # Phase one's seed would replay its sampling noise over the reply.
+            "seed": None if seed is None else seed + _PHASE_TWO_SEED_OFFSET,
         }
 
     # Response path
