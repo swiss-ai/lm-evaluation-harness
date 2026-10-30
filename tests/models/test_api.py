@@ -35,6 +35,47 @@ def api_batch_ssl_tokenized():
     )
 
 
+def test_loglikelihood_rolling_batches_across_documents(api):
+    api.max_length = 4
+    api.prefix_token_id = 0
+    api.cache_hook = MagicMock()
+    requests = [MagicMock(args=(text,)) for text in ("long", "empty", "short")]
+    tokens = {"long": [1, 2, 3, 4], "empty": [], "short": [5, 6]}
+
+    with (
+        patch.object(api, "tok_encode", side_effect=tokens.__getitem__),
+        patch.object(
+            api,
+            "_loglikelihood_tokens",
+            return_value=[(-1.0, True), (-2.0, False), (-4.0, True)],
+        ) as score,
+    ):
+        result = api.loglikelihood_rolling(requests, disable_tqdm=True)
+
+    assert result == [-3.0, 0, -4.0]
+    score.assert_called_once_with(
+        [(None, [0], [1, 2, 3]), (None, [1, 2, 3], [4]), (None, [0], [5, 6])],
+        disable_tqdm=True,
+    )
+    assert api.cache_hook.add_partial.call_args_list == [
+        (("loglikelihood_rolling", (text,), value), {})
+        for text, value in zip(("long", "empty", "short"), result, strict=True)
+    ]
+
+
+@pytest.mark.parametrize("texts", [[], [""]])
+def test_loglikelihood_rolling_without_windows(api, texts):
+    requests = [MagicMock(args=(text,)) for text in texts]
+    with (
+        patch.object(api, "tok_encode", return_value=[]),
+        patch.object(api, "_loglikelihood_tokens") as score,
+    ):
+        assert api.loglikelihood_rolling(requests, disable_tqdm=True) == [0] * len(
+            texts
+        )
+    score.assert_not_called()
+
+
 def test_create_payload_generate(api):
     messages = ["Generate a story"]
     gen_kwargs = {
