@@ -56,6 +56,32 @@ first, return it and set `generation_prefill_skipped`. Call 2 shares call 1's
 token budget and context allowance; no remaining budget yields an empty,
 truncated answer.
 
+## Multi-turn reasoning replay
+
+The Apertus 2 profile keeps every earlier think in context ("Context and Memory
+Policy"). Multi-turn tasks (e.g. `bfcl_v3_fc` multi-turn,
+`realguardrails_s_rules`) store only content and tool calls, so the model
+restores its own reasoning:
+
+- After each response it remembers the response's thinks for that conversation
+  (task and document), keyed by the messages so far (system and developer
+  messages excluded) and the answer it returned (ignoring surrounding
+  whitespace). The memory is kept while the conversation goes on.
+- When that answer reappears in a later request of the conversation, each think
+  is replayed as a think message before the answer's reply and calls. A think
+  cut off by the token budget comes back closed; an empty answer is replayed as
+  thinks only.
+- Not replayed: answers served by `--use_cache`, answers to prefill requests,
+  assistant turns the task wrote or dropped, and answers the task changed beyond
+  whitespace (`generation_reasoning_unmatched`).
+- `replay_reasoning=false` turns it off, e.g. for ablations.
+
+Other models see no earlier reasoning when the harness strips it (think tokens,
+or the chat endpoint's reasoning field), whatever their templates would keep:
+Qwen3 keeps it within the current turn's tool calls, gpt-oss for a tool call
+until the final answer, DeepSeek-R1 never. Note this when comparing multi-turn
+scores.
+
 ## Token budgets
 
 | Limit                      | Counts                                | Set by                    | At the limit                                                                                                  |
@@ -93,6 +119,7 @@ Besides the `local-chat-completions` arguments (`base_url`, `model`,
 | `return_token_ids`       | `true`        | Ask for token IDs; disable if the endpoint rejects the field (text parsing then misreads control spellings written as ordinary text)     |
 | `max_model_len`          | unset         | Server `--max-model-len`: clamp `max_tokens` or skip generation if the prompt fills the context; see [token budgets](#token-budgets)     |
 | `log_native`             | `output`      | `output` stores the raw native output and a hash of the first request's prompt per sample; `full` stores that prompt itself              |
+| `replay_reasoning`       | `true`        | Replay the model's earlier thinks in multi-turn histories; see [replay](#multi-turn-reasoning-replay)                                    |
 
 Likelihood and multiple-choice tasks are not supported and raise.
 
@@ -123,7 +150,9 @@ result saving.
 | `generation_truncated`                                         | Stopped at the token budget                                                                                                           |
 | `generation_prefill_skipped`                                   | `after_think`, but the model did not think first                                                                                      |
 | `generation_budget_clamped`                                    | `max_model_len` check lowered `max_tokens`                                                                                            |
-| `generation_literal_special_tokens`                            | Special-token spellings in the request content                                                                                        |
+| `generation_literal_special_tokens`                            | Special-token spellings in the request content, including replayed thinks                                                             |
+| `generation_reasoning_replayed`                                | Think messages replayed into the prompt; only on sent requests whose history holds an earlier answer of the model                     |
+| `generation_reasoning_unmatched`                               | 1 when the task changed an earlier answer of the model, so its thinks were not replayed (also on every later request); same requests  |
 | `generation_prompt_mismatch`                                   | Returned prompt IDs differ from native IDs; only when the server returns them                                                         |
 | `generation_unknown_output` / `generation_has_claim`           | Unknown output types / claims, both dropped                                                                                           |
 | `generation_call_counter_reused`, `generation_unexpected_call` | Tool calls dropped: reused call counter, or calls without `tools` in the request                                                      |
@@ -132,11 +161,16 @@ result saving.
 
 ## Limitations
 
-- Earlier reasoning is not replayed in multi-turn histories (as for chat
-  models); the native profile retains it.
+- Replayed thinks precede the reply and calls of their response; a response
+  that interleaved them is reordered. Replay lengthens prompts, so more
+  requests may be clamped or skipped (e.g. BFCL long context).
+- Repeats of one document share the replay memory: when they reach the same
+  history with the same answer, the thinks stored last are replayed in all of
+  them.
 - Claims are dropped, not scored.
 - `--use_cache` keys ignore the model: use one cache path per model
-  configuration (tokenizer, effort, prefill, masking, `max_model_len`).
+  configuration (tokenizer, effort, prefill, masking, `max_model_len`,
+  `replay_reasoning`).
 - Sampled repeats share the request `seed` (existing harness behaviour).
 
 ## Setup and tests

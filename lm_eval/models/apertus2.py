@@ -109,6 +109,56 @@ def _prepare_history(messages: list[dict], lib: Any) -> tuple[list[dict], Any]:
     return prepared, context
 
 
+def _join_calls(content: str, calls: list | None) -> str:
+    """A task answer: the reply, then any tool calls after ``TOOL_CALLS_MARKER``."""
+    if not calls:
+        return content
+    return content + TOOL_CALLS_MARKER + json.dumps(calls, ensure_ascii=False)
+
+
+def _history_answer(message: dict) -> str | None:
+    """The answer an assistant history message was built from, stripped.
+
+    Tasks store the returned answer verbatim (or stripped), or split at
+    ``TOOL_CALLS_MARKER`` into content and parsed tool calls (BFCL).
+    """
+    content = message.get("content")
+    if content is not None and not isinstance(content, str):
+        return None
+    return _join_calls(content or "", message.get("tool_calls")).strip()
+
+
+def _with_reasoning(prepared: list[dict], replays: dict[int, list[str]]) -> list[dict]:
+    """Prepared messages with replayed thinks before their assistant messages.
+
+    Runs after ``_prepare_history``, which keeps messages 1:1 but deletes empty
+    reasoning; replayed thinks may be empty. Each think becomes its own assistant
+    message, which the mapping merges into one burst. An empty answer is replayed
+    as thinks only, so a cut think gets no empty reply.
+    """
+    result = []
+    for index, message in enumerate(prepared):
+        thinks = replays.get(index)
+        if thinks:
+            result.extend(
+                {"role": "assistant", "content": None, "reasoning_content": think}
+                for think in thinks[:-1]
+            )
+            message = {
+                **message,
+                "content": message.get("content") or None,
+                "reasoning_content": thinks[-1],
+            }
+        result.append(message)
+    return result
+
+
+class _ScopedMessages(list):
+    """Decoded chat messages with the conversation scope of their request."""
+
+    scope: tuple | None = None
+
+
 def _first_choice(response: Any) -> dict | None:
     """The response's first choice, or None for a missing or malformed response."""
     try:
@@ -147,6 +197,10 @@ class _Request:
     prompt_ids: list[int] | None = None
     # After-think: no budget left after a closed think; no second request.
     out_of_budget: bool = False
+    # Reasoning replay: the conversation (task, document) and the digest of
+    # the request's messages.
+    scope: tuple | None = None
+    history_digest: str | None = None
 
 
 @register_model("apertus2-completions")
@@ -166,6 +220,7 @@ class Apertus2Completions(LocalChatCompletion):
         return_token_ids=True,
         max_model_len=None,
         log_native="output",
+        replay_reasoning=True,
         tokenizer_backend=None,
         tokenized_requests=None,
         think_end_token=None,
@@ -201,6 +256,10 @@ class Apertus2Completions(LocalChatCompletion):
         self.return_token_ids = bool(return_token_ids)
         self.max_model_len = int(max_model_len) if max_model_len else None
         self.log_native = log_native
+        self.replay_reasoning = bool(replay_reasoning)
+        # scope -> history digest -> stripped answer -> think payloads
+        self._memory: dict[tuple, dict] = {}
+        self._scopes: dict[int, tuple] = {}
         self._artifact = str(tokenizer)
         self._bind_encoding(lib.load_encoding(tokenizer))
         self._policy = lib.MappingPolicy(
@@ -264,7 +323,8 @@ class Apertus2Completions(LocalChatCompletion):
         """Provenance for the results config; there is no Jinja template."""
         return (
             f"apertus2-native artifact={self._artifact} "
-            f"effort={self.reasoning_effort} prefill={self.prefill}"
+            f"effort={self.reasoning_effort} prefill={self.prefill} "
+            f"replay={self.replay_reasoning}"
         )
 
     def loglikelihood(self, requests, **kwargs):
@@ -310,7 +370,22 @@ class Apertus2Completions(LocalChatCompletion):
                     "literal_special_tokens=reject: a request contains "
                     "special-token text"
                 )
+        # Replay memory is per conversation (task, document); the context object
+        # reaches create_message unchanged and carries the scope there. Each
+        # multi-turn wave holds every ongoing conversation, so the others ended.
+        self._scopes = {
+            id(r.args[0]): (r.task_name, r.doc_id)
+            for r in requests
+            if r.task_name is not None
+        }
+        active = set(self._scopes.values())
+        self._memory = {s: m for s, m in self._memory.items() if s in active}
         return super().generate_until(requests, disable_tqdm)
+
+    def create_message(self, messages, generate=False):
+        decoded = _ScopedMessages(super().create_message(messages, generate))
+        decoded.scope = self._scopes.get(id(messages[0]))
+        return decoded
 
     def _create_payload(
         self,
@@ -330,6 +405,7 @@ class Apertus2Completions(LocalChatCompletion):
             until=gen_kwargs.pop("until", None),
             has_tools=bool(tools),
             max_tokens=int(gen_kwargs.pop("max_tokens", None) or max_gen_toks),
+            scope=getattr(messages, "scope", None),
         )
         temperature = gen_kwargs.pop("temperature", 0)
         try:
@@ -373,7 +449,9 @@ class Apertus2Completions(LocalChatCompletion):
             request.prefix = messages.pop().get("content") or ""
             # Built here so an invalid prefix fails before any request.
             request.open_reply = lib.Reply(payload=request.prefix, open=True)
+        replays, unmatched = self._recall(request, messages)
         prepared, context = _prepare_history(messages, lib)
+        prepared = _with_reasoning(prepared, replays)
         mapped = lib.from_openai(
             prepared,
             tools=json.loads(tools) if tools else None,
@@ -401,6 +479,13 @@ class Apertus2Completions(LocalChatCompletion):
         request.prompt = prompt
         request.prompt_ids = prompt_ids
         request.max_tokens = budget
+        if unmatched is not None:  # the history holds earlier answers of the model
+            thinks = [think for burst in replays.values() for think in burst]
+            request.info["generation_reasoning_replayed"] = len(thinks)
+            request.info["generation_reasoning_unmatched"] = int(unmatched)
+            request.info["generation_literal_special_tokens"] += sum(
+                len(self._literal.findall(think)) for think in thinks
+            )
 
     def _render(self, request: _Request, extra: list) -> tuple[str, list[int]]:
         """Prompt text and native IDs of the inputs followed by ``extra`` items."""
@@ -411,6 +496,45 @@ class Apertus2Completions(LocalChatCompletion):
         )
         prompt_ids = self.encoding.encode_conversation(conversation)
         return self._bos_text + lib.render_str(conversation), prompt_ids
+
+    # Reasoning replay: earlier thinks stay in context; tasks drop them
+
+    def _recall(
+        self, request: _Request, messages: list[dict]
+    ) -> tuple[dict[int, list[str]], bool | None]:
+        """Thinks to replay by message index, and whether the task changed an answer.
+
+        The flag is None when the history holds no earlier answer of the model.
+        Records the history digest on ``request``.
+        """
+        if not self.replay_reasoning or request.scope is None:
+            return {}, None
+        histories = self._memory.get(request.scope, {})
+        replays, unmatched = {}, None
+        history = hashlib.sha256()
+        for index, message in enumerate(messages):
+            role = message.get("role")
+            answer = _history_answer(message) if role == "assistant" else None
+            answers = histories.get(history.hexdigest())
+            reasoned = message.get("reasoning_content") or message.get("reasoning")
+            if answers is not None and answer is not None and not reasoned:
+                # The model answered this history: a miss means the task changed the
+                # answer.
+                thinks = answers.get(answer)
+                if thinks:
+                    replays[index] = thinks
+                unmatched = unmatched or thinks is None
+            # System messages are left out: some tasks rebuild them per request.
+            if role not in ("system", "developer"):
+                history.update(json.dumps(message, sort_keys=True).encode())
+        request.history_digest = history.hexdigest()
+        return replays, unmatched
+
+    def _remember(self, request: _Request, answer: str, thinks: list) -> None:
+        """Keep a response's thinks for later requests of its conversation."""
+        if request.history_digest is not None and request.prefix is None:
+            histories = self._memory.setdefault(request.scope, {})
+            histories.setdefault(request.history_digest, {})[answer.strip()] = thinks
 
     # Send hooks: one or two requests per generation, one combined response
 
@@ -535,6 +659,7 @@ class Apertus2Completions(LocalChatCompletion):
             items[0] = items[0].model_copy(update={"open": False})
             finish_reason = "length"
         answer, thinks, replies = self._answer(request, items)
+        self._remember(request, answer, thinks)
         return {
             "choices": [
                 self._choice(request, answer, finish_reason, raw, thinks, replies)
@@ -589,9 +714,7 @@ class Apertus2Completions(LocalChatCompletion):
         if calls and not request.has_tools:
             info["generation_unexpected_call"] = 1
             calls = []
-        if calls:
-            content += TOOL_CALLS_MARKER + json.dumps(calls, ensure_ascii=False)
-        return content, thinks, replies
+        return _join_calls(content, calls), thinks, replies
 
     def _choice(
         self,

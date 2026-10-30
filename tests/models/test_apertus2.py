@@ -25,6 +25,7 @@ from lm_eval.api.task import ConfigurableTask
 from lm_eval.evaluator import evaluate
 from lm_eval.models.apertus2 import _REQUEST as REQUEST, Apertus2Completions
 from lm_eval.models.api_models import JsonChatStr
+from lm_eval.tasks.bfcl_v3.task import _fc_calls, _split_tool_calls
 
 
 PREFIX = "The best answer is"
@@ -111,12 +112,13 @@ def make(artifact, **kwargs):
     )
 
 
-def chat_request(messages, **gen_kwargs):
+def chat_request(messages, task="task", doc=0, **gen_kwargs):
     return Instance(
         request_type="generate_until",
         doc={},
         arguments=(JsonChatStr(json.dumps(messages)), {"until": [], **gen_kwargs}),
         idx=0,
+        metadata=(task, doc, 1),
     )
 
 
@@ -437,8 +439,6 @@ def test_thinking_lengths_need_well_formed_output(synthetic):
 
 
 def test_tool_calls_follow_the_marker_for_bfcl(synthetic):
-    from lm_eval.tasks.bfcl_v3.task import _fc_calls, _split_tool_calls
-
     model = make(synthetic)
     enc = model.encoding
     call = lib.Call(name="get_weather", counter=0, payload='{"city":"Bern"}')
@@ -603,6 +603,137 @@ def test_async_path_runs_both_prefill_phases(synthetic):
     with patch.object(model, "_apost", side_effect=fake_post):
         assert model.generate_until([chat_request(PREFILLED)]) == [" C"]
     assert len(sent) == 2 and all(REQUEST not in p for p in sent)
+
+
+# Multi-turn reasoning replay
+
+
+def test_earlier_reasoning_is_replayed(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    tools = json.dumps(TOOLS)
+    call = lib.Call(name="get_weather", counter=0, payload='{"city":"Bern"}')
+    first = [lib.Think(payload="Need <|wait|> weather."), lib.Think(payload=""), call]
+    second = [lib.Think(payload="It is sunny."), lib.Reply(payload="Sunny.\n")]
+    turn0 = chat_request(QUESTION, tools=tools)
+    result, sent0 = run(model, [turn0], [answer(enc, *first)])
+    # The history as bfcl_v3_fc builds it: content and calls split at the marker.
+    content, calls = _split_tool_calls(result[0])
+    history = [
+        *QUESTION,
+        {"role": "assistant", "content": content, "tool_calls": calls},
+        {"role": "tool", "tool_call_id": calls[0]["id"], "content": "sunny"},
+    ]
+    turn1 = chat_request(history, tools=tools)
+    result, sent1 = run(model, [turn1], [answer(enc, *second)])
+    history += [{"role": "assistant", "content": result[0]}, *QUESTION]
+    turn2 = chat_request(history, tools=tools)
+    _, sent2 = run(model, [turn2], [answer(enc, lib.Reply(payload="Bye."))])
+    # Each prompt continues the previous one exactly, thinks included.
+    for before, items, after in ((sent0, first, sent1), (sent1, second, sent2)):
+        output = enc.decode_text(native(enc, *items) + [enc.controls.wait])
+        assert after[0]["prompt"].startswith(before[0]["prompt"] + output)
+    infos = [turn.length_info[0] for turn in (turn0, turn1, turn2)]
+    assert "generation_reasoning_replayed" not in infos[0]
+    assert [info["generation_reasoning_replayed"] for info in infos[1:]] == [2, 3]
+    assert all(info["generation_reasoning_unmatched"] == 0 for info in infos[1:])
+    # Replayed thinks count towards literal special-token text like the content.
+    assert all(info["generation_literal_special_tokens"] == 1 for info in infos[1:])
+
+
+def test_cut_think_is_replayed_closed(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    cut = native(enc, lib.Think(payload="still", open=True))
+    system = {"role": "system", "content": "Be brief."}
+    run(model, [chat_request([system, *QUESTION])], [completion(enc, cut, length=True)])
+    # Tasks may rebuild their system message between turns.
+    other_system = {**system, "content": "Be very brief."}
+    history = [other_system, *QUESTION, {"role": "assistant", "content": ""}, *QUESTION]
+    _, sent = run(model, [chat_request(history)], [answer(enc, lib.Reply(payload="A"))])
+    # Closed, and without an empty reply the model never wrote.
+    assert (
+        "<|in|>user<|hdr|>Q?<|/in|><|out|>think<|hdr|>still<|/out|><|wait|>"
+        in sent[0]["prompt"]
+    )
+
+
+@pytest.mark.parametrize("stored, replayed", [(" A\n", True), ("B", False)])
+def test_answer_matches_up_to_whitespace(synthetic, stored, replayed):
+    model = make(synthetic)
+    enc = model.encoding
+    run(
+        model,
+        [chat_request(QUESTION)],
+        [answer(enc, lib.Think(payload="t"), lib.Reply(payload="A"))],
+    )
+    turn1 = chat_request(
+        [*QUESTION, {"role": "assistant", "content": stored}, *QUESTION]
+    )
+    _, sent = run(model, [turn1], [answer(enc, lib.Reply(payload="C"))])
+    assert ("think<|hdr|>t<|/out|>" in sent[0]["prompt"]) is replayed
+    info = turn1.length_info[0]
+    assert info["generation_reasoning_replayed"] == int(replayed)
+    assert info["generation_reasoning_unmatched"] == int(not replayed)
+
+
+def test_replay_can_be_disabled(synthetic):
+    model = make(synthetic, replay_reasoning=False)
+    enc = model.encoding
+    run(
+        model,
+        [chat_request(QUESTION)],
+        [answer(enc, lib.Think(payload="t"), lib.Reply(payload="A"))],
+    )
+    turn1 = chat_request([*QUESTION, {"role": "assistant", "content": "A"}, *QUESTION])
+    _, sent = run(model, [turn1], [answer(enc, lib.Reply(payload="C"))])
+    assert "think<|hdr|>t<|/out|>" not in sent[0]["prompt"]
+    assert "generation_reasoning_replayed" not in turn1.length_info[0]
+
+
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
+    # Conversations with the same history and answer keep their own thinks, e.g.
+    # bfcl_v3_fc miss_func docs, which share their first turn with base docs.
+    model = make(synthetic, num_concurrent=num_concurrent)
+    enc = model.encoding
+    names = {
+        ("base", 0): "get_weather",
+        ("base", 1): "get_time",
+        ("miss_func", 0): "get_date",
+    }
+    prompts = []
+
+    def tool(name):
+        return {**TOOLS[0], "function": {**TOOLS[0]["function"], "name": name}}
+
+    def server(payload):
+        prompts.append(payload["prompt"])
+        think = next(name for name in names.values() if name in payload["prompt"])
+        return answer(enc, lib.Think(payload=think), lib.Reply(payload="A"))
+
+    async def server_async(session, payload):
+        return server(payload)
+
+    def turn(messages):
+        prompts.clear()
+        requests = [
+            chat_request(messages, task, doc, tools=json.dumps([tool(name)]))
+            for (task, doc), name in names.items()
+        ]
+        with (
+            patch.object(model, "_post", side_effect=server),
+            patch.object(model, "_apost", side_effect=server_async),
+        ):
+            model.generate_until(requests)
+        return list(prompts)
+
+    turn(QUESTION)
+    follow = turn([*QUESTION, {"role": "assistant", "content": "A"}, *QUESTION])
+    assert len(follow) == 3
+    for prompt in follow:
+        think = next(name for name in names.values() if name in prompt)
+        assert f"<|out|>think<|hdr|>{think}<|/out|><|out|>reply<|hdr|>A" in prompt
 
 
 # End to end with in-memory tasks
