@@ -21,7 +21,6 @@ generation_kwargs:
     - "Q:"
     - "Question:"
     - "प्रश्न:"
-    - "<|im_end|>"
   do_sample: false
   temperature: 0.0
   max_gen_toks: 2048
