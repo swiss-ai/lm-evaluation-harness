@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: serbian
+task: include_2_serbian_gen_0shot

@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: dogri
+task: include_2_dogri_gen_0shot

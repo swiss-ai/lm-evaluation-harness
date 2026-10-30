@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: somali
+task: include_2_somali_gen_0shot

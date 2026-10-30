@@ -45,7 +45,7 @@ class WandbLogger:
             assert Version(wandb.__version__) >= Version("0.13.6")
             if Version(wandb.__version__) < Version("0.13.6"):
                 wandb.require("report-editing:v0")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- any import/version problem only disables reporting
             logger.warning(
                 "To use the wandb reporting functionality please install wandb>=0.13.6.\n"
                 "To install the latest version of wandb run `pip install wandb --upgrade`\n"
@@ -58,6 +58,7 @@ class WandbLogger:
         # pop the step key from the args to save for all logging calls
         self.step = self.wandb_args.pop("step", None)
         self.consumed_tokens = self.wandb_args.pop("consumed_tokens", None)
+        self.total_flops = self.wandb_args.pop("total_flops", None)
 
         # initialize a W&B run
         if wandb.run is None:
@@ -73,6 +74,9 @@ class WandbLogger:
         else:
             step_metric_name = "ConsumedTokens"
             self.step_metrics["ConsumedTokens"] = self.consumed_tokens
+        if self.total_flops is not None:
+            self.step_metrics["flops"] = self.total_flops
+            self.run.define_metric("flops")
         self.run.define_metric(step_metric_name)
         self.run.define_metric("*", step_metric=step_metric_name)
 
@@ -96,12 +100,12 @@ class WandbLogger:
 
     def _sanitize_results_dict(self) -> tuple[dict[str, str], dict[str, Any]]:
         """Sanitize the results dictionary."""
-        _results = copy.deepcopy(self.results.get("results", dict()))
+        _results = copy.deepcopy(self.results.get("results", {}))
 
         # Remove None from the metric string name
         tmp_results = copy.deepcopy(_results)
         for task_name in self.task_names:
-            task_result = tmp_results.get(task_name, dict())
+            task_result = tmp_results.get(task_name, {})
             for metric_name, metric_value in task_result.items():
                 _metric_name, removed = remove_none_pattern(metric_name)
                 if removed:
@@ -111,12 +115,12 @@ class WandbLogger:
         # remove string valued keys from the results dict
         wandb_summary = {}
         for task in self.task_names:
-            task_result = _results.get(task, dict())
+            task_result = _results.get(task, {})
             for metric_name, metric_value in task_result.items():
                 if isinstance(metric_value, str):
                     wandb_summary[f"{task}/{metric_name}"] = metric_value
 
-        for summary_metric, _summary_value in wandb_summary.items():
+        for summary_metric in wandb_summary:
             _task, _summary_metric = summary_metric.split("/")
             _results[_task].pop(_summary_metric)
 
@@ -197,8 +201,37 @@ class WandbLogger:
             f.write(dumped)
         self.run.log_artifact(artifact)
 
+    def _log_model_metrics(self) -> None:
+        """Log model-produced metric records to W&B."""
+        records = self.results.get("model_metrics", [])
+        if not records:
+            return
+
+        global_step_name = "inference/global_step"
+        previous_step = self.run.summary.get(global_step_name, 0)
+        first_global_step = (
+            int(previous_step) + 1 if isinstance(previous_step, (int, float)) else 1
+        )
+        parent_steps = {
+            key: value for key, value in self.step_metrics.items() if value is not None
+        }
+        self.run.define_metric(global_step_name)
+        self.run.define_metric("inference/*", step_metric=global_step_name)
+        for local_step, metrics in enumerate(records, start=1):
+            self.run.log(
+                {
+                    global_step_name: first_global_step + local_step - 1,
+                    "inference/local_step": local_step,
+                    **parent_steps,
+                    **{f"inference/{key}": value for key, value in metrics.items()},
+                },
+                commit=True,
+            )
+
     def log_eval_result(self) -> None:
         """Log evaluation results to W&B."""
+        self._log_model_metrics()
+
         # Log configs to wandb
         configs = self._get_config()
         self.run.config.update(configs, allow_val_change=self.step is not None)

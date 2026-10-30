@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: georgian
+task: include_2_georgian_gen_0shot

@@ -1,0 +1,3 @@
+include: _template_yaml
+task: uncheatable_eval_bbc_news
+process_docs: !function utils.process_bbc_news

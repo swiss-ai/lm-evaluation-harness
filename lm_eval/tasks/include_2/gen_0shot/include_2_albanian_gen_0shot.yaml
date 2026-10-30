@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: albanian
+task: include_2_albanian_gen_0shot

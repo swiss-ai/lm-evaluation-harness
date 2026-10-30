@@ -117,9 +117,6 @@ def _resolve_private_saved_dataset_path(
     return None
 
 
-TaskConfig = TaskConfig
-
-
 class Task(abc.ABC):
     """A task represents an entire benchmark including its dataset, problems,
     answers, and evaluation methods. See BoolQ for a simple example implementation
@@ -227,17 +224,14 @@ class Task(abc.ABC):
     @abc.abstractmethod
     def has_training_docs(self):
         """Whether the task has a training set"""
-        pass
 
     @abc.abstractmethod
     def has_validation_docs(self):
         """Whether the task has a validation set"""
-        pass
 
     @abc.abstractmethod
     def has_test_docs(self):
         """Whether the task has a test set"""
-        pass
 
     def training_docs(self) -> Iterable:
         """
@@ -368,6 +362,7 @@ class Task(abc.ABC):
         samples: list[int] | None = None,
         rank: int = 0,
         world_size: int = 1,
+        cache_rank: int | None = None,
         cache_requests: bool = False,
         rewrite_requests_cache: bool = False,
         system_instruction: str | None = None,
@@ -382,6 +377,8 @@ class Task(abc.ABC):
         og_limit = limit
 
         cache_key = f"requests-{self._config.task}-{self.config.num_fewshot}shot-rank{rank}-world_size{world_size}"
+        if cache_rank is not None and cache_rank != rank:
+            cache_key += f"-process{cache_rank}"
         cache_key += "-chat_template" if apply_chat_template else ""
         cache_key += "-fewshot_as_multiturn" if fewshot_as_multiturn else ""
         cache_key += (
@@ -499,7 +496,6 @@ class Task(abc.ABC):
             The number of times each instance in a dataset is inferred on. Defaults to 1,
             can be increased for techniques like majority voting.
         """
-        pass
 
     @abc.abstractmethod
     def process_results(self, doc, results):
@@ -512,7 +508,6 @@ class Task(abc.ABC):
         :param results:
             The results of the requests created in construct_requests.
         """
-        pass
 
     @abc.abstractmethod
     def aggregation(self):
@@ -521,7 +516,6 @@ class Task(abc.ABC):
             A dictionary where keys are the names of submetrics and values are
             functions that aggregate a list of metric scores
         """
-        pass
 
     @abc.abstractmethod
     def higher_is_better(self):
@@ -530,7 +524,6 @@ class Task(abc.ABC):
             A dictionary where keys are the names of submetrics and values are
             whether a higher value of the submetric is better
         """
-        pass
 
     def get_config(self, key: str) -> Any:
         return getattr(self._config, key, None)
@@ -666,7 +659,7 @@ class Task(abc.ABC):
         self._config["process_results"] = "process_results"
 
     def set_fewshot_seed(self, seed: int | None = None) -> None:
-        self.fewshot_rnd = random.Random(seed)  # noqa: S311
+        self.fewshot_rnd = random.Random(seed)
         if hasattr(self, "sampler"):
             self.sampler.set_rnd(seed)
 
@@ -832,7 +825,7 @@ class ConfigurableTask(Task):
                     agg_name = metric_config["aggregation"]
                     if isinstance(agg_name, str):
                         self._aggregation_list[metric_name] = get_aggregation(agg_name)
-                    elif callable(agg_name):  # noqa: E721
+                    elif callable(agg_name):
                         self._aggregation_list[metric_name] = metric_config[
                             "aggregation"
                         ]
@@ -1017,7 +1010,7 @@ class ConfigurableTask(Task):
                     f"{private_dataset_path} (source id: {self.DATASET_PATH})."
                 )
                 return
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- any failure falls back to the public dataset
                 eval_logger.warning(
                     f"Failed loading private dataset for task '{self.config.task}' "
                     f"from '{private_dataset_path}' ({type(e).__name__}: {e}). "
@@ -1087,7 +1080,7 @@ class ConfigurableTask(Task):
             match samples:
                 case list(): return samples
                 case fsamples if callable(samples): return fsamples()
-                case _: raise Exception(
+                case _: raise ValueError(
                         "`fewshot_config['samples']` was incorrectly defined in the configuration. It should either be `list[dict]`, or callable returning this list."
                     ) from None
             # fmt: on
@@ -1372,7 +1365,7 @@ class ConfigurableTask(Task):
         if self.prompt is not None:
             doc_to_text = self.prompt
         elif doc_to_text is not None:
-            doc_to_text = doc_to_text
+            pass  # the caller's own
         else:
             doc_to_text = self.config.doc_to_text
 
@@ -1408,7 +1401,7 @@ class ConfigurableTask(Task):
         if self.prompt is not None:
             doc_to_target = self.prompt
         elif doc_to_target is not None:
-            doc_to_target = doc_to_target
+            pass  # the caller's own
         else:
             doc_to_target = self.config.doc_to_target
 
@@ -1454,7 +1447,7 @@ class ConfigurableTask(Task):
         if self.prompt is not None:
             doc_to_choice = self.prompt
         elif doc_to_choice is not None:
-            doc_to_choice = doc_to_choice
+            pass  # the caller's own
         elif self.config.doc_to_choice is None:
             eval_logger.error("doc_to_choice was called but not set in config")
         else:
@@ -1478,7 +1471,7 @@ class ConfigurableTask(Task):
 
     def doc_to_image(self, doc: Any, doc_to_image=None) -> int | str | list | None:
         if doc_to_image is not None:
-            doc_to_image = doc_to_image
+            pass  # the caller's own
         elif self.config.doc_to_image is not None:
             doc_to_image = self.config.doc_to_image
         else:
@@ -1635,7 +1628,7 @@ class ConfigurableTask(Task):
 
     def doc_to_audio(self, doc: Any, doc_to_audio=None) -> int | str | list | None:
         if doc_to_audio is not None:
-            doc_to_audio = doc_to_audio
+            pass  # the caller's own
         elif self.config.doc_to_audio is not None:
             doc_to_audio = self.config.doc_to_audio
         else:
@@ -1722,7 +1715,7 @@ class ConfigurableTask(Task):
         ):  # TODO: ensure that non-multimodal tasks aren't getting visual args
             multimodal_arg = {
                 **multimodal_arg,
-                **{"visual": self.doc_to_image(doc)},
+                "visual": self.doc_to_image(doc),
             }
 
         if (
@@ -1730,7 +1723,7 @@ class ConfigurableTask(Task):
         ):  # TODO: ensure that non-multimodal tasks aren't getting audio args
             multimodal_arg = {
                 **multimodal_arg,
-                **{"audio": self.doc_to_audio(doc)},
+                "audio": self.doc_to_audio(doc),
             }
 
         if bool(multimodal_arg):
@@ -1964,9 +1957,15 @@ class ConfigurableTask(Task):
                         # Without this, _compute_task_aggregations falls back to mean()
                         # because it looks up the aggregation by the result-dict key, not
                         # by the originating callable's __name__.
-                        if metric in self._aggregation_list and k not in self._aggregation_list:
+                        if (
+                            metric in self._aggregation_list
+                            and k not in self._aggregation_list
+                        ):
                             self._aggregation_list[k] = self._aggregation_list[metric]
-                        if metric in self._higher_is_better and k not in self._higher_is_better:
+                        if (
+                            metric in self._higher_is_better
+                            and k not in self._higher_is_better
+                        ):
                             self._higher_is_better[k] = self._higher_is_better[metric]
                 else:
                     result_dict[metric] = result_score

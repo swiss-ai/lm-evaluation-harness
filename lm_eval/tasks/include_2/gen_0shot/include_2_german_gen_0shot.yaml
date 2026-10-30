@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: german
+task: include_2_german_gen_0shot

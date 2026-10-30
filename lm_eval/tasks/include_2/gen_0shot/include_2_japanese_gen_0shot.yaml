@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: japanese
+task: include_2_japanese_gen_0shot

@@ -1,0 +1,3 @@
+include: _base_template_yaml
+dataset_name: ukrainian
+task: include_2_ukrainian_gen_0shot

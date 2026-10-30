@@ -2,6 +2,7 @@ import argparse
 import ast
 import json
 import logging
+import shlex
 from collections.abc import Sequence
 from typing import Any
 
@@ -53,7 +54,7 @@ def _int_or_none_list_arg_type(
             f"Argument requires {max_len} integers or None, separated by '{split_char}'"
         )
     elif num_items != max_len:
-        logging.warning(
+        eval_logger.warning(
             f"Argument requires {max_len} integers or None, separated by '{split_char}'. "
             "Missing values will be filled with defaults."
         )
@@ -114,7 +115,11 @@ def key_val_to_dict(args: str) -> dict[str, Any]:
     if not args:
         return res
 
-    for k, v in (item.split("=", 1) for item in args.split(",")):
+    lexer = shlex.shlex(args, posix=True)
+    lexer.whitespace = ","
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    for k, v in (item.split("=", 1) for item in lexer):
         v = handle_cli_value_string(v)
         if k in res:
             eval_logger.warning(f"Overwriting key '{k}': {res[k]!r} -> {v!r}")
