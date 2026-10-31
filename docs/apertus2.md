@@ -3,7 +3,7 @@
 `apertus2-completions` renders native prompts and parses outputs client-side
 with [`apertus-common`](https://github.com/swiss-ai/apertus-common), without
 a Jinja chat template. It sends raw text to a `/v1/completions`
-endpoint, such as vLLM serving the checkpoint and its instruct tokenizer. 
+endpoint, such as vLLM serving the checkpoint and its instruct tokenizer.
 Tasks still see a chat model: messages in, reply plus tool calls out.
 Apertus 2 specific logic is contained in the model class.
 
