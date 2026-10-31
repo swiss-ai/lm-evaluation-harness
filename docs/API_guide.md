@@ -204,7 +204,7 @@ def parse_generations(outputs: Union[Dict, List[Dict]], **kwargs) -> List[str]:
     # ... (implementation)
 ```
 
-The requests are initiated in the `model_call` or the `amodel_call` methods.
+The requests are initiated in the `model_call` or the `amodel_call` methods. Each payload is sent by `_send`/`_asend` (one POST through `_post`/`_apost`); override them to send several requests per generation and return one combined response.
 
 ## Implementing Your Own API Model
 
