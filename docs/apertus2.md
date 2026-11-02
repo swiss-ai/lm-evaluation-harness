@@ -187,14 +187,14 @@ result saving.
 
 ## Setup and tests
 
-Requires `apertus-common` with open output messages (commit `e0c1581`, branch
+Requires `apertus-common` with open output messages (commit `ff6a8f6`, branch
 `feat/open-output-messages`, pending merge into `apertus2`). The package declares
 Python >= 3.13 and tokenizers 0.23; it also works on Python 3.12 with tokenizers
 0.22.2 (validated), installed with:
 
 ```bash
 pip install --no-deps --ignore-requires-python \
-  "apertus-common @ git+https://github.com/swiss-ai/apertus-common@e0c1581"
+  "apertus-common @ git+https://github.com/swiss-ai/apertus-common@ff6a8f6"
 ```
 
 plus `pydantic>=2.13.4` and `jsonschema>=4.26.0` if missing.
