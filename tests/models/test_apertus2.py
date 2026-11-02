@@ -644,21 +644,135 @@ def test_earlier_reasoning_is_replayed(synthetic):
     assert all(info["generation_literal_special_tokens"] == 1 for info in infos[1:])
 
 
-def test_cut_think_is_replayed_closed(synthetic):
+@pytest.mark.parametrize("with_ids", [True, False])
+@pytest.mark.parametrize("completed", [None, "", "Finished reasoning."])
+def test_cut_think_is_not_replayed(synthetic, with_ids, completed):
     model = make(synthetic)
     enc = model.encoding
-    cut = native(enc, lib.Think(payload="still", open=True))
+    items = [] if completed is None else [lib.Think(payload=completed)]
+    cut = native(enc, *items, lib.Think(payload="unfinished", open=True))
     system = {"role": "system", "content": "Be brief."}
-    run(model, [chat_request([system, *QUESTION])], [completion(enc, cut, length=True)])
+    first = chat_request([system, *QUESTION])
+    result, _ = run(
+        model, [first], [completion(enc, cut, length=True, with_ids=with_ids)]
+    )
+    assert result == [""]
+    info = first.length_info[0]
+    assert info["generation_think_truncated"] == 1
+    assert info["generation_truncated"] == 1
+    assert info["generation_parse_failed"] == info["generation_map_failed"] == 0
+    assert info["response_length_chars"] == len(completed or "") + len("unfinished")
+    assert info["apertus2_output"].endswith("unfinished")
     # Tasks may rebuild their system message between turns.
     other_system = {**system, "content": "Be very brief."}
     history = [other_system, *QUESTION, {"role": "assistant", "content": ""}, *QUESTION]
-    _, sent = run(model, [chat_request(history)], [answer(enc, lib.Reply(payload="A"))])
-    # Closed, and without an empty reply the model never wrote.
+    second = chat_request(history)
+    _, sent = run(model, [second], [answer(enc, lib.Reply(payload="A"))])
+    assert "unfinished" not in sent[0]["prompt"]
+    assert second.length_info[0]["generation_reasoning_replayed"] == int(
+        completed is not None
+    )
+    assert second.length_info[0]["generation_reasoning_unmatched"] == 0
+    if completed is not None:
+        assert f"<|out|>think<|hdr|>{completed}<|/out|><|wait|>" in sent[0]["prompt"]
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+def test_partial_reply_keeps_completed_thinking_for_replay(synthetic, with_ids):
+    model = make(synthetic)
+    enc = model.encoding
+    first = chat_request(QUESTION)
+    ids = native(
+        enc, lib.Think(payload="finished"), lib.Reply(payload="partial", open=True)
+    )
+    result, _ = run(
+        model, [first], [completion(enc, ids, length=True, with_ids=with_ids)]
+    )
+    assert result == ["partial"]
+    assert first.length_info[0]["generation_truncated"] == 1
+    assert first.length_info[0]["generation_think_truncated"] == 0
+    second = chat_request(
+        [*QUESTION, {"role": "assistant", "content": result[0]}, *QUESTION]
+    )
+    _, sent = run(model, [second], [answer(enc, lib.Reply(payload="A"))])
     assert (
-        "<|in|>user<|hdr|>Q?<|/in|><|out|>think<|hdr|>still<|/out|><|wait|>"
+        "<|out|>think<|hdr|>finished<|/out|><|out|>reply<|hdr|>partial<|/out|>"
         in sent[0]["prompt"]
     )
+    assert second.length_info[0]["generation_reasoning_replayed"] == 1
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+@pytest.mark.parametrize("include_close", [True, False])
+def test_confirmed_output_close_is_replayed(synthetic, with_ids, include_close):
+    model = make(synthetic)
+    enc = model.encoding
+    ids = native(enc, lib.Think(payload="finished"))
+    if not include_close:
+        ids = ids[:-1]
+    response = completion(enc, ids, with_ids=with_ids)
+    response["choices"][0]["stop_reason"] = enc.controls.output_end
+    first = chat_request(QUESTION)
+    result, _ = run(model, [first], [response])
+    assert result == [""]
+    info = first.length_info[0]
+    assert info["generation_think_truncated"] == info["generation_parse_failed"] == 0
+    assert info["thinking_format_has_close"] == 1
+    assert info["apertus2_output"] == enc.decode_text(ids)
+    second = chat_request([*QUESTION, {"role": "assistant", "content": ""}, *QUESTION])
+    _, sent = run(model, [second], [answer(enc, lib.Reply(payload="A"))])
+    assert "<|out|>think<|hdr|>finished<|/out|><|wait|>" in sent[0]["prompt"]
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+@pytest.mark.parametrize(
+    "reason, stop",
+    [("length", "output_end"), ("stop", "wait"), ("stop", None), (None, "output_end")],
+)
+def test_unconfirmed_close_does_not_start_prefill_continuation(
+    synthetic, with_ids, reason, stop
+):
+    model = make(synthetic)
+    enc = model.encoding
+    response = completion(
+        enc, native(enc, lib.Think(payload="unfinished", open=True)), with_ids=with_ids
+    )
+    response["choices"][0].update(
+        finish_reason=reason, stop_reason=getattr(enc.controls, stop) if stop else None
+    )
+    first = chat_request(PREFILLED)
+    result, sent = run(model, [first], [response])
+    assert result == [""] and len(sent) == 1
+    assert first.length_info[0]["generation_think_truncated"] == 1
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+@pytest.mark.parametrize("completed_first", [False, True])
+def test_confirmed_close_does_not_repair_malformed_header(
+    synthetic, with_ids, completed_first
+):
+    model = make(synthetic)
+    enc = model.encoding
+    ids = [enc.controls.output_start, *enc.encode_text("think")]
+    if completed_first:
+        ids = native(enc, lib.Think(payload="finished")) + ids
+    response = completion(enc, ids, stop=enc.controls.output_end, with_ids=with_ids)
+    first = chat_request(PREFILLED)
+    result, sent = run(model, [first], [response])
+    assert result == [""] and len(sent) == 1
+    assert first.length_info[0]["generation_parse_failed"] == 1
+
+
+def test_confirmed_close_rejects_incomplete_utf8(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    ids = native(enc, lib.Think(payload="", open=True)) + enc.encode_text("🚀")[:-1]
+    response = completion(enc, ids)
+    response["choices"][0]["stop_reason"] = enc.controls.output_end
+    first = chat_request(PREFILLED)
+    result, sent = run(model, [first], [response])
+    assert result == [""] and len(sent) == 1
+    assert first.length_info[0]["generation_parse_failed"] == 1
 
 
 @pytest.mark.parametrize("stored, replayed", [(" A\n", True), ("B", False)])

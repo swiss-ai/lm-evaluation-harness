@@ -134,7 +134,7 @@ def _with_reasoning(prepared: list[dict], replays: dict[int, list[str]]) -> list
     Runs after ``_prepare_history``, which keeps messages 1:1 but deletes empty
     reasoning; replayed thinks may be empty. Each think becomes its own assistant
     message, which the mapping merges into one burst. An empty answer is replayed
-    as thinks only, so a cut think gets no empty reply.
+    as thinks only, without an empty reply.
     """
     result = []
     for index, message in enumerate(prepared):
@@ -558,11 +558,15 @@ class Apertus2Completions(LocalChatCompletion):
         request.history_digest = history.hexdigest()
         return replays, unmatched
 
-    def _remember(self, request: _Request, answer: str, thinks: list) -> None:
-        """Keep a response's thinks for later requests of its conversation."""
+    def _remember(self, request: _Request, answer: str, items: list) -> None:
+        """Keep only completed thinks for later requests of the conversation."""
         if request.history_digest is not None and request.prefix is None:
             histories = self._memory.setdefault(request.scope, {})
-            histories.setdefault(request.history_digest, {})[answer.strip()] = thinks
+            histories.setdefault(request.history_digest, {})[answer.strip()] = [
+                item.payload
+                for item in items
+                if isinstance(item, self._lib.Think) and not item.open
+            ]
 
     # Send hooks: one or two requests per generation, one combined response
 
@@ -602,18 +606,15 @@ class Apertus2Completions(LocalChatCompletion):
         choice = _first_choice(first)
         if choice is None:
             return None
-        output, _, _ = self._parse(choice, [])
+        output, _, failed = self._parse(choice, [])
+        if failed:
+            return None
         if not output.items or not isinstance(output.items[0], lib.Think):
             request.info["generation_prefill_skipped"] = 1
             return None
         think = output.items[0]
-        stopped = (
-            choice.get("finish_reason") == "stop"
-            and choice.get("stop_reason") == self._output_end
-        )
-        if think.open and not stopped:
+        if think.open:
             return None  # cut off inside thinking
-        think = think.model_copy(update={"open": False})
         request.info["generation_literal_special_tokens"] += len(
             self._literal.findall(think.payload)
         )
@@ -656,6 +657,10 @@ class Apertus2Completions(LocalChatCompletion):
         if not valid_ids or not valid_text or (ids is None and text is None):
             return lib.Conversation(), "", True
         raw = ""
+        closed = (
+            choice.get("finish_reason") == "stop"
+            and choice.get("stop_reason") == self._output_end
+        )
         try:
             if ids is not None:
                 stopped = choice.get("finish_reason") == "stop"
@@ -663,9 +668,15 @@ class Apertus2Completions(LocalChatCompletion):
                     ids = ids[:-1]
                 ids = encoding.encode_items(head) + ids
                 raw = encoding.decode_text(ids)
+                if closed and (not ids or ids[-1] != self._output_end):
+                    ids = [*ids, self._output_end]
                 return encoding.parse_output(ids, allow_open=True), raw, False
             raw = lib.render_str(lib.Conversation(items=head)) + (text or "")
-            return lib.parse_output_text(raw, allow_open=True), raw, False
+            output_text = raw
+            close = encoding.id_to_token(self._output_end)
+            if closed and not output_text.endswith(close):
+                output_text += close
+            return lib.parse_output_text(output_text, allow_open=True), raw, False
         except lib.StreamParseError as error:
             return error.completed, raw, True
         except lib.ApertusFormatError:  # undecodable token IDs
@@ -686,11 +697,9 @@ class Apertus2Completions(LocalChatCompletion):
         items = list(output.items)
         finish_reason = choice.get("finish_reason")
         if request.out_of_budget:
-            # Phase one stopped at the think's close, which the text omits.
-            items[0] = items[0].model_copy(update={"open": False})
             finish_reason = "length"
         answer, thinks, replies = self._answer(request, items)
-        self._remember(request, answer, thinks)
+        self._remember(request, answer, items)
         return {
             "choices": [
                 self._choice(request, answer, finish_reason, raw, thinks, replies)
@@ -714,6 +723,8 @@ class Apertus2Completions(LocalChatCompletion):
             if isinstance(item, lib.Think):
                 thinks.append(item.payload)
                 info["generation_think_truncated"] |= int(item.open)
+                if item.open:
+                    continue
             elif isinstance(item, lib.Reply):
                 if prefix is not None and not replies:
                     item = item.model_copy(
@@ -722,7 +733,7 @@ class Apertus2Completions(LocalChatCompletion):
                 replies.append(item.payload)
             elif isinstance(item, lib.Call) and item.open:
                 continue  # an unfinished call is never dispatched
-            if isinstance(item, (lib.Think, lib.Reply)):
+            if isinstance(item, lib.Reply):
                 item = item.model_copy(update={"open": False})
             kept.append(item)
         try:

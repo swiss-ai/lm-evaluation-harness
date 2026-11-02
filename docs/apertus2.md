@@ -39,7 +39,9 @@ lm_eval --model apertus2-completions \
    reply, cut at the first task `until` string; append tool calls as OpenAI JSON
    after `TOOL_CALLS_MARKER`, matching `local-chat-completions`
    (`bfcl_v3_fc` works unchanged). Truncated replies keep their partial answer;
-   truncated thinking yields an empty answer.
+   truncated thinking yields an empty answer. A closing output token omitted
+   by the server is restored only when `finish_reason=stop` and `stop_reason`
+   identifies that token; raw output logging remains unchanged.
 
 The native format separates reasoning; `think_start_token`/`think_end_token`
 do not apply.
@@ -68,25 +70,33 @@ Policy"). Multi-turn tasks (e.g. `bfcl_v3_fc` multi-turn,
 `realguardrails_s_rules`) store only content and tool calls, so the model
 restores its own reasoning:
 
-- After each response it remembers the response's thinks for that conversation
+- After each response it remembers the completed thinks for that conversation
   (task, document and episode of a repeated document), keyed by the messages so
   far (system and developer messages excluded) and the answer it returned
   (ignoring surrounding whitespace). The memory is kept while the conversation
   goes on.
 - When that answer reappears in a later request of the conversation, each think
   is replayed as a think message before the answer's reply and calls. A think
-  cut off by the token budget comes back closed; an empty answer is replayed as
-  thinks only.
+  cut off by the token budget stays in diagnostics but is never replayed;
+  completed thinks before it are retained. An empty answer with completed
+  thinking is replayed as thinks only.
 - Not replayed: answers served by `--use_cache`, answers to prefill requests,
   assistant turns the task wrote or dropped, and answers the task changed beyond
   whitespace (`generation_reasoning_unmatched`).
 - `replay_reasoning=false` turns it off, e.g. for ablations.
 
-Other models see no earlier reasoning when the harness strips it (think tokens,
-or the chat endpoint's reasoning field), whatever their templates would keep:
-Qwen3 keeps it within the current turn's tool calls, gpt-oss for a tool call
-until the final answer, DeepSeek-R1 never. Note this when comparing multi-turn
-scores.
+Supplied reference histories are rendered as provided; no thinking is invented.
+Model-generated histories retain partial replies as task answers. Truncation
+flags do not end an episode: the task decides whether another turn follows.
+Budgets are per request, except the two `after_think` requests share one budget.
+
+Other API backends have no separate reasoning replay. With reasoning stripping
+configured, completed reasoning is removed and partial answers remain in history.
+Unfinished reasoning without its closing marker can instead survive as answer
+text and enter later history if the task continues. Chat APIs with separate
+reasoning fields reproduce this when reasoning markers are configured and no
+answer or tool call is returned; without markers, the separate reasoning is
+ignored. These backends are unchanged by the Apertus integration.
 
 ## Token budgets
 
