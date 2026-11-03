@@ -1,0 +1,13 @@
+dataset_path: swiss-ai/MSafeTemp
+dataset_name: harmbench
+output_type: generate_until
+test_split: test
+doc_to_text: "{{text}}"
+doc_to_target: ""
+generation_kwargs:
+  until: []
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 4096
+metadata:
+  version: 1.0

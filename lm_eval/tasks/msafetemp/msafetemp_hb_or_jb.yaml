@@ -1,0 +1,19 @@
+task: msafetemp_hb_or_jb
+include: _msafetemp_hb_yaml
+process_docs: !function utils.hb_or_jb_docs
+process_results: !function metrics.process_benign_jb
+generation_kwargs:
+  until: []
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 8192
+metric_list:
+  - metric: or
+    aggregation: !function metrics.macro_rate
+    higher_is_better: false
+  - metric: or_pooled
+    aggregation: !function metrics.pooled_rate
+    higher_is_better: false
+  - metric: valid
+    aggregation: !function metrics.valid_share
+    higher_is_better: true
