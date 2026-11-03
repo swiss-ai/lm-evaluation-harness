@@ -1,11 +1,16 @@
 import asyncio
+import copy
 import json
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from tenacity import wait_none
 
+from lm_eval.api.instance import Instance
+from lm_eval.models import api_models
 from lm_eval.models.api_models import create_image_prompt
-from lm_eval.models.openai_completions import LocalCompletionsAPI
+from lm_eval.models.openai_completions import LocalChatCompletion, LocalCompletionsAPI
 
 
 @pytest.fixture
@@ -886,3 +891,155 @@ def test_generation_info_reaches_length_info(num_concurrent):
     assert info["generation_truncated"] == 1
     assert send.called is (num_concurrent == 1)
     assert send_concurrent.called is (num_concurrent > 1)
+
+
+def _seed_model(kind, concurrent=1, batch_size=1):
+    factory = _chat_model if kind == "chat" else _thinking_api
+    return factory(
+        tokenized_requests=False, num_concurrent=concurrent, batch_size=batch_size
+    )
+
+
+def _seed_instance(model, prompt, kwargs):
+    if isinstance(model, LocalChatCompletion):
+        prompt = model.apply_chat_template([{"role": "user", "content": prompt}])
+    return Instance("generate_until", {}, (prompt, kwargs), idx=0)
+
+
+def _run_seed_requests(
+    monkeypatch, model, instances, fail_first=False, assert_concurrent=False
+):
+    """Exercise real sync/async payload construction, mocking only HTTP and waits."""
+    payloads = []
+    active = peak = 0
+
+    def post(_url, *, json, **_):
+        payloads.append(copy.deepcopy(json))
+        if fail_first and len(payloads) == 1:
+            raise TimeoutError("transient test failure")
+        prompts = json.get("prompt")
+        chat = prompts is None
+        if chat:
+            prompts = [json["messages"][-1]["content"]]
+        elif isinstance(prompts, str):
+            prompts = [prompts]
+        choices = []
+        for index, prompt in enumerate(prompts):
+            text = f"{prompt}:{json['seed']}"
+            content = {"message": {"content": text}} if chat else {"text": text}
+            choices.append({"index": index, "finish_reason": "stop", **content})
+        response = MagicMock(ok=True, status=200)
+        response.json.return_value = {"choices": choices}
+        return response
+
+    def async_post(*args, **kwargs):
+        response = post(*args, **kwargs)
+        data = response.json()
+
+        async def read_json():
+            nonlocal active, peak
+            active += 1
+            peak = max(peak, active)
+            try:
+                # Let other requests run while this response is in flight.
+                await asyncio.sleep(0)
+                return data
+            finally:
+                active -= 1
+
+        response.json = read_json
+        return DummyAsyncContextManager(response)
+
+    monkeypatch.setattr(api_models.requests, "post", post)
+    monkeypatch.setattr(api_models, "TCPConnector", lambda **_: None)
+    monkeypatch.setattr(
+        api_models,
+        "ClientSession",
+        lambda **_: DummyAsyncContextManager(SimpleNamespace(post=async_post)),
+    )
+    monkeypatch.setattr(api_models, "wait_exponential", lambda **_: wait_none())
+    result = model.generate_until(instances, disable_tqdm=True)
+    if assert_concurrent:
+        assert peak == model._concurrent
+    return result, payloads
+
+
+@pytest.mark.parametrize("kind, concurrent", [("completions", 1), ("chat", 3)])
+def test_sampled_rollout_seeds(monkeypatch, kind, concurrent):
+    model = _seed_model(kind, concurrent)
+    kwargs = {"temperature": 0.8, "do_sample": True, "until": ["STOP"]}
+    original_kwargs = copy.deepcopy(kwargs)
+    short = _seed_instance(model, "short", kwargs)
+    long = _seed_instance(model, "a much longer prompt", kwargs)
+    twin = _seed_instance(model, "short", kwargs)  # Same text, distinct request.
+    instances = [short, long, twin] * 3
+    expected = [
+        f"{prompt}:{1234 + rollout}"
+        for rollout in range(3)
+        for prompt in ("short", "a much longer prompt", "short")
+    ]
+
+    first, payloads = _run_seed_requests(
+        monkeypatch, model, instances, assert_concurrent=concurrent > 1
+    )
+    second, repeated_payloads = _run_seed_requests(monkeypatch, model, instances)
+
+    assert first == second == expected
+    assert payloads == repeated_payloads
+    assert kwargs == original_kwargs
+    assert all("STOP" in payload["stop"] for payload in payloads)
+    assert {payload["seed"] for payload in payloads} == {1234, 1235, 1236}
+
+
+@pytest.mark.parametrize("concurrent", [1, 3])
+def test_retry_keeps_the_same_rollout_seed(monkeypatch, concurrent):
+    model = _seed_model("completions", concurrent)
+    instance = _seed_instance(model, "prompt", {"temperature": 0.8})
+    result, payloads = _run_seed_requests(
+        monkeypatch, model, [instance, instance], fail_first=True
+    )
+    assert sorted(payload["seed"] for payload in payloads) == [1234, 1234, 1235]
+    assert result == ["prompt:1234", "prompt:1235"]
+
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+def test_likelihood_keeps_the_model_seed(monkeypatch, asynchronous):
+    model = _seed_model("completions")
+    kwargs = {"seed": 77}
+    response = MagicMock(ok=True)
+    post = MagicMock(return_value=response)
+    if asynchronous:
+        response.json = AsyncMock(return_value={"choices": []})
+        post.return_value = DummyAsyncContextManager(response)
+        monkeypatch.setattr(model, "parse_logprobs", lambda **_: [])
+
+        async def call():
+            return await model.amodel_call(
+                SimpleNamespace(post=post),
+                asyncio.Semaphore(1),
+                ["prompt"],
+                generate=False,
+                gen_kwargs=kwargs,
+            )
+
+        asyncio.run(call())
+    else:
+        monkeypatch.setattr(api_models.requests, "post", post)
+        model.model_call(["prompt"], generate=False, gen_kwargs=kwargs)
+    assert post.call_args.kwargs["json"]["seed"] == 1234
+    assert kwargs == {"seed": 77}
+
+
+def test_greedy_async_http_batching_is_unchanged(monkeypatch):
+    model = _seed_model("completions", concurrent=3, batch_size=2)
+    instance = _seed_instance(model, "prompt", {"temperature": 0, "seed": 77})
+    result, payloads = _run_seed_requests(monkeypatch, model, [instance] * 4)
+    assert result == ["prompt:77"] * 4
+    assert [len(payload["prompt"]) for payload in payloads] == [2, 2]
+
+
+def test_rollout_seed_overflow(monkeypatch):
+    model = _seed_model("completions")
+    instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
+    _, payloads = _run_seed_requests(monkeypatch, model, [instance, instance])
+    assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
