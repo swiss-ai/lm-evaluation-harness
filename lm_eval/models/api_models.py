@@ -629,6 +629,11 @@ class TemplateAPI(TemplateLM):
     ) -> dict | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
+        seed = (
+            gen_kwargs.pop("seed", self._seed)
+            if generate and gen_kwargs
+            else self._seed
+        )
         try:
             if self._rate_limiter is not None:
                 self._rate_limiter.acquire()
@@ -638,7 +643,7 @@ class TemplateAPI(TemplateLM):
                     self.create_message(messages),
                     generate=generate,
                     gen_kwargs=gen_kwargs,
-                    seed=self._seed,
+                    seed=seed,
                     eos=self.eos_string,
                     **kwargs,
                 ),
@@ -672,11 +677,16 @@ class TemplateAPI(TemplateLM):
     ) -> list[str] | list[tuple[float, bool]] | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
+        seed = (
+            gen_kwargs.pop("seed", self._seed)
+            if generate and gen_kwargs
+            else self._seed
+        )
         payload = self._create_payload(
             self.create_message(messages),
             generate=generate,
             gen_kwargs=gen_kwargs,
-            seed=self._seed,
+            seed=seed,
             **kwargs,
         )
         cache_method = "generate_until" if generate else "loglikelihood"
@@ -769,8 +779,14 @@ class TemplateAPI(TemplateLM):
         *,
         generate: bool = True,
         ctxlens: list[int] | None = None,
+        request_seeds: list[int | None] | None = None,
         **kwargs,
     ) -> list[list[str]] | list[list[tuple[float, bool]]]:
+        # Distinct seeds require individual HTTP payloads, not batched prompts.
+        batch_size = 1 if request_seeds is not None else self._batch_size
+        if request_seeds is not None and len(request_seeds) != len(requests):
+            raise ValueError("Expected one seed per request")
+
         ctxlens = ctxlens or [None] * len(requests)
         conn = TCPConnector(limit=self._concurrent, ssl=self.verify_certificate)
         sem = asyncio.Semaphore(self._concurrent)
@@ -793,11 +809,22 @@ class TemplateAPI(TemplateLM):
             )(self.amodel_call)
             # Create tasks for each batch of request
             tasks = []
-            for message, cache_key, ctxlen in zip(
-                chunks(requests, n=self._batch_size),
-                chunks(cache_keys, n=self._batch_size),
-                chunks(ctxlens, n=self._batch_size),
+            for i, (message, cache_key, ctxlen) in enumerate(
+                zip(
+                    chunks(requests, n=batch_size),
+                    chunks(cache_keys, n=batch_size),
+                    chunks(ctxlens, n=batch_size),
+                )
             ):
+                task_kwargs = kwargs
+                if request_seeds is not None:
+                    task_kwargs = {
+                        **kwargs,
+                        "gen_kwargs": {
+                            **kwargs["gen_kwargs"],
+                            "seed": request_seeds[i],
+                        },
+                    }
                 task = asyncio.create_task(
                     retry_(
                         session=session,
@@ -806,7 +833,7 @@ class TemplateAPI(TemplateLM):
                         cache_keys=cache_key,
                         generate=generate,
                         ctxlens=ctxlen,
-                        **kwargs,
+                        **task_kwargs,
                     )
                 )
                 size = len(message)
@@ -900,6 +927,12 @@ class TemplateAPI(TemplateLM):
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
+        """Generate completions with distinct seeds for repeated sampled inputs.
+
+        Assign offsets before batching and retries. A task-level seed is the base
+        seed; seed=None leaves seed selection to the server. Greedy inputs retain
+        their existing seeds.
+        """
         res = []
         instances = requests
 
@@ -930,19 +963,44 @@ class TemplateAPI(TemplateLM):
             )
         else:
             requests, all_gen_kwargs = zip(*(req.args for req in requests))
+
+        # Generate unique seeds for each rollout for one prompt (to have distinct pass@k generations)
+        # NOTE: doc_id should be enough as pass@k requests are together (as we do this before the reordering of the collator),
+        # so using doc_id is enough to have the different seeds between each rollout of a same doc_id prompt.
+        rollout_counts = {}
+        seeded_gen_kwargs = []
+        for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
+            seed = gen_kwargs.get("seed", self._seed)
+            if gen_kwargs.get("temperature", 0) > 0 and seed is not None:
+                # Evaluator repeats reference the same Instance, not just its text.
+                gen_kwargs = {**gen_kwargs, "seed": seed}
+                key = id(instance)
+                rollout_index = rollout_counts.get(key, 0)
+                rollout_counts[key] = rollout_index + 1
+                # Stay within the signed 64-bit API seed range on overflow.
+                gen_kwargs["seed"] = (seed + rollout_index + 2**63) % 2**64 - 2**63
+            seeded_gen_kwargs.append(gen_kwargs)
+        all_gen_kwargs = seeded_gen_kwargs
+
         if self.tokenized_requests:
             encodings_list = self.tok_encode(
                 requests, add_special_tokens=self.add_bos_token
             )
         else:
             encodings_list = [None] * len(requests)
-        requests = [
+        request_args = [
             (a, b, c) for a, b, c in zip(requests, all_gen_kwargs, encodings_list)
         ]
 
         re_ord = Collator(
-            requests,
+            request_args,
             sort_fn=_collate_gen,
+            # Async sampled rollouts share a scheduling group, if they have different generation settings (here the seed) it thinks it has to run them sequentially.
+            group_fn=lambda req: (
+                {k: v for k, v in req[1].items() if k != "seed"}
+                if self._concurrent > 1 and req[1].get("temperature", 0) > 0
+                else req[1]
+            ),
             group_by="gen_kwargs",
         )
         chunked = re_ord.get_batched(
@@ -1036,9 +1094,14 @@ class TemplateAPI(TemplateLM):
                     asyncio.run(
                         self.get_batched_requests(
                             req,
-                            cache_keys=[(ctx, all_gen_kwargs[0]) for ctx in contexts],
+                            cache_keys=list(zip(contexts, all_gen_kwargs, strict=True)),
                             generate=True,
                             gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
+                            request_seeds=(
+                                [kw["seed"] for kw in all_gen_kwargs]
+                                if all_gen_kwargs[0].get("temperature", 0) > 0
+                                else None
+                            ),
                         )
                     )
                 )
