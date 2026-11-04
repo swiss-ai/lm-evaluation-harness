@@ -64,9 +64,12 @@ class Generation(str):
     ``finish_reason`` is the OpenAI-style value ("stop", "length", ...) or None when
     the response didn't carry one. Behaves as a plain ``str`` everywhere else; read
     back in generate_until as the per-response ``generation_truncated`` flag.
+    ``generation_info`` holds backend-specific per-response metadata that
+    generate_until merges last into the response's ``length_info``.
     """
 
     finish_reason: str | None = None
+    generation_info: dict | None = None
 
 
 def parse_finish_reasons(outputs: Any) -> list[str | None]:
@@ -93,7 +96,7 @@ def with_finish_reasons(texts: list[str], outputs: Any) -> list[str]:
         return texts
     tagged = []
     for text, reason in zip(texts, reasons):
-        gen = Generation(text)
+        gen = text if isinstance(text, Generation) else Generation(text)
         gen.finish_reason = reason
         tagged.append(gen)
     return tagged
@@ -619,6 +622,51 @@ class TemplateAPI(TemplateLM):
         elif self.tokenizer_backend == "remote":
             return self.tokenizer.batch_decode(tokens)
 
+    def _post(self, payload: dict) -> dict:
+        """POST one payload and return the decoded JSON response."""
+        if self._rate_limiter is not None:
+            self._rate_limiter.acquire()
+        response = requests.post(
+            self.base_url,
+            json=payload,
+            headers=self.header,
+            verify=self.verify_certificate,
+            timeout=self.timeout,
+        )
+        if not response.ok:
+            eval_logger.warning(
+                f"API request failed with error message: {response.text}. Retrying..."
+            )
+        response.raise_for_status()
+        return response.json()
+
+    async def _apost(self, session: ClientSession, payload: dict) -> dict:
+        """Async counterpart of ``_post``; raising lets the caller retry."""
+        if self._rate_limiter is not None:
+            await self._rate_limiter.acquire_async()
+        async with session.post(
+            self.base_url,
+            json=payload,
+            headers=self.header,
+        ) as response:
+            if not response.ok:
+                error_text = await response.text()
+                eval_logger.warning(
+                    f"API request failed! Status code: {response.status}, "
+                    f"Response text: {error_text}. Retrying..."
+                )
+            response.raise_for_status()
+            return await response.json()
+
+    def _send(self, payload: dict) -> dict:
+        """Response for one request payload. Subclasses may issue several requests
+        per generation and return one combined response."""
+        return self._post(payload)
+
+    async def _asend(self, session: ClientSession, payload: dict) -> dict:
+        """Async counterpart of ``_send``."""
+        return await self._apost(session, payload)
+
     def model_call(
         self,
         messages: list[list[int]] | list[str] | list[JsonChatStr],
@@ -635,28 +683,16 @@ class TemplateAPI(TemplateLM):
             else self._seed
         )
         try:
-            if self._rate_limiter is not None:
-                self._rate_limiter.acquire()
-            response = requests.post(
-                self.base_url,
-                json=self._create_payload(
+            return self._send(
+                self._create_payload(
                     self.create_message(messages),
                     generate=generate,
                     gen_kwargs=gen_kwargs,
                     seed=seed,
                     eos=self.eos_string,
                     **kwargs,
-                ),
-                headers=self.header,
-                verify=self.verify_certificate,
-                timeout=self.timeout,
-            )
-            if not response.ok:
-                eval_logger.warning(
-                    f"API request failed with error message: {response.text}. Retrying..."
                 )
-            response.raise_for_status()
-            return response.json()
+            )
         except RetryError:
             eval_logger.error(
                 "API request failed after multiple retries. Please check the API status."
@@ -693,22 +729,7 @@ class TemplateAPI(TemplateLM):
         acquired = await sem.acquire()
         outputs = None
         try:
-            if self._rate_limiter is not None:
-                await self._rate_limiter.acquire_async()
-            async with session.post(
-                self.base_url,
-                json=payload,
-                headers=self.header,
-            ) as response:
-                if not response.ok:
-                    error_text = await response.text()
-                    eval_logger.warning(
-                        f"API request failed! Status code: {response.status}, "
-                        f"Response text: {error_text}. Retrying..."
-                    )
-                # raising exception will retry the request
-                response.raise_for_status()
-                outputs = await response.json()
+            outputs = await self._asend(session, payload)
             tmp_answers = (
                 self.parse_generations(
                     outputs=outputs,
@@ -1054,8 +1075,12 @@ class TemplateAPI(TemplateLM):
                         )
                         # Patch "None" answer with consistent value (async and sync calls)
                         res.append(Generation(LMEVAL_MODEL_NONE_ANSWER_PLACEHOLDER))
-                    else:
-                        res.append(Generation(generated_text))
+                    else:  # an existing Generation keeps its generation_info
+                        res.append(
+                            generated_text
+                            if isinstance(generated_text, Generation)
+                            else Generation(generated_text)
+                        )
                     res[-1].finish_reason = reason
 
                     # partial caching only for successful generations; a thinking
@@ -1126,6 +1151,7 @@ class TemplateAPI(TemplateLM):
                     track_thinking_metrics=self.track_thinking_metrics,
                 )
                 | truncation_info(text)
+                | (getattr(text, "generation_info", None) or {})
                 for text in res
             ],
         )
@@ -1146,8 +1172,10 @@ class TemplateAPI(TemplateLM):
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[float]:
-        loglikelihoods = []
+        all_windows = []
+        window_counts = []
 
+        # Flatten the windows of all documents, so we can evaluate all documents in parallel
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):
             rolling_token_windows = list(
                 map(
@@ -1164,16 +1192,25 @@ class TemplateAPI(TemplateLM):
 
             # TODO: Right now, we pass single EOT token to the Encoder and the full context to the decoder, in seq2seq case
             rolling_token_windows = [(None,) + x for x in rolling_token_windows]
+            all_windows.extend(rolling_token_windows)
 
-            string_nll = self._loglikelihood_tokens(
-                rolling_token_windows,
-                disable_tqdm=True,
+            window_counts.append(len(rolling_token_windows))
+
+        # Compute the loglikelihoods for all windows in parallel, then sum the scores for each document
+        window_scores = (
+            self._loglikelihood_tokens(all_windows, disable_tqdm=disable_tqdm)
+            if all_windows
+            else []
+        )
+
+        loglikelihoods = []
+        offset = 0
+        for request, window_count in zip(requests, window_counts, strict=True):
+            (string,) = request.args
+            string_nll = sum(
+                score for score, _ in window_scores[offset : offset + window_count]
             )
-
-            # discard is_greedy
-            string_nll = [x[0] for x in string_nll]
-
-            string_nll = sum(string_nll)
+            offset += window_count  # Go to the next document's windows
             loglikelihoods.append(string_nll)
 
             # cache this loglikelihood_rolling request

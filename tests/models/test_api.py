@@ -40,6 +40,47 @@ def api_batch_ssl_tokenized():
     )
 
 
+def test_loglikelihood_rolling_batches_across_documents(api):
+    api.max_length = 4
+    api.prefix_token_id = 0
+    api.cache_hook = MagicMock()
+    requests = [MagicMock(args=(text,)) for text in ("long", "empty", "short")]
+    tokens = {"long": [1, 2, 3, 4], "empty": [], "short": [5, 6]}
+
+    with (
+        patch.object(api, "tok_encode", side_effect=tokens.__getitem__),
+        patch.object(
+            api,
+            "_loglikelihood_tokens",
+            return_value=[(-1.0, True), (-2.0, False), (-4.0, True)],
+        ) as score,
+    ):
+        result = api.loglikelihood_rolling(requests, disable_tqdm=True)
+
+    assert result == [-3.0, 0, -4.0]
+    score.assert_called_once_with(
+        [(None, [0], [1, 2, 3]), (None, [1, 2, 3], [4]), (None, [0], [5, 6])],
+        disable_tqdm=True,
+    )
+    assert api.cache_hook.add_partial.call_args_list == [
+        (("loglikelihood_rolling", (text,), value), {})
+        for text, value in zip(("long", "empty", "short"), result, strict=True)
+    ]
+
+
+@pytest.mark.parametrize("texts", [[], [""]])
+def test_loglikelihood_rolling_without_windows(api, texts):
+    requests = [MagicMock(args=(text,)) for text in texts]
+    with (
+        patch.object(api, "tok_encode", return_value=[]),
+        patch.object(api, "_loglikelihood_tokens") as score,
+    ):
+        assert api.loglikelihood_rolling(requests, disable_tqdm=True) == [0] * len(
+            texts
+        )
+    score.assert_not_called()
+
+
 def test_create_payload_generate(api):
     messages = ["Generate a story"]
     gen_kwargs = {
@@ -993,3 +1034,53 @@ def test_rollout_seed_overflow(monkeypatch):
     instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
     _, payloads = _run_seed_requests(monkeypatch, model, [instance, instance])
     assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
+
+
+class _InfoAPI(LocalCompletionsAPI):
+    """Returns Generations carrying backend metadata, as Apertus 2 does."""
+
+    def parse_generations(self, outputs, **kwargs):
+        from lm_eval.models.api_models import Generation
+
+        texts = super().parse_generations(outputs, **kwargs)
+        tagged = []
+        for text in texts:
+            gen = Generation(text)
+            gen.generation_info = {"generation_custom": 1, "note": text}
+            tagged.append(gen)
+        return tagged
+
+
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+def test_generation_info_reaches_length_info(num_concurrent):
+    from lm_eval.api.instance import Instance
+
+    model = _InfoAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        num_concurrent=num_concurrent,
+    )
+    instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("Question?", {"until": []}),
+        idx=0,
+    )
+    outputs = {"choices": [{"index": 0, "text": "42", "finish_reason": "length"}]}
+
+    async def send_async(session, payload):
+        return outputs
+
+    with (
+        patch.object(model, "_send", return_value=outputs) as send,
+        patch.object(model, "_asend", side_effect=send_async) as send_concurrent,
+    ):
+        result = model.generate_until([instance])
+    assert result == ["42"]
+    info = instance.length_info[0]
+    assert info["generation_custom"] == 1
+    assert info["note"] == "42"
+    assert info["generation_truncated"] == 1
+    assert send.called is (num_concurrent == 1)
+    assert send_concurrent.called is (num_concurrent > 1)
