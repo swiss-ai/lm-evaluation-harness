@@ -44,8 +44,7 @@ _INFO_KEYS = (
 )
 _LIBRARY_HINT = (
     "apertus2-completions needs apertus-common with open output messages "
-    "(https://github.com/swiss-ai/apertus-common, commit ff6a8f6 on "
-    "feat/open-output-messages)"
+    "(https://github.com/swiss-ai/apertus-common, commit 60776c4 on apertus2)"
 )
 
 
