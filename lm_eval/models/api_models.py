@@ -221,6 +221,8 @@ def create_image_prompt(
 
 
 class TemplateAPI(TemplateLM):
+    repeat_seed_support = "provider-dependent"
+
     MULTIMODAL = True
 
     def __init__(
@@ -960,6 +962,13 @@ class TemplateAPI(TemplateLM):
             gen_kwargs["until"] = []
         return gen_kwargs
 
+    cache_generation = True
+
+    def _sampling_enabled(self, gen_kwargs: dict) -> bool:
+        return gen_kwargs.get("temperature", 0) > 0 or gen_kwargs.get(
+            "do_sample", False
+        )
+
     def _rollout_seed(self, seed: int, rollout_index: int) -> int:
         """Offset a sampled rollout's seed within the signed 64-bit API range."""
         return (seed + rollout_index + 2**63) % 2**64 - 2**63
@@ -1004,18 +1013,21 @@ class TemplateAPI(TemplateLM):
         else:
             requests, all_gen_kwargs = zip(*(req.args for req in requests))
 
-        # Generate unique seeds for each rollout for one prompt (to have distinct pass@k generations)
-        # NOTE: doc_id should be enough as pass@k requests are together (as we do this before the reordering of the collator),
-        # so using doc_id is enough to have the different seeds between each rollout of a same doc_id prompt.
+        # Direct backend callers without explicit attempt IDs retain occurrence offsets.
         rollout_counts = {}
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
             seed = gen_kwargs.get("seed", self._seed)
-            if gen_kwargs.get("temperature", 0) > 0 and seed is not None:
-                # Evaluator repeats reference the same Instance, not just its text.
+            if (
+                self._sampling_enabled(gen_kwargs) or instance.repeat_index is not None
+            ) and seed is not None:
                 gen_kwargs = {**gen_kwargs, "seed": seed}
                 key = id(instance)
-                rollout_index = rollout_counts.get(key, 0)
+                rollout_index = (
+                    instance.repeat_index
+                    if instance.repeat_index is not None
+                    else instance.episode + rollout_counts.get(key, 0)
+                )
                 rollout_counts[key] = rollout_index + 1
                 gen_kwargs["seed"] = self._rollout_seed(seed, rollout_index)
             seeded_gen_kwargs.append(gen_kwargs)
@@ -1037,7 +1049,7 @@ class TemplateAPI(TemplateLM):
             # Async sampled rollouts share a scheduling group, if they have different generation settings (here the seed) it thinks it has to run them sequentially.
             group_fn=lambda req: (
                 {k: v for k, v in req[1].items() if k != "seed"}
-                if self._concurrent > 1 and req[1].get("temperature", 0) > 0
+                if self._concurrent > 1
                 else req[1]
             ),
             group_by="gen_kwargs",
@@ -1141,8 +1153,16 @@ class TemplateAPI(TemplateLM):
                             generate=True,
                             gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                             request_seeds=(
-                                [kw["seed"] for kw in all_gen_kwargs]
-                                if all_gen_kwargs[0].get("temperature", 0) > 0
+                                [kw.get("seed", self._seed) for kw in all_gen_kwargs]
+                                if self._sampling_enabled(all_gen_kwargs[0])
+                                or any(i.repeat_index is not None for i in instances)
+                                or len(
+                                    {
+                                        kw.get("seed", self._seed)
+                                        for kw in all_gen_kwargs
+                                    }
+                                )
+                                > 1
                                 else None
                             ),
                         )

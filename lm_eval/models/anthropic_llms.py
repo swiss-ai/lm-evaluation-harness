@@ -58,7 +58,7 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
 
     @retry_on_specific_exceptions(
         on_exceptions=[anthropic.RateLimitError],
-        max_retries=None,  # retry forever, consider changing
+        max_retries=5,
         on_exception_callback=_exception_callback,
     )
     def completion():
@@ -125,7 +125,7 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
             anthropic.APIConnectionError,
             anthropic.APIStatusError,
         ],
-        max_retries=None,  # retry forever, consider changing
+        max_retries=5,
         on_exception_callback=_exception_callback,
     )
     def messages():
@@ -143,6 +143,8 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
 
 @register_model("anthropic-completions")
 class AnthropicLM(LM):
+    repeat_seed_support = "unsupported"
+
     REQ_CHUNK_SIZE = 20  # TODO: not used
 
     def __init__(
@@ -233,6 +235,10 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
             try:
                 inp = request[0]
                 request_args = request[1]
+                params = self.kwargs | {
+                    k: request_args[k] for k in ("top_p", "top_k") if k in request_args
+                }
+                params.pop("seed", None)
                 # generation_kwargs
                 until = request_args.get("until")
                 max_gen_toks = request_args.get("max_gen_toks", self.max_length)
@@ -244,17 +250,17 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
                     max_tokens_to_sample=max_gen_toks,
                     temperature=temperature,  # TODO: implement non-greedy sampling for Anthropic
                     stop=until,  # type: ignore
-                    **self.kwargs,
+                    **params,
                 )
                 res.append(response)
 
                 self.cache_hook.add_partial("generate_until", request, response)
-            except anthropic.APIConnectionError as e:  # type: ignore # noqa: F821
+            except anthropic.APIConnectionError as e:  # type: ignore
                 eval_logger.critical(f"Server unreachable: {e.__cause__}")
-                break
-            except anthropic.APIStatusError as e:  # type: ignore # noqa: F821
+                raise
+            except anthropic.APIStatusError as e:  # type: ignore
                 eval_logger.critical(f"API error {e.status_code}: {e.message}")
-                break
+                raise
 
         return res
 
@@ -275,6 +281,8 @@ please install anthropic via `pip install 'lm-eval[anthropic]'` or `pip install 
 
 @register_model("anthropic-chat", "anthropic-chat-completions")
 class AnthropicChat(LocalCompletionsAPI):
+    repeat_seed_support = "unsupported"
+
     def __init__(
         self,
         base_url="https://api.anthropic.com/v1/messages",
@@ -314,7 +322,7 @@ class AnthropicChat(LocalCompletionsAPI):
         self,
         messages: list[dict],
         generate=True,
-        gen_kwargs: dict = None,
+        gen_kwargs: dict | None = None,
         eos="\n\nHuman:",
         **kwargs,
     ) -> dict:
@@ -364,8 +372,13 @@ class AnthropicChat(LocalCompletionsAPI):
         if not isinstance(outputs, list):
             outputs = [outputs]
         for out in outputs:
-            for choices in out["content"]:
-                res.append(choices["text"])
+            res.append(
+                "".join(
+                    block["text"]
+                    for block in out["content"]
+                    if block.get("type", "text") == "text"
+                )
+            )
         return res
 
     def tok_encode(

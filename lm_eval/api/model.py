@@ -288,14 +288,16 @@ class CacheHook:
         self.dbdict = cachinglm.dbdict
 
     def add_partial(self, attr: str, req: Iterable[Any], res: Any) -> None:
-        if self.dbdict is None:
+        if self.dbdict is None or attr == "generate_until":
             return
         hsh = hash_args(attr, req)
         self.dbdict[hsh] = res
 
 
 class CachingLM:
-    def __init__(self, lm: LM, cache_db: str) -> None:
+    def __init__(
+        self, lm: LM, cache_db: str, cache_namespace: str | None = None
+    ) -> None:
         """LM wrapper that returns cached results when available, falling back to the underlying model.
 
         Args:
@@ -306,6 +308,7 @@ class CachingLM:
 
         self.lm: LM = lm
         self.cache_db: str = cache_db
+        self.cache_namespace = cache_namespace
         if os.path.dirname(cache_db):
             os.makedirs(os.path.dirname(cache_db), exist_ok=True)
         self.dbdict = SqliteDict(cache_db, autocommit=True)
@@ -319,27 +322,59 @@ class CachingLM:
             eval_logger.debug(f"Passing through attribute '{attr}' to underlying LM")
             return lm_attr
 
-        def _fn(requests: list["Instance"]) -> list["Instance"]:
+        def _fn(requests: list["Instance"], **kwargs) -> list["Instance"]:
+            if attr == "generate_until":
+                if (
+                    self.cache_namespace is None
+                    or not getattr(self.lm, "cache_generation", False)
+                    or any(req.repeat_index is None for req in requests)
+                ):
+                    return self.lm.generate_until(requests, **kwargs)
+                results = [None] * len(requests)
+                missing, positions, keys = [], [], []
+                for index, req in enumerate(requests):
+                    identity = (
+                        req.task_name,
+                        req.doc_id,
+                        req.repeat_index,
+                        req.idx,
+                        req.episode,
+                    )
+                    key = hash_args(
+                        attr, ("attempt-v1", self.cache_namespace, identity, req.args)
+                    )
+                    if key in self.dbdict:
+                        cached = self.dbdict[key]
+                        results[index] = cached["response"]
+                        req.length_info.extend(cached["length_info"])
+                    else:
+                        missing.append(req)
+                        positions.append(index)
+                        keys.append(key)
+                generated = self.lm.generate_until(missing, **kwargs) if missing else []
+                for index, key, req, response in zip(
+                    positions, keys, missing, generated, strict=True
+                ):
+                    if response is None:
+                        raise RuntimeError(
+                            "Incomplete generation; refusing to cache a missing attempt"
+                        )
+                    results[index] = response
+                    self.dbdict[key] = {
+                        "response": response,
+                        "length_info": req.length_info,
+                    }
+                self.dbdict.commit()
+                return results
             res = []
             remaining_reqs = []
-            warned = False
             # figure out which ones are cached and which ones are new
             eval_logger.info(
                 f"Loading '{attr}' responses from cache '{self.cache_db}' where possible..."
             )
             for req in tqdm(requests, desc="Checking cached requests"):
                 hsh = hash_args(attr, req.args)
-                if attr == "generate_until" and req.args[1].get("do_sample", False):
-                    # when we are doing non-greedy generation, don't use the cache
-                    # (else every "randomly sampled" generation would be identical for repeats > 1).
-                    if not warned:
-                        eval_logger.warning(
-                            f"Arguments to lm.generate_until() '{req.args[1]}' include non-deterministic sampling. Caching will not be performed for such requests."
-                        )
-                        warned = True
-                    res.append(None)
-                    remaining_reqs.append(req)
-                elif hsh in self.dbdict:
+                if hsh in self.dbdict:
                     ob = self.dbdict[hsh]
 
                     assert ob is not None
