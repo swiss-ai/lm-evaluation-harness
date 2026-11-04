@@ -351,6 +351,10 @@ class Apertus2Completions(LocalChatCompletion):
         texts = (json.dumps(messages, ensure_ascii=False), tools or "")
         return sum(len(self._literal.findall(text)) for text in texts)
 
+    def _rollout_seed(self, seed: int, rollout_index: int) -> int:
+        # _create_payload applies the scoped repeat/episode offset exactly once.
+        return seed
+
     def generate_until(self, requests, disable_tqdm: bool = False) -> list[str]:
         # Configuration errors fail before any request; data errors are per sample.
         for request in requests:
