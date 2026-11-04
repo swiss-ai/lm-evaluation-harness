@@ -43,6 +43,8 @@ EvalResults = TypedDict(
         "samples": "dict[str, list[SampleResult]]",
         # Metrics emitted by the model backend during evaluation.
         "model_metrics": list[dict[str, Any]],
+        "repeat_results": list[dict[str, Any]],
+        "repeat_protocols": dict[str, dict[str, Any]],
         # --- Metadata added by simple_evaluate() ---
         #
         # Model and execution configuration.
@@ -162,7 +164,7 @@ class _EvalConfig(TypedDict, total=False):
     fewshot_seed: int
 
 
-class SampleResult(TypedDict, extra_items=float):
+class SampleResult(TypedDict, extra_items=Any):
     """Per-document result written to ``samples_*.jsonl`` when ``log_samples=True``.
 
     There is one entry per filter (e.g. ``"none"``, ``"strict-match"``).
@@ -170,6 +172,8 @@ class SampleResult(TypedDict, extra_items=float):
     Dynamic keys are per-sample metric scores (e.g. ``acc``, ``acc_norm``,
     ``exact_match``) whose names and count vary by task — these are always floats.
     """
+
+    repeat_indices: NotRequired[list[int]]
 
     doc_id: int
     """Zero-based index of the document within the evaluation split."""

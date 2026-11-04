@@ -76,6 +76,9 @@ class EvaluatorConfig:
     num_fewshot: int | None = field(
         default=None, metadata={"help": "Number of examples in few-shot context"}
     )
+    repeats: int | None = None
+    repeat_scoring: dict | None = None
+    task_overrides: dict | None = None
     batch_size: int = field(default=1, metadata={"help": "Batch size for evaluation"})
     max_batch_size: int | None = field(
         default=None, metadata={"help": "Maximum batch size for auto batching"}
@@ -223,8 +226,29 @@ class EvaluatorConfig:
         cli_args = {
             k: v
             for k, v in vars(namespace).items()
-            if (v or v == 0) and k not in excluded_args
+            if (
+                v
+                or v == 0
+                or (k in {"repeat_scoring", "task_overrides"} and v is not None)
+            )
+            and k not in excluded_args
         }
+        if "repeat_scoring" in cli_args:
+            cli_args["repeat_scoring"] = {
+                **(config.get("repeat_scoring") or {}),
+                **cli_args["repeat_scoring"],
+            }
+        if "task_overrides" in cli_args:
+            overrides = dict(config.get("task_overrides") or {})
+            for name, fields in cli_args["task_overrides"].items():
+                previous = overrides.get(name, {})
+                overrides[name] = {**previous, **fields}
+                if "repeat_scoring" in fields:
+                    overrides[name]["repeat_scoring"] = {
+                        **previous.get("repeat_scoring", {}),
+                        **fields["repeat_scoring"],
+                    }
+            cli_args["task_overrides"] = overrides
         config.update(cli_args)
 
         # Create an instance and validate

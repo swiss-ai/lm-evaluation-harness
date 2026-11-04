@@ -38,17 +38,21 @@ def textsynth_completion(**kwargs):
 
     @retry_on_specific_exceptions(
         on_exceptions=[_requests.exceptions.RequestException],
-        max_retries=None,  # retry forever, consider changing
+        max_retries=5,
         on_exception_callback=_exception_callback,
     )
     def completion():
-        return _requests.post(**kwargs)
+        response = _requests.post(timeout=120, **kwargs)
+        response.raise_for_status()
+        return response
 
     return completion()
 
 
 @register_model("textsynth")
 class TextSynthLM(LM):
+    repeat_seed_support = "task-seed; zero is unseeded"
+
     def __init__(self, engine, truncate: bool = False, **kwargs) -> None:
         """
         :param engine: str
@@ -117,7 +121,7 @@ class TextSynthLM(LM):
                 logger.error(
                     f"The following response does not contain `logprobs`. Got:\n{resp}"
                 )
-                assert False
+                raise RuntimeError("TextSynth returned an invalid response")
         return res
 
     def loglikelihood_rolling(self, requests, disable_tqdm: bool = False):
@@ -136,17 +140,26 @@ class TextSynthLM(LM):
 
         res = []
         for request in tqdm(requests, disable=disable_tqdm):
-            inp = request[0]
-            request_args = request[1]
-            until = request_args["until"]
+            inp, request_args = request.args
+            params = dict(request_args)
+            until = params.pop("until", None)
+            params.pop("do_sample", None)
+            params["max_tokens"] = params.pop(
+                "max_tokens", params.pop("max_gen_toks", self.max_gen_toks)
+            )
+            params.setdefault("temperature", 0)
+            base_seed = params.pop("seed", None)
+            if base_seed:
+                params["seed"] = request.generation_seed(base_seed)
+            elif base_seed == 0:
+                params["seed"] = 0
             response = textsynth_completion(
                 url=self.api_url + "/v1/engines/" + self.engine + "/completions",
                 headers={"Authorization": "Bearer " + self.api_key},
                 json={
                     "prompt": inp,
-                    "max_tokens": self.max_gen_toks,
-                    "top_k": 1,
                     "stop": until,
+                    **params,
                 },
             )
             resp = response.json()
@@ -160,7 +173,7 @@ class TextSynthLM(LM):
                     "The following response does not contain generated `text`. "
                     "Got:\n{resp}"
                 )
-                assert False
+                raise RuntimeError("TextSynth returned an invalid response")
         return res
 
     def _model_call(self, inps):

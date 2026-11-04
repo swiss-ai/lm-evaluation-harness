@@ -433,6 +433,11 @@ class OpenAIChatCompletion(LocalChatCompletion):
             "Loglikelihood (and therefore `multiple_choice`-type tasks) is not supported for chat completions as OpenAI does not provide prompt logprobs. See https://github.com/EleutherAI/lm-evaluation-harness/issues/942#issuecomment-1777836312 or https://github.com/EleutherAI/lm-evaluation-harness/issues/1196 for more background on this limitation."
         )
 
+    def _sampling_enabled(self, gen_kwargs: dict) -> bool:
+        return any(
+            name in self.model for name in ("o1", "o3", "o4", "5")
+        ) or super()._sampling_enabled(gen_kwargs)
+
     def _create_payload(
         self,
         messages: list[dict],
@@ -490,19 +495,12 @@ class AzureOpenaiChatCompletionsLM(OpenAIChatCompletion):
         truncate: bool = False,
         **kwargs,
     ) -> None:
-        super().__init__()
-        try:
-            import openai
-        except ModuleNotFoundError as e:
-            raise ModuleNotFoundError(
-                "attempted to use 'openai' LM type, but package `openai` or `tiktoken` are not installed. \
-    please install these via `pip install lm-eval[openai]` or `pip install -e .[openai]`",
-            ) from e
-        self.model = model
-        self.base_url = f"{base_url}/openai/deployments/{model}/chat/completions?api-version={api_version}"
-        self.truncate = truncate
-        self.client = openai.AzureOpenAI(
-            azure_endpoint=base_url, api_version=api_version, api_key=self.api_key
+        if not model or not base_url:
+            raise ValueError("Azure requires a deployment model and base_url")
+        endpoint = f"{base_url.rstrip('/')}/openai/deployments/{model}/chat/completions?api-version={api_version}"
+        header = kwargs.pop("header", None) or {"api-key": self.api_key}
+        super().__init__(
+            model=model, base_url=endpoint, truncate=truncate, header=header, **kwargs
         )
 
     @cached_property

@@ -1011,3 +1011,12 @@ def test_evaluate_prefill_task_end_to_end(synthetic):
     assert f"<|out|>reply<|hdr|>{PREFIX} A<|/out|><|wait|>" in prompt
     sample = results["samples"]["toy_prefill"][0]
     assert sample["length_info"][0][-1]["apertus2_prefill_mode"] == "after_think"
+
+
+def test_explicit_attempt_identity_survives_reordering(synthetic):
+    model = make(synthetic)
+    requests = [chat_request(QUESTION, seed=7, temperature=0.8) for _ in range(3)]
+    for request, index in zip(requests, [2, 0, 1], strict=True):
+        request.repeat_index = index
+    _, sent = run(model, requests, [answer(model.encoding, lib.Reply(payload="A"))] * 3)
+    assert [payload["seed"] for payload in sent] == [9, 7, 8]

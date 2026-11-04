@@ -163,6 +163,10 @@ class Run(SubCommand):
             ),
         )
 
+        eval_group.add_argument("--repeats", type=int, default=None)
+        eval_group.add_argument("--repeat_scoring", type=json.loads, default=None)
+        eval_group.add_argument("--task_overrides", type=json.loads, default=None)
+
         # Data and Output
         data_group = self._parser.add_argument_group(
             "data and output (see also: --limit)"
@@ -421,6 +425,9 @@ class Run(SubCommand):
             apply_chat_template=cfg.apply_chat_template,
             fewshot_as_multiturn=cfg.fewshot_as_multiturn,
             gen_kwargs=cfg.gen_kwargs,
+            repeats=cfg.repeats,
+            repeat_scoring=cfg.repeat_scoring,
+            task_overrides=cfg.task_overrides,
             task_manager=task_manager,
             verbosity=cfg.verbosity,
             predict_only=cfg.predict_only,

@@ -35,6 +35,8 @@ def get_result(logprobs, context_length):
 
 @register_model("gguf", "ggml")
 class GGUFLM(LM):
+    repeat_seed_support = "task-seed"
+
     def __init__(self, base_url=None, max_length=2048, **kwargs):
         super().__init__()
         self.base_url = base_url
@@ -46,13 +48,14 @@ class GGUFLM(LM):
     def gguf_completion(
         self, context, continuation=None, stop=None, retries=3, delay=5, **kwargs
     ):
-        for _ in range(retries):
+        for attempt in range(retries):
             try:
                 prompt = context
                 request = {
                     "prompt": prompt,
                     "logprobs": self.logprobs,
                     "temperature": self.temperature,
+                    **kwargs,
                 }
                 if continuation:
                     prompt += continuation
@@ -60,17 +63,15 @@ class GGUFLM(LM):
                 if stop is not None:
                     request["stop"] = stop
                 response = requests.post(
-                    f"{self.base_url}/v1/completions", json=request
+                    f"{self.base_url}/v1/completions", json=request, timeout=120
                 )
                 response.raise_for_status()
                 return response.json()
             except RequestException as e:
                 logger.error(f"RequestException: {e}")
-                time.sleep(delay)  # wait before retrying
-        else:
-            raise RuntimeError(
-                f"Failed to get a valid response after {retries} retries."
-            )
+                if attempt + 1 < retries:
+                    time.sleep(delay)
+        raise RuntimeError(f"Failed to get a valid response after {retries} retries.")
 
     def loglikelihood(self, requests, disable_tqdm: bool = False):
         if not requests:
@@ -98,7 +99,7 @@ class GGUFLM(LM):
                 logger.error(
                     f"Invalid response for loglikelihood. Response: {response}"
                 )
-                assert False
+                raise RuntimeError("GGUF returned invalid loglikelihood data")
         return res
 
     def generate_until(self, requests, disable_tqdm: bool = False):
@@ -106,24 +107,23 @@ class GGUFLM(LM):
             return []
 
         res = []
-        for request in tqdm([req.args for req in requests], disable=disable_tqdm):
-            inp = request[0]
-            request_args = request[1]
-            until = request_args.get("until", ["</s>"])
-            response = self.gguf_completion(context=inp, stop=until)
-            if response and "choices" in response and response["choices"]:
-                choice = response["choices"][0]
-                if "text" in choice:
-                    generated_text = choice["text"].strip()
-                    res.append(generated_text)
-                else:
-                    logger.error(
-                        f"Invalid response for greedy_until. Response: {response}"
-                    )
-                    res.append(None)  # Add default value in case of error
-            else:
-                logger.error(f"Invalid response for greedy_until. Response: {response}")
-                res.append(None)  # Add default value in case of error
+        for instance in tqdm(requests, disable=disable_tqdm):
+            inp, request_args = instance.args
+            params = dict(request_args)
+            until = params.pop("until", ["</s>"])
+            params.pop("do_sample", None)
+            params["max_tokens"] = params.pop(
+                "max_tokens", params.pop("max_gen_toks", 256)
+            )
+            seed = instance.generation_seed()
+            params.pop("seed", None)
+            if seed is not None:
+                params["seed"] = seed
+            response = self.gguf_completion(context=inp, stop=until, **params)
+            try:
+                res.append(response["choices"][0]["text"].strip())
+            except (KeyError, IndexError, TypeError) as exc:
+                raise RuntimeError("GGUF returned no completion") from exc
         return res
 
     def loglikelihood_rolling(self, requests, disable_tqdm: bool = False):

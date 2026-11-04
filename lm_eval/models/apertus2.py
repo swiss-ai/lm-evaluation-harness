@@ -351,6 +351,9 @@ class Apertus2Completions(LocalChatCompletion):
         texts = (json.dumps(messages, ensure_ascii=False), tools or "")
         return sum(len(self._literal.findall(text)) for text in texts)
 
+    repeat_seed_support = "request-seed"
+    cache_generation = False
+
     def _rollout_seed(self, seed: int, rollout_index: int) -> int:
         # _create_payload applies the scoped repeat/episode offset exactly once.
         return seed
@@ -393,7 +396,11 @@ class Apertus2Completions(LocalChatCompletion):
         for r in requests:
             scope = None if r.task_name is None else (r.task_name, r.doc_id, r.episode)
             pending = self._pending.setdefault(id(r.args[0]), [])
-            repeat = r.episode + sum(queued == scope for queued, _ in pending)
+            repeat = (
+                r.repeat_index
+                if r.repeat_index is not None
+                else r.episode + sum(queued == scope for queued, _ in pending)
+            )
             pending.append((scope, repeat))
         active = {scope for queued in self._pending.values() for scope, _ in queued}
         self._memory = {s: m for s, m in self._memory.items() if s in active}

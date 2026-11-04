@@ -1043,3 +1043,48 @@ def test_rollout_seed_overflow(monkeypatch):
     instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
     _, payloads = _run_seed_requests(monkeypatch, model, [instance, instance])
     assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
+
+
+def test_cache_preserves_attempts_across_reordering_and_partial_resume(
+    monkeypatch, tmp_path
+):
+    from dataclasses import replace
+
+    from lm_eval.api.model import CachingLM
+
+    model = _seed_model("completions", concurrent=3)
+    source = _seed_instance(model, "prompt", {"temperature": 0.8})
+    attempts = [replace(source, repeat_index=i, length_info=[]) for i in range(3)]
+    cached = CachingLM(model, str(tmp_path / "results.db"), cache_namespace="model-v1")
+    first, sent = _run_seed_requests(monkeypatch, cached, attempts)
+    assert first == ["prompt:1234", "prompt:1235", "prompt:1236"]
+    assert len(sent) == 3
+    second, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
+    assert second == first[::-1] and not sent
+    key = next(
+        key for key in cached.dbdict if cached.dbdict[key]["response"] == "prompt:1235"
+    )
+    del cached.dbdict[key]
+    third, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
+    assert third == first[::-1]
+    assert [p["seed"] for p in sent] == [1235]
+    cached.cache_namespace = "model-v2"
+    _, sent = _run_seed_requests(monkeypatch, cached, attempts)
+    assert len(sent) == 3
+
+
+def test_forced_sampling_and_explicit_episode_seeds(monkeypatch):
+    from dataclasses import replace
+
+    from lm_eval.models.openai_completions import OpenAIChatCompletion
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    model = OpenAIChatCompletion(model="o3", num_concurrent=2, max_retries=1)
+    source = _seed_instance(model, "prompt", {"temperature": 0})
+    _, sent = _run_seed_requests(monkeypatch, model, [source, source])
+    assert [(p["temperature"], p["seed"]) for p in sent] == [(1, 1234), (1, 1235)]
+    episodes = [
+        replace(source, episode=i, repeat_index=i, length_info=[]) for i in (2, 0)
+    ]
+    _, sent = _run_seed_requests(monkeypatch, model, episodes)
+    assert [p["seed"] for p in sent] == [1236, 1234]

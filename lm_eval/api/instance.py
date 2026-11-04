@@ -31,6 +31,7 @@ class Instance:
     # Which of a multi-turn document's `repeats` episodes sent this request
     # (evaluator.run_multi_turn_rollout); 0 otherwise.
     episode: int = 0
+    repeat_index: int | None = None
 
     # initialized after init
     task_name: str | None = None
@@ -40,6 +41,11 @@ class Instance:
     def __post_init__(self) -> None:
         # unpack metadata field
         self.task_name, self.doc_id, self.repeats = self.metadata
+
+    def generation_seed(self, base=None):
+        seed = self.args[1].get("seed", base)
+        index = self.repeat_index if self.repeat_index is not None else self.episode
+        return None if seed is None else (seed + index + 2**63) % 2**64 - 2**63
 
     @property
     def args(self):
