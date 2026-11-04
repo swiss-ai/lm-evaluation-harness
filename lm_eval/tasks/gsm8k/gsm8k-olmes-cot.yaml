@@ -58,3 +58,5 @@ metric_list:
       - ","
       - "\\$"
 repeats: 1
+repeat_support:
+  exact_match: binary

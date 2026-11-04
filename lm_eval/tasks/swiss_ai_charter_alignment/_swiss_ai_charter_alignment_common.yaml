@@ -33,3 +33,10 @@ generation_kwargs:
   max_gen_toks: 512
 metadata:
   version: 1.1
+repeat_support:
+  swiss_ai_charter_score: native
+  swiss_ai_charter_judge_success_rate: native
+  swiss_ai_charter_pairwise_winrate: native
+  swiss_ai_charter_length_controlled_winrate: native
+  swiss_ai_charter_pairwise_judge_success_rate: native
+  avg_word_count: mean

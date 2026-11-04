@@ -28,3 +28,8 @@ metric_list:
     higher_is_better: true
 metadata:
   version: 1.0
+repeat_support:
+  prompt_level_strict_acc: binary
+  inst_level_strict_acc: native
+  prompt_level_loose_acc: binary
+  inst_level_loose_acc: native
