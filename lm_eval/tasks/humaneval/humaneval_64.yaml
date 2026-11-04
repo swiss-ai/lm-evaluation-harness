@@ -17,3 +17,5 @@ generation_kwargs:
   do_sample: true
   temperature: 0.2
   top_p: 0.95
+repeat_support:
+  pass@1: binary

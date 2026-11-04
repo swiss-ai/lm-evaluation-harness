@@ -22,3 +22,6 @@ generation_kwargs:
   until: []
 metadata:
   version: 0.1
+repeat_support:
+  arena_hard_score: native
+  avg_word_count: mean

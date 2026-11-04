@@ -32,4 +32,5 @@ filter_list:
       - function: !function utils.PassAtKFilter
       - function: "take_first"
 metadata:
-  version: 1.1
+  version: 1.2
+repeat_filter: score-first
