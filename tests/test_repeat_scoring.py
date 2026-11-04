@@ -326,3 +326,23 @@ def test_cli_writes_repeated_results_from_run_file(tmp_path):
     assert result["results"]["repeat_cli_smoke"]["correctness_pass@2,none"] == 0
     assert result["repeat_protocols"]["repeat_cli_smoke"]["completed_attempts"] == 6
     assert len(result["repeat_results"]) == 3
+
+
+def test_api_protocol_reports_temperature_not_ignored_sampling_flag(
+    task_factory, monkeypatch
+):
+    from lm_eval.models.openai_completions import LocalCompletionsAPI
+
+    model = LocalCompletionsAPI(
+        model="test", base_url="http://example.invalid", tokenizer_backend=None
+    )
+    monkeypatch.setattr(model, "generate_until", Answers().generate_until)
+    task = task_factory(
+        repeats=2,
+        repeat_scoring={"enabled": True},
+        generation_kwargs={"temperature": 0, "do_sample": True},
+    )
+    result = evaluate(
+        model, {"tasks": {"example": task}, "groups": {}}, bootstrap_iters=0
+    )
+    assert result["repeat_protocols"]["example"]["sampling_enabled"] is False
