@@ -836,3 +836,53 @@ def test_parse_logprobs_without_tokens_slices_from_ctxlen():
     out = {"choices": [_echo_choice([None, -1.0, -2.0, -3.0, -4.0, -9.0])]}
     [(logprob, _)] = LocalCompletionsAPI.parse_logprobs(out, ctxlens=[3])
     assert logprob == -7.0
+
+
+class _InfoAPI(LocalCompletionsAPI):
+    """Returns Generations carrying backend metadata, as Apertus 2 does."""
+
+    def parse_generations(self, outputs, **kwargs):
+        from lm_eval.models.api_models import Generation
+
+        texts = super().parse_generations(outputs, **kwargs)
+        tagged = []
+        for text in texts:
+            gen = Generation(text)
+            gen.generation_info = {"generation_custom": 1, "note": text}
+            tagged.append(gen)
+        return tagged
+
+
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+def test_generation_info_reaches_length_info(num_concurrent):
+    from lm_eval.api.instance import Instance
+
+    model = _InfoAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        num_concurrent=num_concurrent,
+    )
+    instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("Question?", {"until": []}),
+        idx=0,
+    )
+    outputs = {"choices": [{"index": 0, "text": "42", "finish_reason": "length"}]}
+
+    async def send_async(session, payload):
+        return outputs
+
+    with (
+        patch.object(model, "_send", return_value=outputs) as send,
+        patch.object(model, "_asend", side_effect=send_async) as send_concurrent,
+    ):
+        result = model.generate_until([instance])
+    assert result == ["42"]
+    info = instance.length_info[0]
+    assert info["generation_custom"] == 1
+    assert info["note"] == "42"
+    assert info["generation_truncated"] == 1
+    assert send.called is (num_concurrent == 1)
+    assert send_concurrent.called is (num_concurrent > 1)

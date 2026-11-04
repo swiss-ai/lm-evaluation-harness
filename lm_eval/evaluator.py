@@ -107,11 +107,12 @@ def run_multi_turn_rollout(
     for instance in requests:
         task = eval_tasks[instance.task_name]
         ctx, gen_kwargs = instance.arguments
-        for _ in range(instance.repeats):
+        for index in range(instance.repeats):
             episodes.append(
                 {
                     "task": task,
                     "instance": instance,
+                    "index": index,
                     "state": _init_multiturn_state(
                         task,
                         instance.doc,
@@ -149,6 +150,7 @@ def run_multi_turn_rollout(
                     episode["instance"].doc_id,
                     1,
                 ),
+                episode=episode["index"],
             )
             active.append((episode, request))
             wave_requests.append(request)
