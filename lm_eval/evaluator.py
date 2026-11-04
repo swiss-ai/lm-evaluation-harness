@@ -1053,7 +1053,10 @@ def evaluate(
             protocol["default_seed"] = getattr(lm, "_seed", None)
             if name in eval_tasks and callable(getattr(lm, "_sampling_enabled", None)):
                 protocol["sampling_enabled"] = lm._sampling_enabled(
-                    eval_tasks[name].get_config("generation_kwargs") or {}
+                    {
+                        **(eval_tasks[name].get_config("generation_kwargs") or {}),
+                        "do_sample": False,
+                    }
                 )
         model_metrics = lm.get_model_metrics()
         if model_metrics:
