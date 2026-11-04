@@ -171,7 +171,13 @@ def run(model, instances, responses):
             raise reply
         return reply(payload) if callable(reply) else reply
 
-    with patch.object(model, "_post", side_effect=post):
+    async def apost(session, payload):
+        return post(payload)
+
+    with (
+        patch.object(model, "_post", side_effect=post),
+        patch.object(model, "_apost", side_effect=apost),
+    ):
         result = model.generate_until(instances)
     return result, sent
 
@@ -854,7 +860,8 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
 
 
 @pytest.mark.parametrize("num_concurrent", [1, 2])
-def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
+@pytest.mark.parametrize("temperature", [0, 0.8])
+def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperature):
     # A seeded server returns one sample for all of a document's repeats (pass@k,
     # maj@k) unless each has its own seed: single-turn repeats are one request
     # object, multi-turn episodes one each (numbered), and a retry keeps its seed.
@@ -871,8 +878,11 @@ def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
     async def server_async(session, payload):
         return server(payload)
 
-    repeated = chat_request(QUESTION)
-    episodes = [chat_request(QUESTION, doc=1, episode=k) for k in range(2)]
+    repeated = chat_request(QUESTION, temperature=temperature)
+    episodes = [
+        chat_request(QUESTION, doc=1, episode=k, temperature=temperature)
+        for k in range(2)
+    ]
     with (
         patch.object(model, "_post", side_effect=server),
         patch.object(model, "_apost", side_effect=server_async),
@@ -909,14 +919,18 @@ def test_episodes_keep_their_own_reasoning(synthetic, shared):
         assert f"think<|hdr|>think {payload['seed']}<|/out|>" in payload["prompt"]
 
 
-def test_task_seed_is_the_base_and_none_is_unseeded(synthetic):
-    model = make(synthetic)
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+@pytest.mark.parametrize("temperature", [0, 0.8])
+def test_task_seed_is_the_base_and_none_is_unseeded(
+    synthetic, num_concurrent, temperature
+):
+    model = make(synthetic, num_concurrent=num_concurrent)
     enc = model.encoding
-    seeded = chat_request(QUESTION, seed=7)
+    seeded = chat_request(QUESTION, seed=7, temperature=temperature)
     _, sent = run(model, [seeded] * 2, [answer(enc, lib.Reply(payload="A"))] * 2)
     assert sorted(payload["seed"] for payload in sent) == [7, 8]
     reply = enc.encode_text(" B.") + [enc.controls.output_end]
-    unseeded = chat_request(PREFILLED, until=["."], seed=None)
+    unseeded = chat_request(PREFILLED, until=["."], seed=None, temperature=temperature)
     responses = [phase_one(enc), completion(enc, reply, stop=enc.controls.wait)]
     result, sent = run(model, [unseeded], responses)
     assert result == [" B"]  # the after_think continuation ran

@@ -960,6 +960,10 @@ class TemplateAPI(TemplateLM):
             gen_kwargs["until"] = []
         return gen_kwargs
 
+    def _rollout_seed(self, seed: int, rollout_index: int) -> int:
+        """Offset a sampled rollout's seed within the signed 64-bit API range."""
+        return (seed + rollout_index + 2**63) % 2**64 - 2**63
+
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
@@ -1013,8 +1017,7 @@ class TemplateAPI(TemplateLM):
                 key = id(instance)
                 rollout_index = rollout_counts.get(key, 0)
                 rollout_counts[key] = rollout_index + 1
-                # Stay within the signed 64-bit API seed range on overflow.
-                gen_kwargs["seed"] = (seed + rollout_index + 2**63) % 2**64 - 2**63
+                gen_kwargs["seed"] = self._rollout_seed(seed, rollout_index)
             seeded_gen_kwargs.append(gen_kwargs)
         all_gen_kwargs = seeded_gen_kwargs
 
