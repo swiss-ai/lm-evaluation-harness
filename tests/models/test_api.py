@@ -1084,3 +1084,56 @@ def test_generation_info_reaches_length_info(num_concurrent):
     assert info["generation_truncated"] == 1
     assert send.called is (num_concurrent == 1)
     assert send_concurrent.called is (num_concurrent > 1)
+
+
+def _unauthorized_error(api_key: str):
+    from aiohttp import ClientResponseError, RequestInfo
+    from multidict import CIMultiDict, CIMultiDictProxy
+    from yarl import URL
+
+    url = URL("http://test-url.com/v1/completions")
+    info = RequestInfo(
+        url=url,
+        method="POST",
+        headers=CIMultiDictProxy(CIMultiDict({"Authorization": f"Bearer {api_key}"})),
+        real_url=url,
+    )
+    return ClientResponseError(info, (), status=429, message="Too Many Requests")
+
+
+def test_describe_error_leaves_out_the_request_headers():
+    api_key = "sk-test-key-123"
+    error = _unauthorized_error(api_key)
+    # The plain repr is what leaked the key.
+    assert api_key in repr(error)
+    described = api_models._describe_error(error)
+    assert api_key not in described
+    assert "status=429" in described and "Too Many Requests" in described
+    assert api_models._describe_error(ValueError("boom")) == "ValueError('boom')"
+
+
+def test_failed_request_log_does_not_contain_the_api_key(caplog, monkeypatch):
+    api_key = "sk-test-key-123"
+    monkeypatch.setenv("OPENAI_API_KEY", api_key)
+    failing_api = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        tokenizer_backend=None,
+        model="test-model",
+    )
+    assert api_key in failing_api.header["Authorization"]
+    from aiohttp import ClientResponseError
+
+    session = MagicMock()
+    session.post.side_effect = _unauthorized_error(api_key)
+
+    async def run():
+        with pytest.raises(ClientResponseError):
+            await failing_api.amodel_call(
+                session, asyncio.Semaphore(1), ["hello"], gen_kwargs={}
+            )
+
+    with caplog.at_level("ERROR"):
+        asyncio.run(run())
+
+    assert "retrying" in caplog.text
+    assert api_key not in caplog.text
