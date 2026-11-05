@@ -114,12 +114,17 @@ def _split_top_level_commas(args: str) -> list[str]:
 
     `chat_template_args={"reasoning_effort":"low"}` and `stop=["a,b"]` stay one
     item with their quotes intact, so the value can still be read as a literal;
-    `extra_args=--window-size '(1024,0)'` stays one item too.
+    `extra_args=--window-size '(1024,0)'` stays one item too. Unbalanced quotes
+    or brackets fall back to splitting on every comma.
     """
-    items, buf, quote, depth = [], [], None, 0
+    items, buf, quote, depth, escaped = [], [], None, 0, False
     for ch in args:
-        if quote:
-            if ch == quote:
+        if escaped:
+            escaped = False
+        elif quote:
+            if ch == "\\":
+                escaped = True
+            elif ch == quote:
                 quote = None
         elif ch in "'\"":
             quote = ch
@@ -132,6 +137,10 @@ def _split_top_level_commas(args: str) -> list[str]:
             buf = []
             continue
         buf.append(ch)
+    if quote or depth:
+        # An apostrophe in plain text (`Don't`) or a stray bracket: not quoting,
+        # so split on every comma as the CLI always did.
+        return [item for item in args.split(",") if item]
     items.append("".join(buf))
     return [item for item in items if item]
 

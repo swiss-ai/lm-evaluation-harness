@@ -45,3 +45,21 @@ def test_key_val_to_dict_plain_values_unchanged():
     }
     # an unbalanced quote is kept as it is
     assert key_val_to_dict("note=it's") == {"note": "it's"}
+
+
+def test_key_val_to_dict_apostrophes_and_stray_brackets_do_not_swallow_keys():
+    assert key_val_to_dict("system_instruction=Don't guess,max_gen_toks=5") == {
+        "system_instruction": "Don't guess",
+        "max_gen_toks": 5,
+    }
+    assert key_val_to_dict("extra_args=--foo (bar,devices=4") == {
+        "extra_args": "--foo (bar",
+        "devices": 4,
+    }
+
+
+def test_key_val_to_dict_escaped_quote_inside_quotes():
+    assert key_val_to_dict('stop=["\\"", "x"],top_p=0.9') == {
+        "stop": ['"', "x"],
+        "top_p": 0.9,
+    }
