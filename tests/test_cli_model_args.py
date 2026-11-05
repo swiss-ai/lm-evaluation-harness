@@ -63,3 +63,15 @@ def test_key_val_to_dict_escaped_quote_inside_quotes():
         "stop": ['"', "x"],
         "top_p": 0.9,
     }
+
+
+def test_key_val_to_dict_reads_shell_quoted_literals():
+    # evals-post-train's sbatch passes the quotes backslash-escaped
+    assert key_val_to_dict(
+        'pretrained=m,chat_template_args={\\"reasoning_effort\\":\\"medium\\"}'
+    ) == {"pretrained": "m", "chat_template_args": {"reasoning_effort": "medium"}}
+    assert key_val_to_dict("""chat_template_args='{"reasoning_effort":"low"}'""") == {
+        "chat_template_args": {"reasoning_effort": "low"}
+    }
+    # a quoted number or word stays a string
+    assert key_val_to_dict("""a='5',b="x" """.strip()) == {"a": "5", "b": "x"}
