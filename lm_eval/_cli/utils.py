@@ -109,18 +109,60 @@ def handle_cli_value_string(arg: str) -> bool | int | float | str:
             return arg
 
 
+def _split_top_level_commas(args: str) -> list[str]:
+    """Split on commas outside quotes and brackets, keeping every character.
+
+    `chat_template_args={"reasoning_effort":"low"}` and `stop=["a,b"]` stay one
+    item with their quotes intact, so the value can still be read as a literal;
+    `extra_args=--window-size '(1024,0)'` stays one item too.
+    """
+    items, buf, quote, depth = [], [], None, 0
+    for ch in args:
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"":
+            quote = ch
+        elif ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth = max(depth - 1, 0)
+        elif ch == "," and depth == 0:
+            items.append("".join(buf))
+            buf = []
+            continue
+        buf.append(ch)
+    items.append("".join(buf))
+    return [item for item in items if item]
+
+
+def _strip_shell_quotes(value: str) -> str:
+    """`--window-size '(1024,0)' --skip 2` -> `--window-size (1024,0) --skip 2`.
+
+    Only for values that are not Python literals; unbalanced quotes are kept.
+    """
+    if "'" not in value and '"' not in value:
+        return value
+    lexer = shlex.shlex(value, posix=True)
+    lexer.whitespace = ""
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    try:
+        return "".join(lexer)
+    except ValueError:
+        return value
+
+
 def key_val_to_dict(args: str) -> dict[str, Any]:
     """Parse model arguments from a string into a dictionary."""
     res = {}
     if not args:
         return res
 
-    lexer = shlex.shlex(args, posix=True)
-    lexer.whitespace = ","
-    lexer.whitespace_split = True
-    lexer.commenters = ""
-    for k, v in (item.split("=", 1) for item in lexer):
+    for k, v in (item.split("=", 1) for item in _split_top_level_commas(args)):
         v = handle_cli_value_string(v)
+        if isinstance(v, str):
+            v = _strip_shell_quotes(v)
         if k in res:
             eval_logger.warning(f"Overwriting key '{k}': {res[k]!r} -> {v!r}")
         res[k] = v

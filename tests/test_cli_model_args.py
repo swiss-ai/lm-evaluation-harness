@@ -13,3 +13,35 @@ def test_key_val_to_dict_preserves_quoted_comma_in_extra_args():
         "extra_args": "--window-size (1024,0) --window-attn-skip-freq 2",
         "devices": 32,
     }
+
+
+def test_key_val_to_dict_keeps_quotes_inside_literals():
+    # e.g. evals-post-train's `--reasoning-effort medium` for gpt-oss
+    args = 'pretrained=m,chat_template_args={"reasoning_effort":"medium"},enable_thinking=True'
+
+    assert key_val_to_dict(args) == {
+        "pretrained": "m",
+        "chat_template_args": {"reasoning_effort": "medium"},
+        "enable_thinking": True,
+    }
+
+
+def test_key_val_to_dict_reads_quoted_lists_and_strings():
+    assert key_val_to_dict('stop=["\\n\\n"]') == {"stop": ["\n\n"]}
+    assert key_val_to_dict("stop=['a,b', 'c'],top_p=0.95") == {
+        "stop": ["a,b", "c"],
+        "top_p": 0.95,
+    }
+    assert key_val_to_dict('name="x, y"') == {"name": "x, y"}
+
+
+def test_key_val_to_dict_plain_values_unchanged():
+    assert key_val_to_dict(
+        "think_end_token=<|channel|>final<|message|>,max_gen_toks=8000,dtype=auto"
+    ) == {
+        "think_end_token": "<|channel|>final<|message|>",
+        "max_gen_toks": 8000,
+        "dtype": "auto",
+    }
+    # an unbalanced quote is kept as it is
+    assert key_val_to_dict("note=it's") == {"note": "it's"}
