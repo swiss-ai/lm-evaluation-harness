@@ -1112,14 +1112,15 @@ def test_describe_error_leaves_out_the_request_headers():
     assert api_models._describe_error(ValueError("boom")) == "ValueError('boom')"
 
 
-def test_failed_request_log_does_not_contain_the_api_key(caplog):
+def test_failed_request_log_does_not_contain_the_api_key(caplog, monkeypatch):
     api_key = "sk-test-key-123"
+    monkeypatch.setenv("OPENAI_API_KEY", api_key)
     failing_api = LocalCompletionsAPI(
         base_url="http://test-url.com",
         tokenizer_backend=None,
         model="test-model",
-        api_key=api_key,
     )
+    assert api_key in failing_api.header["Authorization"]
     from aiohttp import ClientResponseError
 
     session = MagicMock()
