@@ -155,6 +155,21 @@ def _special_tokens(tokenizer) -> set[str]:
 
 
 # utility class to keep track of json encoded chats
+def _describe_error(e: BaseException) -> str:
+    """``repr(e)`` without the request's headers.
+
+    aiohttp's ``ClientResponseError`` repr includes its ``request_info``, headers
+    among them: the ``Authorization`` bearer token would land in the logs.
+    """
+    request_info = getattr(e, "request_info", None)
+    if request_info is None:
+        return repr(e)
+    return (
+        f"{type(e).__name__}(status={getattr(e, 'status', None)}, "
+        f"message={getattr(e, 'message', '')!r}, url={request_info.real_url})"
+    )
+
+
 class JsonChatStr(NamedTuple):
     prompt: str
 
@@ -763,7 +778,7 @@ class TemplateAPI(TemplateLM):
         # If the retries also fail
         except BaseException as e:
             eval_logger.error(
-                f"Exception:{e!r}, {locals().get('outputs', '(no outputs)')}, retrying."
+                f"Exception:{_describe_error(e)}, {locals().get('outputs', '(no outputs)')}, retrying."
             )
             raise
         finally:
