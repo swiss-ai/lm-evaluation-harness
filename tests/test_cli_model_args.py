@@ -73,5 +73,11 @@ def test_key_val_to_dict_reads_shell_quoted_literals():
     assert key_val_to_dict("""chat_template_args='{"reasoning_effort":"low"}'""") == {
         "chat_template_args": {"reasoning_effort": "low"}
     }
+    assert key_val_to_dict('chat_template_args={\\"enable_thinking\\":false}') == {
+        "chat_template_args": {"enable_thinking": False}
+    }
+    assert key_val_to_dict('chat_template_args={"enable_thinking":false}') == {
+        "chat_template_args": {"enable_thinking": False}
+    }
     # a quoted number or word stays a string
     assert key_val_to_dict("""a='5',b="x" """.strip()) == {"a": "5", "b": "x"}
