@@ -8,6 +8,7 @@ Apertus_2_instruct directory to run the real-artifact checks too.
 import json
 import os
 import sys
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
@@ -113,6 +114,7 @@ def make(artifact, **kwargs):
 
 
 def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
+    # Like the evaluator: a multi-turn episode's requests carry it as repeat index.
     return Instance(
         request_type="generate_until",
         doc={},
@@ -120,7 +122,15 @@ def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
         idx=0,
         metadata=(task, doc, 1),
         episode=episode,
+        repeat_index=episode,
     )
+
+
+def attempts(request, count):
+    """A single-turn document's repeats: copies sharing the context object."""
+    return [
+        replace(request, repeat_index=index, length_info=[]) for index in range(count)
+    ]
 
 
 def native(enc, *items):
@@ -171,7 +181,13 @@ def run(model, instances, responses):
             raise reply
         return reply(payload) if callable(reply) else reply
 
-    with patch.object(model, "_post", side_effect=post):
+    async def apost(session, payload):
+        return post(payload)
+
+    with (
+        patch.object(model, "_post", side_effect=post),
+        patch.object(model, "_apost", side_effect=apost),
+    ):
         result = model.generate_until(instances)
     return result, sent
 
@@ -854,10 +870,11 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
 
 
 @pytest.mark.parametrize("num_concurrent", [1, 2])
-def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
+@pytest.mark.parametrize("temperature", [0, 0.8])
+def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperature):
     # A seeded server returns one sample for all of a document's repeats (pass@k,
-    # maj@k) unless each has its own seed: single-turn repeats are one request
-    # object, multi-turn episodes one each (numbered), and a retry keeps its seed.
+    # maj@k) unless each has its own seed: single-turn repeats share one context
+    # object, multi-turn episodes have one each, and a retry keeps its seed.
     model = make(synthetic, num_concurrent=num_concurrent)
     seeds, failed = [], []
 
@@ -871,14 +888,17 @@ def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent):
     async def server_async(session, payload):
         return server(payload)
 
-    repeated = chat_request(QUESTION)
-    episodes = [chat_request(QUESTION, doc=1, episode=k) for k in range(2)]
+    repeated = chat_request(QUESTION, temperature=temperature)
+    episodes = [
+        chat_request(QUESTION, doc=1, episode=k, temperature=temperature)
+        for k in range(2)
+    ]
     with (
         patch.object(model, "_post", side_effect=server),
         patch.object(model, "_apost", side_effect=server_async),
     ):
         model.generate_until(
-            [repeated] * 3 + episodes + [chat_request(QUESTION, doc=2)]
+            attempts(repeated, 3) + episodes + [chat_request(QUESTION, doc=2)]
         )
     assert failed
     assert sorted(seeds) == [1234, 1234, 1234, 1235, 1235, 1236]
@@ -909,14 +929,18 @@ def test_episodes_keep_their_own_reasoning(synthetic, shared):
         assert f"think<|hdr|>think {payload['seed']}<|/out|>" in payload["prompt"]
 
 
-def test_task_seed_is_the_base_and_none_is_unseeded(synthetic):
-    model = make(synthetic)
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+@pytest.mark.parametrize("temperature", [0, 0.8])
+def test_task_seed_is_the_base_and_none_is_unseeded(
+    synthetic, num_concurrent, temperature
+):
+    model = make(synthetic, num_concurrent=num_concurrent)
     enc = model.encoding
-    seeded = chat_request(QUESTION, seed=7)
-    _, sent = run(model, [seeded] * 2, [answer(enc, lib.Reply(payload="A"))] * 2)
+    seeded = chat_request(QUESTION, seed=7, temperature=temperature)
+    _, sent = run(model, attempts(seeded, 2), [answer(enc, lib.Reply(payload="A"))] * 2)
     assert sorted(payload["seed"] for payload in sent) == [7, 8]
     reply = enc.encode_text(" B.") + [enc.controls.output_end]
-    unseeded = chat_request(PREFILLED, until=["."], seed=None)
+    unseeded = chat_request(PREFILLED, until=["."], seed=None, temperature=temperature)
     responses = [phase_one(enc), completion(enc, reply, stop=enc.controls.wait)]
     result, sent = run(model, [unseeded], responses)
     assert result == [" B"]  # the after_think continuation ran
@@ -997,3 +1021,12 @@ def test_evaluate_prefill_task_end_to_end(synthetic):
     assert f"<|out|>reply<|hdr|>{PREFIX} A<|/out|><|wait|>" in prompt
     sample = results["samples"]["toy_prefill"][0]
     assert sample["length_info"][0][-1]["apertus2_prefill_mode"] == "after_think"
+
+
+def test_explicit_attempt_identity_survives_reordering(synthetic):
+    model = make(synthetic)
+    requests = [chat_request(QUESTION, seed=7, temperature=0.8) for _ in range(3)]
+    for request, index in zip(requests, [2, 0, 1], strict=True):
+        request.repeat_index = index
+    _, sent = run(model, requests, [answer(model.encoding, lib.Reply(payload="A"))] * 3)
+    assert [payload["seed"] for payload in sent] == [9, 7, 8]

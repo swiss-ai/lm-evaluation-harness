@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import TypedDict
 
+from lm_eval import repeats as repeat_scoring_utils
 from lm_eval.api.metrics import (
     mean,
     stderr_for_metric,
@@ -171,6 +172,8 @@ class EvalAcc:
     # Original vs effective sample counts per task
     n_samples: dict[str, _SampleCount] = field(default_factory=dict)
 
+    repeat_results: dict[str, list[dict]] = field(default_factory=dict)
+
     # All groups (for aggregation and formatting)
     groups: dict[str, Group] = field(default_factory=dict)
 
@@ -221,6 +224,67 @@ class EvalAcc:
             "higher_is_better": dict(sorted(higher_is_better.items())),
             "n-samples": dict(self.n_samples),
         }
+        if self.repeat_results:
+            results_dict["repeat_protocols"] = {
+                name: {
+                    "version": 1,
+                    "repeats": len(values),
+                    "policy": self.configs[name]["repeat_scoring"],
+                    "metrics": self.configs[name]["repeat_support"],
+                    "documents": self.metrics[name]["sample_len"],
+                }
+                for name, values in self.repeat_results.items()
+            }
+            for group in all_groups:
+                leaves = group.get_all_tasks()
+                if not leaves or not all(
+                    t.task_name in self.repeat_results for t in leaves
+                ):
+                    continue
+                metrics = task_data.get(group.name, {})
+                mean_enabled = any("_mean_repeats," in key for key in metrics)
+                passes = {}
+                for key in metrics:
+                    metric, separator, tail = key.partition("_pass@")
+                    if separator and tail.split(",")[0].isdigit():
+                        passes.setdefault(metric, set()).add(int(tail.split(",")[0]))
+                # One k per metric, however many filters the group aggregates.
+                passes = {metric: sorted(ks) for metric, ks in passes.items()}
+                if not mean_enabled and not passes:
+                    continue
+                budgets = {
+                    t.task_name: len(self.repeat_results[t.task_name]) for t in leaves
+                }
+                counts = sorted(set(budgets.values()))
+                results_dict["repeat_protocols"][group.name] = {
+                    "version": 1,
+                    "repeats": counts[0] if len(counts) == 1 else counts,
+                    "per_task_repeats": budgets,
+                    "metric_tasks": {
+                        key: [
+                            t.task_name for t in leaves if key in task_data[t.task_name]
+                        ]
+                        for key in metrics
+                        if ("_mean_repeats," in key or "_pass@" in key)
+                        and "_stderr," not in key
+                    },
+                    "policy": {
+                        "enabled": True,
+                        "mean": mean_enabled,
+                        "pass_at_k": passes,
+                    },
+                }
+            results_dict["repeat_results"] = [
+                {
+                    "repeat_index": i,
+                    "results": {
+                        name: values[i]
+                        for name, values in self.repeat_results.items()
+                        if i < len(values)
+                    },
+                }
+                for i in range(max(map(len, self.repeat_results.values())))
+            ]
         if samples is not None:
             results_dict["samples"] = dict(samples)
 
@@ -231,6 +295,7 @@ def _compute_task_aggregations(
     task: Task,
     raw_metrics: dict[tuple[str, str], list],
     bootstrap_iters: int | None = 100000,
+    repeat_results: list[dict] | None = None,
 ) -> tuple[dict[str, Any], int]:
     """
     Compute aggregated metrics from raw per-sample metrics.
@@ -246,7 +311,23 @@ def _compute_task_aggregations(
     agg_metrics: dict[str, Any] = {}
     sample_len = 0
 
+    repeat_metrics = (
+        task.get_config("repeat_support") if repeat_scoring_utils.enabled(task) else {}
+    )
     for (metric, filter_key), items in raw_metrics.items():
+        if metric in repeat_metrics:
+            values, per_repeat = repeat_scoring_utils.aggregate_metric(
+                task, metric, items
+            )
+            for key, value in values.items():
+                agg_metrics[f"{key},{filter_key}"] = value
+                agg_metrics[f"{key}_stderr,{filter_key}"] = "N/A"
+            if repeat_results is not None:
+                for index, value in enumerate(per_repeat):
+                    repeat_results[index][f"{metric},{filter_key}"] = value
+            sample_len = max(sample_len, len(items))
+            continue
+
         try:
             agg_fn = task.aggregation()[metric]  # type: ignore[index]
         except KeyError:
@@ -306,9 +387,16 @@ def _collect_results(
 
         # Compute aggregated metrics
         # TODO: note: currently assume all metrics are scalar-valued
-        agg_metrics, sample_len = _compute_task_aggregations(
-            task, acc["raw_metrics"], bootstrap_iters
+        per_repeat = (
+            [{} for _ in range(task.get_config("repeats"))]
+            if repeat_scoring_utils.enabled(task)
+            else None
         )
+        agg_metrics, sample_len = _compute_task_aggregations(
+            task, acc["raw_metrics"], bootstrap_iters, per_repeat
+        )
+        if per_repeat is not None:
+            result.repeat_results[task_name] = per_repeat
 
         # Get task config
         task_config = dict(task.dump_config())
@@ -322,7 +410,15 @@ def _collect_results(
         result.configs[task_name] = task_config
         result.versions[task_name] = task.VERSION
         result.num_fewshot[task_name] = task_config.get("num_fewshot", 0)
-        result.higher_is_better[task_name] = task.higher_is_better()
+        directions = dict(task.higher_is_better())
+        if per_repeat is not None:
+            policy = task.get_config("repeat_scoring")
+            for metric in task.get_config("repeat_support"):
+                if policy["mean"]:
+                    directions[f"{metric}_mean_repeats"] = directions.get(metric)
+                for k in policy["pass_at_k"].get(metric, []):
+                    directions[f"{metric}_pass@{k}"] = directions.get(metric)
+        result.higher_is_better[task_name] = directions
         result.samples[task_name] = acc["logged_samples"]
 
         # Compute n_samples: effective comes from sample_len (actual evaluated count)
@@ -354,7 +450,8 @@ def aggregate_groups(
 
     for group in all_groups:
         # Each group aggregates its own metrics from leaf tasks
-        results.metrics[group.name] = group.aggregate(results.metrics)
+        scored_group = repeat_scoring_utils.scoring_group(group)
+        results.metrics[group.name] = scored_group.aggregate(results.metrics)
         # Set group version from metadata if available
         results.versions[group.name] = group.version
 

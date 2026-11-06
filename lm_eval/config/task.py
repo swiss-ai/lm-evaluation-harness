@@ -119,6 +119,9 @@ class TaskConfig(dict):
     output_type: OutputType = "generate_until"
     generation_kwargs: dict | None = None
     repeats: int = 1
+    repeat_support: dict | None = None
+    repeat_scoring: dict | None = None
+    repeat_filter: str | None = None
     filter_list: str | list | None = None
     should_decontaminate: bool = False
     doc_to_decontamination_query: str | None = None
@@ -141,7 +144,7 @@ class TaskConfig(dict):
 
             if "until" not in self.generation_kwargs:
                 eval_logger.warning(
-                    f"{self.task}: No `until` specified in `generation_kwargs`! Defaulting to the fewshot_delimiter={repr(self.fewshot_delimiter)}"
+                    f"{self.task}: No `until` specified in `generation_kwargs`! Defaulting to the fewshot_delimiter={self.fewshot_delimiter!r}"
                 )
                 self.generation_kwargs["until"] = [self.fewshot_delimiter]
         else:

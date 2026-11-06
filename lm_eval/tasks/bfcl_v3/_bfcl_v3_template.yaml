@@ -17,3 +17,6 @@ generation_kwargs:
   do_sample: false
 metadata:
   version: 3
+repeat_support:
+  acc: binary
+  acc_lenient: binary

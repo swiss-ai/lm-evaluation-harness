@@ -21,3 +21,5 @@ fewshot_config:
   samples: !function utils.list_fewshot_samples
 metadata:
   version: 1.0
+repeat_support:
+  pass_at_1: binary

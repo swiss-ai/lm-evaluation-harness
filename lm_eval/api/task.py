@@ -387,6 +387,7 @@ class Task(abc.ABC):
             else ""
         )
         cache_key += f"-tokenizer{tokenizer_name}"
+        cache_key += f"-repeats{self.config.repeats}"
 
         cached_instances = load_from_cache(file_name=cache_key, cache=cache_requests)
 
@@ -733,7 +734,11 @@ class ConfigurableTask(Task):
 
         # Use new configurations if there was no preconfiguration
         if self.config is None:
-            self._config = TaskConfig(**config)
+            self._config = (
+                deepcopy(config)
+                if isinstance(config, TaskConfig)
+                else TaskConfig(**config)
+            )
         # Overwrite configs
         else:
             if config is not None:

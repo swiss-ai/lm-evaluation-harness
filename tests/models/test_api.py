@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -884,6 +885,56 @@ def test_parse_logprobs_without_tokens_slices_from_ctxlen():
     assert logprob == -7.0
 
 
+class _InfoAPI(LocalCompletionsAPI):
+    """Returns Generations carrying backend metadata, as Apertus 2 does."""
+
+    def parse_generations(self, outputs, **kwargs):
+        from lm_eval.models.api_models import Generation
+
+        texts = super().parse_generations(outputs, **kwargs)
+        tagged = []
+        for text in texts:
+            gen = Generation(text)
+            gen.generation_info = {"generation_custom": 1, "note": text}
+            tagged.append(gen)
+        return tagged
+
+
+@pytest.mark.parametrize("num_concurrent", [1, 2])
+def test_generation_info_reaches_length_info(num_concurrent):
+    from lm_eval.api.instance import Instance
+
+    model = _InfoAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        num_concurrent=num_concurrent,
+    )
+    instance = Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=("Question?", {"until": []}),
+        idx=0,
+    )
+    outputs = {"choices": [{"index": 0, "text": "42", "finish_reason": "length"}]}
+
+    async def send_async(session, payload):
+        return outputs
+
+    with (
+        patch.object(model, "_send", return_value=outputs) as send,
+        patch.object(model, "_asend", side_effect=send_async) as send_concurrent,
+    ):
+        result = model.generate_until([instance])
+    assert result == ["42"]
+    info = instance.length_info[0]
+    assert info["generation_custom"] == 1
+    assert info["note"] == "42"
+    assert info["generation_truncated"] == 1
+    assert send.called is (num_concurrent == 1)
+    assert send_concurrent.called is (num_concurrent > 1)
+
+
 def _seed_model(kind, concurrent=1, batch_size=1):
     factory = _chat_model if kind == "chat" else _thinking_api
     return factory(
@@ -895,6 +946,15 @@ def _seed_instance(model, prompt, kwargs):
     if isinstance(model, LocalChatCompletion):
         prompt = model.apply_chat_template([{"role": "user", "content": prompt}])
     return Instance("generate_until", {}, (prompt, kwargs), idx=0)
+
+
+def _attempts(instances, count):
+    """Repeat attempts as the evaluator sends them: one copy per repeat index."""
+    return [
+        replace(instance, repeat_index=index, length_info=[])
+        for index in range(count)
+        for instance in instances
+    ]
 
 
 def _run_seed_requests(
@@ -963,7 +1023,7 @@ def test_sampled_rollout_seeds(monkeypatch, kind, concurrent):
     short = _seed_instance(model, "short", kwargs)
     long = _seed_instance(model, "a much longer prompt", kwargs)
     twin = _seed_instance(model, "short", kwargs)  # Same text, distinct request.
-    instances = [short, long, twin] * 3
+    instances = _attempts([short, long, twin], 3)
     expected = [
         f"{prompt}:{1234 + rollout}"
         for rollout in range(3)
@@ -987,7 +1047,7 @@ def test_retry_keeps_the_same_rollout_seed(monkeypatch, concurrent):
     model = _seed_model("completions", concurrent)
     instance = _seed_instance(model, "prompt", {"temperature": 0.8})
     result, payloads = _run_seed_requests(
-        monkeypatch, model, [instance, instance], fail_first=True
+        monkeypatch, model, _attempts([instance], 2), fail_first=True
     )
     assert sorted(payload["seed"] for payload in payloads) == [1234, 1234, 1235]
     assert result == ["prompt:1234", "prompt:1235"]
@@ -1032,58 +1092,52 @@ def test_greedy_async_http_batching_is_unchanged(monkeypatch):
 def test_rollout_seed_overflow(monkeypatch):
     model = _seed_model("completions")
     instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
-    _, payloads = _run_seed_requests(monkeypatch, model, [instance, instance])
+    _, payloads = _run_seed_requests(monkeypatch, model, _attempts([instance], 2))
     assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
 
 
-class _InfoAPI(LocalCompletionsAPI):
-    """Returns Generations carrying backend metadata, as Apertus 2 does."""
+def test_cache_preserves_attempts_across_reordering_and_partial_resume(
+    monkeypatch, tmp_path
+):
+    from lm_eval.api.model import CachingLM
 
-    def parse_generations(self, outputs, **kwargs):
-        from lm_eval.models.api_models import Generation
-
-        texts = super().parse_generations(outputs, **kwargs)
-        tagged = []
-        for text in texts:
-            gen = Generation(text)
-            gen.generation_info = {"generation_custom": 1, "note": text}
-            tagged.append(gen)
-        return tagged
-
-
-@pytest.mark.parametrize("num_concurrent", [1, 2])
-def test_generation_info_reaches_length_info(num_concurrent):
-    from lm_eval.api.instance import Instance
-
-    model = _InfoAPI(
-        base_url="http://test-url.com",
-        model="test-model",
-        tokenizer_backend=None,
-        num_concurrent=num_concurrent,
+    model = _seed_model("completions", concurrent=3)
+    source = _seed_instance(model, "prompt", {"temperature": 0.8})
+    attempts = [replace(source, repeat_index=i, length_info=[]) for i in range(3)]
+    cached = CachingLM(model, str(tmp_path / "results.db"), cache_namespace="model-v1")
+    first, sent = _run_seed_requests(monkeypatch, cached, attempts)
+    assert first == ["prompt:1234", "prompt:1235", "prompt:1236"]
+    assert len(sent) == 3
+    second, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
+    assert second == first[::-1] and not sent
+    key = next(
+        key for key in cached.dbdict if cached.dbdict[key]["response"] == "prompt:1235"
     )
-    instance = Instance(
-        request_type="generate_until",
-        doc={},
-        arguments=("Question?", {"until": []}),
-        idx=0,
-    )
-    outputs = {"choices": [{"index": 0, "text": "42", "finish_reason": "length"}]}
+    del cached.dbdict[key]
+    third, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
+    assert third == first[::-1]
+    assert [p["seed"] for p in sent] == [1235]
+    cached.cache_namespace = "model-v2"
+    _, sent = _run_seed_requests(monkeypatch, cached, attempts)
+    assert len(sent) == 3
 
-    async def send_async(session, payload):
-        return outputs
 
-    with (
-        patch.object(model, "_send", return_value=outputs) as send,
-        patch.object(model, "_asend", side_effect=send_async) as send_concurrent,
-    ):
-        result = model.generate_until([instance])
-    assert result == ["42"]
-    info = instance.length_info[0]
-    assert info["generation_custom"] == 1
-    assert info["note"] == "42"
-    assert info["generation_truncated"] == 1
-    assert send.called is (num_concurrent == 1)
-    assert send_concurrent.called is (num_concurrent > 1)
+def test_greedy_repeats_keep_their_seed_and_stay_batched(monkeypatch):
+    model = _seed_model("completions", concurrent=3, batch_size=2)
+    source = _seed_instance(model, "prompt", {"temperature": 0, "seed": 77})
+    result, payloads = _run_seed_requests(monkeypatch, model, _attempts([source], 4))
+    assert result == ["prompt:77"] * 4
+    assert [len(payload["prompt"]) for payload in payloads] == [2, 2]
+
+
+def test_explicit_episode_seeds(monkeypatch):
+    model = _seed_model("chat", concurrent=2)
+    source = _seed_instance(model, "prompt", {"temperature": 0.8})
+    episodes = [
+        replace(source, episode=i, repeat_index=i, length_info=[]) for i in (2, 0)
+    ]
+    _, sent = _run_seed_requests(monkeypatch, model, episodes)
+    assert [p["seed"] for p in sent] == [1236, 1234]
 
 
 def _unauthorized_error(api_key: str):

@@ -22,3 +22,6 @@ generation_kwargs:
   until: []
 metadata:
   version: 1.0
+repeat_support:
+  length_controlled_winrate: native
+  avg_word_count: mean

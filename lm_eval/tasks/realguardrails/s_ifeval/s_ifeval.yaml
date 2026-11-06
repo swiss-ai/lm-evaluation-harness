@@ -38,3 +38,8 @@ metadata:
   # warns if the model is run without the system-prompt authority check.
   requires_system_prompt_authority: true
   version: 0.1
+repeat_support:
+  prompt_level_strict_acc: binary
+  inst_level_strict_acc: native
+  prompt_level_loose_acc: binary
+  inst_level_loose_acc: native

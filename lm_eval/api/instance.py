@@ -31,6 +31,7 @@ class Instance:
     # Which of a multi-turn document's `repeats` episodes sent this request
     # (evaluator.run_multi_turn_rollout); 0 otherwise.
     episode: int = 0
+    repeat_index: int | None = None
 
     # initialized after init
     task_name: str | None = None
