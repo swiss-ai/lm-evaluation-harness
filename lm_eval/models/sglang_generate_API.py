@@ -1,4 +1,3 @@
-# ruff: noqa: N999
 from lm_eval.api.registry import register_model
 from lm_eval.models.openai_completions import LocalCompletionsAPI
 from lm_eval.models.utils import handle_stop_sequences
@@ -6,8 +5,6 @@ from lm_eval.models.utils import handle_stop_sequences
 
 @register_model("sglang-generate")
 class SGLANGGENERATEAPI(LocalCompletionsAPI):
-    repeat_seed_support = "request-seed"
-
     def __init__(
         self,
         base_url=None,
@@ -41,7 +38,6 @@ class SGLANGGENERATEAPI(LocalCompletionsAPI):
                     "max_new_tokens": max_tokens,
                     "temperature": temperature,
                     "stop": stop,
-                    **({"sampling_seed": seed} if seed is not None else {}),
                     **gen_kwargs,
                 },
             }
@@ -63,8 +59,8 @@ class SGLANGGENERATEAPI(LocalCompletionsAPI):
     @staticmethod
     def parse_logprobs(
         outputs: dict | list[dict],
-        tokens: list[list[int]] | None = None,
-        ctxlens: list[int] | None = None,
+        tokens: list[list[int]] = None,
+        ctxlens: list[int] = None,
         **kwargs,
     ) -> list[tuple[float, bool]]:
         res = []

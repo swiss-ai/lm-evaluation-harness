@@ -125,7 +125,7 @@ def _score(response: str, gold_answer: str, solution: str) -> tuple[int, int]:
     em = 1 if answer and is_equiv(answer, gold_answer) else 0
     try:
         mv = 1 if verify(gold=_parse_gold(solution), target=parse(response)) else 0
-    except Exception:  # noqa: BLE001 - Invalid model answers score zero.
+    except Exception:
         mv = 0
     return em, mv
 
@@ -178,24 +178,24 @@ class MajorityVoteFilter:
 
 
 class PassAtKFilter:
-    """Keep each grader's any-correct result when their winning answers differ."""
+    """pass@k: returns a correct response if any of the k exists, else the first.
+    With n == k this is the unbiased pass@k. Chain a ``take_first`` after this filter.
+
+    A response correct under *both* exact_match and math_verify is preferred, so
+    that both reported metrics are a true pass@k whenever one response satisfies
+    both; otherwise exact_match wins the tie-break."""
 
     def __init__(self, **kwargs) -> None:
         pass
 
     def apply(self, resps, docs):
-        results = []
-        for responses, doc in zip(resps, docs, strict=True):
-            scores = [_score_doc(response, doc) for response in responses]
-            results.append(
-                [
-                    {
-                        "exact_match": max(em for em, _ in scores),
-                        "math_verify": max(mv for _, mv in scores),
-                    }
-                ]
-            )
-        return results
+        def select(resp_list, doc):
+            # `max` keeps the first maximal element, so an all-wrong set of samples
+            # falls back to the first response.
+            scored = [(_score_doc(resp, doc), resp) for resp in resp_list]
+            return max(scored, key=lambda item: (sum(item[0]), item[0][0]))[1]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
 
 
 def process_results_sc(doc: dict, results: list) -> dict[str, float]:
@@ -207,8 +207,6 @@ def process_results_sc(doc: dict, results: list) -> dict[str, float]:
     ``process_results``.
     """
     response = results[0]
-    if isinstance(response, dict):
-        return response
     responses = list(response) if isinstance(response, list) else [response]
 
     scores = [_score_doc(cand, doc) for cand in responses]
@@ -311,7 +309,7 @@ def is_equiv(x1: str, x2: str) -> bool:
     except ImportError as e:
         eval_logger.error(e)
         raise
-    except Exception as e:  # noqa: BLE001 - Symbolic solvers raise varied exceptions.
+    except Exception as e:
         eval_logger.debug(f"Failed comparing {x1} and {x2} with {e}")
         return False
 
