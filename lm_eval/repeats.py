@@ -167,6 +167,14 @@ def check_scope(tasks, groups, lm):
             "local-chat-completions, apertus2-completions and other TemplateAPI "
             f"models); requested for {', '.join(scored[:5])}"
         )
+    for name in scored:
+        count = tasks[name].get_config("repeats")
+        gen_kwargs = tasks[name].get_config("generation_kwargs") or {}
+        if count > 1 and float(gen_kwargs.get("temperature") or 0) == 0:
+            eval_logger.warning(
+                f"{name}: {count} repeats with greedy decoding (temperature 0) "
+                "give near-identical attempts"
+            )
     for group in groups.values():
         if not group.aggregate_metric_list or not any(
             enabled(task) for task in group.get_all_tasks()
