@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -897,6 +898,15 @@ def _seed_instance(model, prompt, kwargs):
     return Instance("generate_until", {}, (prompt, kwargs), idx=0)
 
 
+def _attempts(instances, count):
+    """Repeat attempts as the evaluator sends them: one copy per repeat index."""
+    return [
+        replace(instance, repeat_index=index, length_info=[])
+        for index in range(count)
+        for instance in instances
+    ]
+
+
 def _run_seed_requests(
     monkeypatch, model, instances, fail_first=False, assert_concurrent=False
 ):
@@ -963,7 +973,7 @@ def test_sampled_rollout_seeds(monkeypatch, kind, concurrent):
     short = _seed_instance(model, "short", kwargs)
     long = _seed_instance(model, "a much longer prompt", kwargs)
     twin = _seed_instance(model, "short", kwargs)  # Same text, distinct request.
-    instances = [short, long, twin] * 3
+    instances = _attempts([short, long, twin], 3)
     expected = [
         f"{prompt}:{1234 + rollout}"
         for rollout in range(3)
@@ -987,7 +997,7 @@ def test_retry_keeps_the_same_rollout_seed(monkeypatch, concurrent):
     model = _seed_model("completions", concurrent)
     instance = _seed_instance(model, "prompt", {"temperature": 0.8})
     result, payloads = _run_seed_requests(
-        monkeypatch, model, [instance, instance], fail_first=True
+        monkeypatch, model, _attempts([instance], 2), fail_first=True
     )
     assert sorted(payload["seed"] for payload in payloads) == [1234, 1234, 1235]
     assert result == ["prompt:1234", "prompt:1235"]
@@ -1032,7 +1042,7 @@ def test_greedy_async_http_batching_is_unchanged(monkeypatch):
 def test_rollout_seed_overflow(monkeypatch):
     model = _seed_model("completions")
     instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
-    _, payloads = _run_seed_requests(monkeypatch, model, [instance, instance])
+    _, payloads = _run_seed_requests(monkeypatch, model, _attempts([instance], 2))
     assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
 
 
@@ -1142,8 +1152,6 @@ def test_failed_request_log_does_not_contain_the_api_key(caplog, monkeypatch):
 def test_cache_preserves_attempts_across_reordering_and_partial_resume(
     monkeypatch, tmp_path
 ):
-    from dataclasses import replace
-
     from lm_eval.api.model import CachingLM
 
     model = _seed_model("completions", concurrent=3)
@@ -1167,16 +1175,18 @@ def test_cache_preserves_attempts_across_reordering_and_partial_resume(
     assert len(sent) == 3
 
 
-def test_forced_sampling_and_explicit_episode_seeds(monkeypatch):
-    from dataclasses import replace
+def test_greedy_single_attempts_stay_batched(monkeypatch):
+    model = _seed_model("completions", concurrent=3, batch_size=2)
+    source = _seed_instance(model, "prompt", {"temperature": 0, "seed": 77})
+    # The evaluator gives every request a repeat index, 0 for a single attempt.
+    attempts = [replace(source, repeat_index=0, length_info=[]) for _ in range(4)]
+    _, payloads = _run_seed_requests(monkeypatch, model, attempts)
+    assert [len(payload["prompt"]) for payload in payloads] == [2, 2]
 
-    from lm_eval.models.openai_completions import OpenAIChatCompletion
 
-    monkeypatch.setenv("OPENAI_API_KEY", "test")
-    model = OpenAIChatCompletion(model="o3", num_concurrent=2, max_retries=1)
-    source = _seed_instance(model, "prompt", {"temperature": 0})
-    _, sent = _run_seed_requests(monkeypatch, model, [source, source])
-    assert [(p["temperature"], p["seed"]) for p in sent] == [(1, 1234), (1, 1235)]
+def test_explicit_episode_seeds(monkeypatch):
+    model = _seed_model("chat", concurrent=2)
+    source = _seed_instance(model, "prompt", {"temperature": 0.8})
     episodes = [
         replace(source, episode=i, repeat_index=i, length_info=[]) for i in (2, 0)
     ]

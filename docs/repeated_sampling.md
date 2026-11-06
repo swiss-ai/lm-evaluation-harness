@@ -1,8 +1,13 @@
 # Repeated sampling
 
-Repeated scoring is opt-in and independent of the model backend. The harness
-creates `m` attempts, runs the task's extraction and grader on each, then reduces
-the scores. `repeats` alone retains the task's legacy scoring behavior.
+Repeated scoring is opt-in and supported for API models: `apertus2-completions`
+and the other TemplateAPI models (`local-completions`, `local-chat-completions`,
+`openai-completions`, `openai-chat-completions`, LiteLLM). They send every
+attempt as its own request with an offset seed (`anthropic-chat` and
+`sglang-generate` send no seed). Local backends (HF, vLLM, SGLang, Megatron)
+and API adapters outside TemplateAPI are rejected before any request. The harness creates `m` attempts, runs the task's
+extraction and grader on each, then reduces the scores. `repeats` alone retains
+the task's legacy scoring behavior.
 
 ## Configuration
 
@@ -41,14 +46,30 @@ output_path: results/repeated
 
 `--repeats`, `--repeat_scoring` and `--task_overrides` are also CLI options;
 the latter two take JSON objects. `simple_evaluate` accepts the same Python
-arguments. Task YAML can supply `repeats` and `repeat_scoring` defaults.
+arguments. Task YAML can supply `repeats` and `repeat_scoring` defaults. The
+run-level `repeat_scoring` applies to generative tasks that declare
+`repeat_support` and score one attempt at a time (no multi-sample filter, or a
+`repeat_filter` that selects a single-attempt one), except the tasks of a group
+that aggregates over a task that does not; the others keep ordinary scoring, so
+mixed suites run. Its
+`pass_at_k` applies to the binary metrics each task declares; without `mean`,
+tasks that declare none of them keep ordinary scoring. A run-level
+`repeats` applies to the tasks it repeat-scores, or to all generative tasks when
+it does not enable repeat scoring (legacy repeats). Other tasks keep their own
+count unless a task override sets one.
 
 Precedence is per-task override, run policy, task default. Missing policy fields
 inherit; an explicit `pass_at_k` map replaces the whole inherited map, including
 `{}` to clear it. CLI fields override run-file fields. Overrides name selected
 leaf tasks after group expansion. Unknown names, unsupported tasks, invalid
-counts and nonbinary pass metrics fail before generation. `enabled: false`
-selects legacy scoring and keeps the resolved repeat count.
+counts, nonbinary pass metrics, `predict_only` and non-API models fail before
+generation, and so does a group aggregate that only some of its tasks
+repeat-score (enable repeat scoring for all of a group's tasks or none). As
+for ordinary groups, a group aggregates each metric over the tasks that report
+it, and each filter covers the tasks that define it, which must all select it
+for repeats; a warning before generation names a group metric that this leaves
+without a filter.
+`enabled: false` selects legacy scoring and keeps the resolved repeat count.
 
 Task authors declare capabilities, which runs cannot override:
 
@@ -79,10 +100,9 @@ required. An unavailable native score remains NaN; repeats are never dropped.
   Majority voting remains a task-specific legacy mode.
 - `repeat_results` contains scalar task scores by repeat index, even with sample
   logging disabled. Tasks with fewer repeats are absent from later indices.
-- `repeat_protocols` records version, policy, capabilities, budgets, completed
-  attempts and available provider sampling/seed metadata. Group protocols include
-  leaf budgets and metric contributors. Incompatible policies or filters cannot
-  silently remove expected contributors from a reported group score.
+- `repeat_protocols` records version, policy, capabilities, repeats, documents,
+  whether the task samples (temperature above 0) and provider seed support.
+  Group protocols include leaf budgets and metric contributors.
 - Sample logs retain raw/filtered responses and score lists ordered by
   `repeat_indices`. Existing private-dataset redaction still applies. Generation
   lengths, truncation and parsing diagnostics retain their existing aggregation.
@@ -92,37 +112,28 @@ required. An unavailable native score remains NaN; repeats are never dropped.
 Greedy repeats do not become independent samples merely because seeds differ.
 Set decoding settings explicitly and compare protocols with the same prompt,
 reasoning budget, grader and temperature. Provider seed support does not guarantee
-bit-for-bit replay. OpenAI reasoning adapters record their forced sampling mode.
+bit-for-bit replay.
 
 ## API support and validation
 
-All registered API paths use the same scorer. The following coverage is offline;
-no live provider or served Apertus checkpoint has been certified for this change.
+The supported API paths share one scorer. The following coverage is offline;
+no live provider has been certified for this change.
 
 | Backend | Attempt/seed behavior | Offline evidence |
 | --- | --- | --- |
-| Apertus 2 completions | Explicit episode identity; one seed offset; native reasoning replay | Synthetic native format, sync/async, retries, reordered attempts, multi-turn |
-| Local/OpenAI completions and chat | Attempt seed before batching; retries keep it | Mock HTTP, concurrency, cache hits/partial resume and forced sampling |
-| Azure OpenAI chat | Shared HTTP path, forwarded sampling/concurrency; `api-key` auth | Constructor and payload regression; shared transport tests |
+| Apertus 2 completions | Seed offset by repeat index in its own payload; native reasoning replay | Synthetic native format, sync/async, retries, multi-turn |
+| Local/OpenAI completions and chat | Seed offset by repeat index before batching; retries keep it; requests with one seed stay batched | Mock HTTP, concurrency, cache hits/partial resume |
 | LiteLLM chat | Shared attempt identity; SDK may drop unsupported seed parameters | Mock SDK sync/async dispatch |
-| Anthropic chat/completions | Independent requests; no seed support | Block extraction and bounded retry tests; payload review |
-| SGLang HTTP | Maps request seed to `sampling_seed` | Payload regression; shared transport tests |
-| GGUF | Uses task seed if supplied; one call per attempt | Reordered request and parameter regression |
-| TextSynth | Uses task seed if supplied; zero means unseeded | Reordered request and parameter regression |
-| Watsonx | Maps seed to `random_seed`; preserves model defaults | Mock text dispatch and task-parameter regression |
 
-The Azure header follows the [Azure OpenAI REST reference](https://learn.microsoft.com/en-us/azure/foundry/openai/latest).
 Provider-specific model availability, accepted sampling fields and reasoning
-formats still require an endpoint smoke test. HF/vLLM/native backends can use the
-scorer for eligible tasks, but are outside this API certification milestone.
+formats still require an endpoint smoke test.
 
-Response caching is opt-in for stateless API adapters, keyed by model namespace,
-task/document/repeat/turn identity and request arguments. Legacy argument-only
-completion entries are not reused. Apertus's stateful generation and native
-backends bypass response caching. Request caches include task/generation policy,
-repeat count, renderer/template arguments, dataset fingerprints and few-shot seed.
-Retries do not consume a new attempt. Exhausted transport errors, missing
-responses and incomplete response counts fail the evaluation.
+API generations are cached per attempt when generation returns, keyed by model namespace,
+task/document/repeat/turn identity and request arguments; Apertus 2 and models
+passed as objects are not cached. Other models keep the prompt-keyed caching of
+greedy generations. Missing attempts are not cached; empty answers are. The
+request cache key includes the repeat count. Retries do not consume a new
+attempt. A missing attempt of a repeat-scored task fails the evaluation.
 
 The thinking-suite configuration inventory covers all 560 leaf tasks in the
 post-training suite: knowledge/math, code, instruction following, multilingual,

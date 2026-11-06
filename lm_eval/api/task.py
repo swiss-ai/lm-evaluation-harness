@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import ast
-import json
 import logging
 import os
 import random
@@ -172,11 +171,7 @@ class Task(abc.ABC):
         self._fewshot_docs: list | None = None
         self._instances: list[Instance] | None = None
 
-        self._config: TaskConfig = (
-            deepcopy(config)
-            if isinstance(config, TaskConfig)
-            else TaskConfig(**(config or {}))
-        )
+        self._config: TaskConfig = TaskConfig({**config}) if config else TaskConfig()
 
         self._filters = [build_filter_ensemble("none", [["take_first", None]])]
         self.fewshot_rnd: random.Random | None = (
@@ -375,7 +370,6 @@ class Task(abc.ABC):
         fewshot_as_multiturn: bool = False,
         chat_template: Callable | None = None,
         tokenizer_name: str = "",
-        chat_template_cache_key: str | None = None,
     ) -> None:
         """Build a set of Instances for a task, and store them in task.instances"""
 
@@ -393,40 +387,7 @@ class Task(abc.ABC):
             else ""
         )
         cache_key += f"-tokenizer{tokenizer_name}"
-
-        cache_key += "-" + utils.hash_string(
-            json.dumps(
-                {
-                    "config": self.dump_config(),
-                    "template": getattr(
-                        getattr(
-                            getattr(chat_template, "__self__", None), "tokenizer", None
-                        ),
-                        "chat_template",
-                        None,
-                    ),
-                    "selected_template": chat_template_cache_key,
-                    "template_args": getattr(
-                        getattr(chat_template, "__self__", None),
-                        "chat_template_args",
-                        None,
-                    ),
-                    "renderer": type(
-                        getattr(chat_template, "__self__", None)
-                    ).__qualname__,
-                    "samples": samples,
-                    "fewshot_seed": getattr(self, "fewshot_seed", None),
-                    "dataset_fingerprints": {
-                        split: getattr(dataset, "_fingerprint", None)
-                        for split, dataset in (
-                            getattr(self, "dataset", None) or {}
-                        ).items()
-                    },
-                },
-                sort_keys=True,
-                default=utils.handle_non_serializable,
-            )
-        )
+        cache_key += f"-repeats{self.config.repeats}"
 
         cached_instances = load_from_cache(file_name=cache_key, cache=cache_requests)
 
@@ -699,7 +660,6 @@ class Task(abc.ABC):
         self._config["process_results"] = "process_results"
 
     def set_fewshot_seed(self, seed: int | None = None) -> None:
-        self.fewshot_seed = seed
         self.fewshot_rnd = random.Random(seed)
         if hasattr(self, "sampler"):
             self.sampler.set_rnd(seed)
@@ -770,7 +730,7 @@ class ConfigurableTask(Task):
         config: dict | None = None,
     ) -> None:  # TODO no super() call here
         # Get pre-configured attributes
-        self._config = deepcopy(self.CONFIG)
+        self._config = self.CONFIG
 
         # Use new configurations if there was no preconfiguration
         if self.config is None:
@@ -782,9 +742,7 @@ class ConfigurableTask(Task):
         # Overwrite configs
         else:
             if config is not None:
-                self._config.__dict__.update(
-                    deepcopy(vars(config) if isinstance(config, TaskConfig) else config)
-                )
+                self._config.__dict__.update(config)
 
         if self.config is None:
             raise ValueError(

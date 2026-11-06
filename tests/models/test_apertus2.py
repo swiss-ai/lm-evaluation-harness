@@ -8,6 +8,7 @@ Apertus_2_instruct directory to run the real-artifact checks too.
 import json
 import os
 import sys
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
@@ -113,6 +114,7 @@ def make(artifact, **kwargs):
 
 
 def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
+    # Like the evaluator: a multi-turn episode's requests carry it as repeat index.
     return Instance(
         request_type="generate_until",
         doc={},
@@ -120,7 +122,15 @@ def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
         idx=0,
         metadata=(task, doc, 1),
         episode=episode,
+        repeat_index=episode,
     )
+
+
+def attempts(request, count):
+    """A single-turn document's repeats: copies sharing the context object."""
+    return [
+        replace(request, repeat_index=index, length_info=[]) for index in range(count)
+    ]
 
 
 def native(enc, *items):
@@ -863,8 +873,8 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
 @pytest.mark.parametrize("temperature", [0, 0.8])
 def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperature):
     # A seeded server returns one sample for all of a document's repeats (pass@k,
-    # maj@k) unless each has its own seed: single-turn repeats are one request
-    # object, multi-turn episodes one each (numbered), and a retry keeps its seed.
+    # maj@k) unless each has its own seed: single-turn repeats share one context
+    # object, multi-turn episodes have one each, and a retry keeps its seed.
     model = make(synthetic, num_concurrent=num_concurrent)
     seeds, failed = [], []
 
@@ -888,7 +898,7 @@ def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperatu
         patch.object(model, "_apost", side_effect=server_async),
     ):
         model.generate_until(
-            [repeated] * 3 + episodes + [chat_request(QUESTION, doc=2)]
+            attempts(repeated, 3) + episodes + [chat_request(QUESTION, doc=2)]
         )
     assert failed
     assert sorted(seeds) == [1234, 1234, 1234, 1235, 1235, 1236]
@@ -927,7 +937,7 @@ def test_task_seed_is_the_base_and_none_is_unseeded(
     model = make(synthetic, num_concurrent=num_concurrent)
     enc = model.encoding
     seeded = chat_request(QUESTION, seed=7, temperature=temperature)
-    _, sent = run(model, [seeded] * 2, [answer(enc, lib.Reply(payload="A"))] * 2)
+    _, sent = run(model, attempts(seeded, 2), [answer(enc, lib.Reply(payload="A"))] * 2)
     assert sorted(payload["seed"] for payload in sent) == [7, 8]
     reply = enc.encode_text(" B.") + [enc.controls.output_end]
     unseeded = chat_request(PREFILLED, until=["."], seed=None, temperature=temperature)

@@ -163,9 +163,27 @@ class Run(SubCommand):
             ),
         )
 
-        eval_group.add_argument("--repeats", type=int, default=None)
-        eval_group.add_argument("--repeat_scoring", type=json.loads, default=None)
-        eval_group.add_argument("--task_overrides", type=json.loads, default=None)
+        eval_group.add_argument(
+            "--repeats",
+            type=int,
+            default=None,
+            metavar="<n>",
+            help="Attempts per document (see docs/repeated_sampling.md)",
+        )
+        eval_group.add_argument(
+            "--repeat_scoring",
+            type=json.loads,
+            default=None,
+            metavar="<json>",
+            help='Repeat scoring policy, e.g. \'{"enabled": true, "pass_at_k": {"exact_match": [4]}}\'',
+        )
+        eval_group.add_argument(
+            "--task_overrides",
+            type=json.loads,
+            default=None,
+            metavar="<json>",
+            help="Per-task repeats and repeat_scoring, keyed by leaf task name",
+        )
 
         # Data and Output
         data_group = self._parser.add_argument_group(

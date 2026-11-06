@@ -232,9 +232,6 @@ class EvalAcc:
                     "policy": self.configs[name]["repeat_scoring"],
                     "metrics": self.configs[name]["repeat_support"],
                     "documents": self.metrics[name]["sample_len"],
-                    "expected_attempts": self.metrics[name]["sample_len"] * len(values),
-                    "completed_attempts": self.metrics[name]["sample_len"]
-                    * len(values),
                 }
                 for name, values in self.repeat_results.items()
             }
@@ -250,7 +247,9 @@ class EvalAcc:
                 for key in metrics:
                     metric, separator, tail = key.partition("_pass@")
                     if separator and tail.split(",")[0].isdigit():
-                        passes.setdefault(metric, []).append(int(tail.split(",")[0]))
+                        passes.setdefault(metric, set()).add(int(tail.split(",")[0]))
+                # One k per metric, however many filters the group aggregates.
+                passes = {metric: sorted(ks) for metric, ks in passes.items()}
                 if not mean_enabled and not passes:
                     continue
                 budgets = {
@@ -266,7 +265,8 @@ class EvalAcc:
                             t.task_name for t in leaves if key in task_data[t.task_name]
                         ]
                         for key in metrics
-                        if "_mean_repeats," in key or "_pass@" in key
+                        if ("_mean_repeats," in key or "_pass@" in key)
+                        and "_stderr," not in key
                     },
                     "policy": {
                         "enabled": True,
@@ -311,10 +311,11 @@ def _compute_task_aggregations(
     agg_metrics: dict[str, Any] = {}
     sample_len = 0
 
+    repeat_metrics = (
+        task.get_config("repeat_support") if repeat_scoring_utils.enabled(task) else {}
+    )
     for (metric, filter_key), items in raw_metrics.items():
-        if repeat_scoring_utils.enabled(task) and metric in (
-            task.get_config("repeat_support") or {}
-        ):
+        if metric in repeat_metrics:
             values, per_repeat = repeat_scoring_utils.aggregate_metric(
                 task, metric, items
             )
@@ -416,7 +417,7 @@ def _collect_results(
                 if policy["mean"]:
                     directions[f"{metric}_mean_repeats"] = directions.get(metric)
                 for k in policy["pass_at_k"].get(metric, []):
-                    directions[f"{metric}_pass@{k}"] = True
+                    directions[f"{metric}_pass@{k}"] = directions.get(metric)
         result.higher_is_better[task_name] = directions
         result.samples[task_name] = acc["logged_samples"]
 

@@ -28,6 +28,10 @@ class LM(abc.ABC):
     Inputs and outputs should be tokenization-agnostic.
     """
 
+    # Repeat scoring needs every attempt sent as its own request (TemplateAPI).
+    supports_repeat_scoring = False
+    repeat_seed_support = "none"
+
     def __init__(self) -> None:
         # set rank and world size to a single process, by default.
         self._rank = 0
@@ -281,14 +285,14 @@ def hash_args(attr: str, args: Iterable[Any]) -> str:
 
 class CacheHook:
     def __init__(self, cachinglm: Optional["CachingLM"]) -> None:
-        if cachinglm is None:
-            self.dbdict: SqliteDict | None = None
-            return
-
-        self.dbdict = cachinglm.dbdict
+        self.dbdict: SqliteDict | None = None if cachinglm is None else cachinglm.dbdict
+        # An entry keyed by prompt alone would hand one sample to every attempt.
+        self.skip_generation = getattr(
+            getattr(cachinglm, "lm", None), "supports_repeat_scoring", False
+        )
 
     def add_partial(self, attr: str, req: Iterable[Any], res: Any) -> None:
-        if self.dbdict is None or attr == "generate_until":
+        if self.dbdict is None or (attr == "generate_until" and self.skip_generation):
             return
         hsh = hash_args(attr, req)
         self.dbdict[hsh] = res
@@ -303,12 +307,19 @@ class CachingLM:
         Args:
             lm: The underlying language model to wrap.
             cache_db: Path to the SQLite cache database.
+            cache_namespace: Model identity; with it, API models cache each
+                attempt separately.
         """
         from sqlitedict import SqliteDict
 
         self.lm: LM = lm
         self.cache_db: str = cache_db
         self.cache_namespace = cache_namespace
+        # API models cache generations per attempt, or not at all; other models
+        # keep prompt-keyed caching of greedy generations.
+        self.attempt_cache = cache_namespace is not None and getattr(
+            lm, "cache_generation", False
+        )
         if os.path.dirname(cache_db):
             os.makedirs(os.path.dirname(cache_db), exist_ok=True)
         self.dbdict = SqliteDict(cache_db, autocommit=True)
@@ -323,12 +334,8 @@ class CachingLM:
             return lm_attr
 
         def _fn(requests: list["Instance"], **kwargs) -> list["Instance"]:
-            if attr == "generate_until":
-                if (
-                    self.cache_namespace is None
-                    or not getattr(self.lm, "cache_generation", False)
-                    or any(req.repeat_index is None for req in requests)
-                ):
+            if attr == "generate_until" and self.lm.supports_repeat_scoring:
+                if not self.attempt_cache:
                     return self.lm.generate_until(requests, **kwargs)
                 results = [None] * len(requests)
                 missing, positions, keys = [], [], []
@@ -343,8 +350,8 @@ class CachingLM:
                     key = hash_args(
                         attr, ("attempt-v1", self.cache_namespace, identity, req.args)
                     )
-                    if key in self.dbdict:
-                        cached = self.dbdict[key]
+                    cached = self.dbdict.get(key)
+                    if cached is not None:
                         results[index] = cached["response"]
                         req.length_info.extend(cached["length_info"])
                     else:
@@ -355,26 +362,35 @@ class CachingLM:
                 for index, key, req, response in zip(
                     positions, keys, missing, generated, strict=True
                 ):
-                    if response is None:
-                        raise RuntimeError(
-                            "Incomplete generation; refusing to cache a missing attempt"
-                        )
                     results[index] = response
-                    self.dbdict[key] = {
-                        "response": response,
-                        "length_info": req.length_info,
-                    }
+                    # A missing attempt is requested again on the next run.
+                    if response is not None:
+                        self.dbdict[key] = {
+                            "response": response,
+                            "length_info": req.length_info,
+                        }
                 self.dbdict.commit()
                 return results
             res = []
             remaining_reqs = []
+            warned = False
             # figure out which ones are cached and which ones are new
             eval_logger.info(
                 f"Loading '{attr}' responses from cache '{self.cache_db}' where possible..."
             )
             for req in tqdm(requests, desc="Checking cached requests"):
                 hsh = hash_args(attr, req.args)
-                if hsh in self.dbdict:
+                if attr == "generate_until" and req.args[1].get("do_sample", False):
+                    # when we are doing non-greedy generation, don't use the cache
+                    # (else every "randomly sampled" generation would be identical for repeats > 1).
+                    if not warned:
+                        eval_logger.warning(
+                            f"Arguments to lm.generate_until() '{req.args[1]}' include non-deterministic sampling. Caching will not be performed for such requests."
+                        )
+                        warned = True
+                    res.append(None)
+                    remaining_reqs.append(req)
+                elif hsh in self.dbdict:
                     ob = self.dbdict[hsh]
 
                     assert ob is not None
@@ -387,7 +403,11 @@ class CachingLM:
                 f"Cached requests: {len(requests) - len(remaining_reqs)}, Requests remaining: {len(remaining_reqs)}"
             )
             # actually run the LM on the requests that do not have cached results
-            rem_res = getattr(self.lm, attr)(remaining_reqs) if remaining_reqs else []
+            rem_res = (
+                getattr(self.lm, attr)(remaining_reqs, **kwargs)
+                if remaining_reqs
+                else []
+            )
 
             # stick the new ones back into the list and also cache any of the new ones
             resptr = 0
