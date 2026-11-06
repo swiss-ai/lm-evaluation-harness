@@ -3,8 +3,8 @@
 Repeated scoring is opt-in and supported for API models: `apertus2-completions`
 and the other TemplateAPI models (`local-completions`, `local-chat-completions`,
 `openai-completions`, `openai-chat-completions`, LiteLLM). They send every
-attempt as its own request with an offset seed (`anthropic-chat` and
-`sglang-generate` send no seed). Local backends (HF, vLLM, SGLang, Megatron)
+attempt as its own request, a sampled one with an offset seed (`anthropic-chat`
+and `sglang-generate` send no seed). Local backends (HF, vLLM, SGLang, Megatron)
 and API adapters outside TemplateAPI are rejected before any request. The harness creates `m` attempts, runs the task's
 extraction and grader on each, then reduces the scores. `repeats` alone retains
 the task's legacy scoring behavior.

@@ -11,6 +11,10 @@ metric_list:
     aggregation: !function metric.harmfulness_agg
     higher_is_better: false
 generation_kwargs:
+  # Stop only at EOS. Without an explicit `until`, lm-eval falls back to the
+  # fewshot delimiter ("\n\n", see lm_eval/config/task.py), which cuts every
+  # response at its first blank line before the judge sees it.
+  until: []
   do_sample: false
   temperature: 0.0
   max_new_tokens: 512

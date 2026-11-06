@@ -41,6 +41,47 @@ def api_batch_ssl_tokenized():
     )
 
 
+def test_loglikelihood_rolling_batches_across_documents(api):
+    api.max_length = 4
+    api.prefix_token_id = 0
+    api.cache_hook = MagicMock()
+    requests = [MagicMock(args=(text,)) for text in ("long", "empty", "short")]
+    tokens = {"long": [1, 2, 3, 4], "empty": [], "short": [5, 6]}
+
+    with (
+        patch.object(api, "tok_encode", side_effect=tokens.__getitem__),
+        patch.object(
+            api,
+            "_loglikelihood_tokens",
+            return_value=[(-1.0, True), (-2.0, False), (-4.0, True)],
+        ) as score,
+    ):
+        result = api.loglikelihood_rolling(requests, disable_tqdm=True)
+
+    assert result == [-3.0, 0, -4.0]
+    score.assert_called_once_with(
+        [(None, [0], [1, 2, 3]), (None, [1, 2, 3], [4]), (None, [0], [5, 6])],
+        disable_tqdm=True,
+    )
+    assert api.cache_hook.add_partial.call_args_list == [
+        (("loglikelihood_rolling", (text,), value), {})
+        for text, value in zip(("long", "empty", "short"), result, strict=True)
+    ]
+
+
+@pytest.mark.parametrize("texts", [[], [""]])
+def test_loglikelihood_rolling_without_windows(api, texts):
+    requests = [MagicMock(args=(text,)) for text in texts]
+    with (
+        patch.object(api, "tok_encode", return_value=[]),
+        patch.object(api, "_loglikelihood_tokens") as score,
+    ):
+        assert api.loglikelihood_rolling(requests, disable_tqdm=True) == [0] * len(
+            texts
+        )
+    score.assert_not_called()
+
+
 def test_create_payload_generate(api):
     messages = ["Generate a story"]
     gen_kwargs = {
@@ -1081,12 +1122,11 @@ def test_cache_preserves_attempts_across_reordering_and_partial_resume(
     assert len(sent) == 3
 
 
-def test_greedy_single_attempts_stay_batched(monkeypatch):
+def test_greedy_repeats_keep_their_seed_and_stay_batched(monkeypatch):
     model = _seed_model("completions", concurrent=3, batch_size=2)
     source = _seed_instance(model, "prompt", {"temperature": 0, "seed": 77})
-    # The evaluator gives every request a repeat index, 0 for a single attempt.
-    attempts = [replace(source, repeat_index=0, length_info=[]) for _ in range(4)]
-    _, payloads = _run_seed_requests(monkeypatch, model, attempts)
+    result, payloads = _run_seed_requests(monkeypatch, model, _attempts([source], 4))
+    assert result == ["prompt:77"] * 4
     assert [len(payload["prompt"]) for payload in payloads] == [2, 2]
 
 
@@ -1098,3 +1138,56 @@ def test_explicit_episode_seeds(monkeypatch):
     ]
     _, sent = _run_seed_requests(monkeypatch, model, episodes)
     assert [p["seed"] for p in sent] == [1236, 1234]
+
+
+def _unauthorized_error(api_key: str):
+    from aiohttp import ClientResponseError, RequestInfo
+    from multidict import CIMultiDict, CIMultiDictProxy
+    from yarl import URL
+
+    url = URL("http://test-url.com/v1/completions")
+    info = RequestInfo(
+        url=url,
+        method="POST",
+        headers=CIMultiDictProxy(CIMultiDict({"Authorization": f"Bearer {api_key}"})),
+        real_url=url,
+    )
+    return ClientResponseError(info, (), status=429, message="Too Many Requests")
+
+
+def test_describe_error_leaves_out_the_request_headers():
+    api_key = "sk-test-key-123"
+    error = _unauthorized_error(api_key)
+    # The plain repr is what leaked the key.
+    assert api_key in repr(error)
+    described = api_models._describe_error(error)
+    assert api_key not in described
+    assert "status=429" in described and "Too Many Requests" in described
+    assert api_models._describe_error(ValueError("boom")) == "ValueError('boom')"
+
+
+def test_failed_request_log_does_not_contain_the_api_key(caplog, monkeypatch):
+    api_key = "sk-test-key-123"
+    monkeypatch.setenv("OPENAI_API_KEY", api_key)
+    failing_api = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        tokenizer_backend=None,
+        model="test-model",
+    )
+    assert api_key in failing_api.header["Authorization"]
+    from aiohttp import ClientResponseError
+
+    session = MagicMock()
+    session.post.side_effect = _unauthorized_error(api_key)
+
+    async def run():
+        with pytest.raises(ClientResponseError):
+            await failing_api.amodel_call(
+                session, asyncio.Semaphore(1), ["hello"], gen_kwargs={}
+            )
+
+    with caplog.at_level("ERROR"):
+        asyncio.run(run())
+
+    assert "retrying" in caplog.text
+    assert api_key not in caplog.text

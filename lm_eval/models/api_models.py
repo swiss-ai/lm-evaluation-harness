@@ -155,6 +155,21 @@ def _special_tokens(tokenizer) -> set[str]:
 
 
 # utility class to keep track of json encoded chats
+def _describe_error(e: BaseException) -> str:
+    """``repr(e)`` without the request's headers.
+
+    aiohttp's ``ClientResponseError`` repr includes its ``request_info``, headers
+    among them: the ``Authorization`` bearer token would land in the logs.
+    """
+    request_info = getattr(e, "request_info", None)
+    if request_info is None:
+        return repr(e)
+    return (
+        f"{type(e).__name__}(status={getattr(e, 'status', None)}, "
+        f"message={getattr(e, 'message', '')!r}, url={request_info.real_url})"
+    )
+
+
 class JsonChatStr(NamedTuple):
     prompt: str
 
@@ -764,7 +779,7 @@ class TemplateAPI(TemplateLM):
         # If the retries also fail
         except BaseException as e:
             eval_logger.error(
-                f"Exception:{e!r}, {locals().get('outputs', '(no outputs)')}, retrying."
+                f"Exception:{_describe_error(e)}, {locals().get('outputs', '(no outputs)')}, retrying."
             )
             raise
         finally:
@@ -958,7 +973,7 @@ class TemplateAPI(TemplateLM):
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
-        """Generate completions; each attempt's seed is offset by its repeat index.
+        """Generate completions; a sampled attempt's seed is offset by its repeat index.
 
         A task-level seed replaces the model seed; seed=None leaves seeding to the
         server. The offset is set before batching, so retries keep it.
@@ -997,7 +1012,8 @@ class TemplateAPI(TemplateLM):
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
             seed = gen_kwargs.get("seed", self._seed)
-            if seed is not None:
+            # Greedy requests keep their seed: an offset would only split batches.
+            if seed is not None and float(gen_kwargs.get("temperature") or 0) > 0:
                 seed = self._rollout_seed(seed, instance.repeat_index or 0)
                 gen_kwargs = {**gen_kwargs, "seed": seed}
             seeded_gen_kwargs.append(gen_kwargs)
@@ -1009,12 +1025,12 @@ class TemplateAPI(TemplateLM):
             )
         else:
             encodings_list = [None] * len(requests)
-        requests = [
+        request_args = [
             (a, b, c) for a, b, c in zip(requests, all_gen_kwargs, encodings_list)
         ]
 
         re_ord = Collator(
-            requests,
+            request_args,
             sort_fn=_collate_gen,
             # Concurrent runs send each attempt's seed per request, so attempts that
             # differ only in seed stay in one group instead of running group by group.
@@ -1121,7 +1137,7 @@ class TemplateAPI(TemplateLM):
                     asyncio.run(
                         self.get_batched_requests(
                             req,
-                            cache_keys=[(ctx, all_gen_kwargs[0]) for ctx in contexts],
+                            cache_keys=list(zip(contexts, all_gen_kwargs, strict=True)),
                             generate=True,
                             gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                             request_seeds=seeds if len(set(seeds)) > 1 else None,
@@ -1170,8 +1186,10 @@ class TemplateAPI(TemplateLM):
     def loglikelihood_rolling(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[float]:
-        loglikelihoods = []
+        all_windows = []
+        window_counts = []
 
+        # Flatten the windows of all documents, so we can evaluate all documents in parallel
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):
             rolling_token_windows = list(
                 map(
@@ -1188,16 +1206,25 @@ class TemplateAPI(TemplateLM):
 
             # TODO: Right now, we pass single EOT token to the Encoder and the full context to the decoder, in seq2seq case
             rolling_token_windows = [(None,) + x for x in rolling_token_windows]
+            all_windows.extend(rolling_token_windows)
 
-            string_nll = self._loglikelihood_tokens(
-                rolling_token_windows,
-                disable_tqdm=True,
+            window_counts.append(len(rolling_token_windows))
+
+        # Compute the loglikelihoods for all windows in parallel, then sum the scores for each document
+        window_scores = (
+            self._loglikelihood_tokens(all_windows, disable_tqdm=disable_tqdm)
+            if all_windows
+            else []
+        )
+
+        loglikelihoods = []
+        offset = 0
+        for request, window_count in zip(requests, window_counts, strict=True):
+            (string,) = request.args
+            string_nll = sum(
+                score for score, _ in window_scores[offset : offset + window_count]
             )
-
-            # discard is_greedy
-            string_nll = [x[0] for x in string_nll]
-
-            string_nll = sum(string_nll)
+            offset += window_count  # Go to the next document's windows
             loglikelihoods.append(string_nll)
 
             # cache this loglikelihood_rolling request
