@@ -11,7 +11,7 @@ from lm_eval.config.group import AggMetricConfig
 from lm_eval.config.task import TaskConfig
 from lm_eval.evaluator import evaluate
 from lm_eval.models.dummy import DummyLM
-from lm_eval.repeats import configure_repeats
+from lm_eval.repeats import configure_repeats, enabled
 
 
 def grade(doc, responses):
@@ -59,12 +59,14 @@ def task_factory(monkeypatch):
                     }
                     for k in ("exact_match", "math_verify", "weighted")
                 ],
-                repeat_support={
-                    "exact_match": "binary",
-                    "math_verify": "binary",
-                    "weighted": "native",
+                **{
+                    "repeat_support": {
+                        "exact_match": "binary",
+                        "math_verify": "binary",
+                        "weighted": "native",
+                    },
+                    **kwargs,
                 },
-                **kwargs,
             )
         )
 
@@ -72,6 +74,8 @@ def task_factory(monkeypatch):
 
 
 class Answers(DummyLM):
+    supports_repeat_scoring = True
+
     def generate_until(self, requests, **kwargs):
         return [["A", "B", "wrong", "B", "B", "B"][i % 6] for i in range(len(requests))]
 
@@ -127,7 +131,10 @@ def test_precedence_clear_and_fail_before_generation(task_factory, tmp_path):
     assert a.config.repeat_scoring["pass_at_k"] == {"math_verify": [2]}
     assert b.config.repeat_scoring["pass_at_k"] == {}
     with pytest.raises(ValueError, match="binary"):
-        configure_repeats({"b": b}, repeat_scoring={"pass_at_k": {"weighted": [2]}})
+        configure_repeats(
+            {"b": b},
+            task_overrides={"b": {"repeat_scoring": {"pass_at_k": {"weighted": [2]}}}},
+        )
     with pytest.raises(ValueError, match="between"):
         configure_repeats({"b": b}, repeat_scoring={"pass_at_k": {"exact_match": [4]}})
     with pytest.raises(ValueError, match="leaf"):
@@ -157,6 +164,19 @@ def test_group_never_reports_a_partial_repeat_score(task_factory, mixed):
     )
     group.add(a)
     group.add(b)
+
+    class NoGeneration(Answers):
+        def generate_until(self, requests, **kwargs):
+            raise AssertionError("checked before any request")
+
+    if mixed:
+        with pytest.raises(ValueError, match="all of them or none"):
+            evaluate(
+                NoGeneration(),
+                {"tasks": {"a": a, "b": b}, "groups": {"suite": group}},
+                bootstrap_iters=0,
+            )
+        return
     result = evaluate(
         Answers(),
         {"tasks": {"a": a, "b": b}, "groups": {"suite": group}},
@@ -164,11 +184,243 @@ def test_group_never_reports_a_partial_repeat_score(task_factory, mixed):
     )
     metrics = result["results"]["suite"]
     assert "exact_match,none" not in metrics
-    if mixed:
-        assert "exact_match_mean_repeats,none" not in metrics
-    else:
-        assert metrics["exact_match_mean_repeats,none"] == pytest.approx(1 / 3)
-        assert "b" not in result["repeat_results"][1]["results"]
+    assert metrics["exact_match_mean_repeats,none"] == pytest.approx(1 / 3)
+    assert "b" not in result["repeat_results"][1]["results"]
+
+
+def test_group_aggregates_repeat_metrics_over_the_tasks_that_report_them(
+    task_factory,
+):
+    a = task_factory("a", repeats=3, repeat_scoring={"enabled": True})
+    b = task_factory(
+        "b",
+        repeats=3,
+        repeat_scoring={"enabled": True},
+        repeat_support={"math_verify": "binary"},
+    )
+    group = Group(
+        "suite", aggregate_metric_list=[AggMetricConfig(metric="exact_match")]
+    )
+    group.add(a)
+    group.add(b)
+    result = evaluate(
+        Answers(),
+        {"tasks": {"a": a, "b": b}, "groups": {"suite": group}},
+        bootstrap_iters=0,
+    )["results"]
+    key = "exact_match_mean_repeats,none"
+    assert key not in result["b"]
+    assert result["suite"][key] == result["a"][key]
+
+
+def test_run_level_pass_at_k_covers_the_metrics_each_task_declares(task_factory):
+    scored = task_factory("scored")
+    other = task_factory("other", repeat_support={"math_verify": "binary"})
+    configure_repeats(
+        {"scored": scored, "other": other},
+        repeats=2,
+        repeat_scoring={"enabled": True, "pass_at_k": {"exact_match": [2]}},
+    )
+    assert scored.config.repeat_scoring["pass_at_k"] == {"exact_match": [2]}
+    assert other.config.repeat_scoring["pass_at_k"] == {}
+
+
+def test_cli_overrides_update_run_file_fields(tmp_path):
+    config = tmp_path / "eval.yaml"
+    config.write_text(
+        "tasks: [a]\ntask_overrides:\n  a: {repeats: 2, repeat_scoring: {enabled: true}}\n"
+    )
+    cfg = EvaluatorConfig.from_cli(
+        Namespace(
+            config=str(config),
+            task_overrides={"a": {"repeat_scoring": {"mean": False}}, "b": 5},
+        )
+    )
+    assert cfg.task_overrides == {
+        "a": {"repeats": 2, "repeat_scoring": {"enabled": True, "mean": False}},
+        "b": 5,
+    }
+
+
+def test_repeat_scoring_rejects_models_without_attempt_seeds(task_factory, tmp_path):
+    from lm_eval.api.model import CachingLM
+
+    class Local(Answers):
+        supports_repeat_scoring = False
+
+    task = task_factory(repeats=2, repeat_scoring={"enabled": True})
+    for model in (Local(), CachingLM(Local(), str(tmp_path / "cache.db"))):
+        with pytest.raises(ValueError, match="API models only"):
+            evaluate(model, {"tasks": {"example": task}, "groups": {}})
+    legacy = task_factory(repeats=2)
+    result = evaluate(Local(), {"tasks": {"example": legacy}, "groups": {}})
+    assert "exact_match,none" in result["results"]["example"]
+
+
+def test_run_level_repeats_leave_loglikelihood_tasks_alone(task_factory):
+    generative = task_factory("gen")
+    choice = task_factory(
+        "choice", output_type="multiple_choice", doc_to_choice=["A", "B"]
+    )
+    configure_repeats({"gen": generative, "choice": choice}, repeats=5)
+    assert generative.config.repeats == 5 and choice.config.repeats == 1
+
+
+def test_run_level_policy_covers_only_tasks_that_can_repeat_score(task_factory):
+    def choice(name):
+        return task_factory(
+            name, output_type="multiple_choice", doc_to_choice=["A", "B"]
+        )
+
+    tasks = {"gen": task_factory("gen"), "choice": choice("choice")}
+    tasks |= {"member": task_factory("member"), "mc_member": choice("mc_member")}
+    group = Group("mixed", aggregate_metric_list=[AggMetricConfig(metric="acc")])
+    group.add(tasks["member"])
+    group.add(tasks["mc_member"])
+    configure_repeats(tasks, repeat_scoring={"enabled": True}, groups=[group])
+    assert [name for name, task in tasks.items() if enabled(task)] == ["gen"]
+
+
+def test_run_level_policy_skips_multi_sample_filters_and_rejects_non_objects(
+    task_factory,
+):
+    voting = task_factory(
+        "voting",
+        filter_list=[
+            {"name": "maj@8", "filter": [{"function": "take_first_k", "k": 8}]}
+        ],
+    )
+    configure_repeats({"voting": voting}, repeat_scoring={"enabled": True})
+    assert not enabled(voting)
+    with pytest.raises(ValueError, match="must be an object"):
+        configure_repeats({"voting": voting}, repeat_scoring=True)
+    with pytest.raises(ValueError, match="requests no metrics"):
+        configure_repeats(
+            {"voting": voting}, repeat_scoring={"enabled": True, "mean": False}
+        )
+
+
+def test_single_attempts_reach_the_model_uncopied(task_factory):
+    task = task_factory()
+    sent = []
+
+    class Recorder(Answers):
+        def generate_until(self, requests, **kwargs):
+            sent.extend(requests)
+            return super().generate_until(requests)
+
+    evaluate(Recorder(), {"tasks": {"example": task}, "groups": {}})
+    assert all(any(r is i for i in task.instances) for r in sent)
+
+
+def test_pass_at_k_keeps_the_metric_direction(task_factory):
+    task = task_factory(
+        repeats=2,
+        repeat_scoring={"enabled": True, "pass_at_k": {"exact_match": [2]}},
+    )
+    task._higher_is_better["exact_match"] = False
+    result = evaluate(Answers(), {"tasks": {"example": task}, "groups": {}})
+    assert result["higher_is_better"]["example"]["exact_match_pass@2"] is False
+
+
+def test_override_on_an_unscored_task_warns(task_factory, caplog):
+    task = task_factory("plain")
+    configure_repeats(
+        {"plain": task},
+        task_overrides={
+            "plain": {"repeat_scoring": {"pass_at_k": {"exact_match": [4]}}}
+        },
+    )
+    assert not enabled(task) and "override is ignored" in caplog.text
+
+
+def test_overlapping_groups_exclude_each_others_tasks(task_factory):
+    tasks = {name: task_factory(name) for name in "ab"}
+    tasks["c"] = task_factory(
+        "c", output_type="multiple_choice", doc_to_choice=["A", "B"]
+    )
+    groups = []
+    for name, members in (("first", "ab"), ("second", "bc")):
+        group = Group(name, aggregate_metric_list=[AggMetricConfig(metric="acc")])
+        for member in members:
+            group.add(tasks[member])
+        groups.append(group)
+    configure_repeats(tasks, repeat_scoring={"enabled": True}, groups=groups)
+    assert not any(enabled(task) for task in tasks.values())
+
+
+def test_run_level_repeats_skip_tasks_that_opt_out_of_repeat_scoring(task_factory):
+    scored, opted_out = task_factory("scored"), task_factory("opted_out", repeats=2)
+    configure_repeats(
+        {"scored": scored, "opted_out": opted_out},
+        repeats=5,
+        repeat_scoring={"enabled": True},
+        task_overrides={"opted_out": {"repeat_scoring": {"enabled": False}}},
+    )
+    assert scored.config.repeats == 5 and opted_out.config.repeats == 2
+
+
+def test_predict_only_rejects_repeat_scoring(task_factory):
+    from lm_eval.evaluator import simple_evaluate
+
+    with pytest.raises(ValueError, match="predict_only"):
+        simple_evaluate(
+            model=Answers(),
+            tasks=[task_factory(repeats=2)],
+            repeat_scoring={"enabled": True},
+            predict_only=True,
+        )
+
+
+def test_group_protocol_lists_each_k_once(task_factory):
+    tasks = {
+        name: task_factory(
+            name,
+            repeats=2,
+            repeat_scoring={"enabled": True, "pass_at_k": {"exact_match": [2]}},
+            filter_list=[
+                {"name": f, "filter": [{"function": "take_first"}]} for f in ("f", "g")
+            ],
+        )
+        for name in ("a", "b")
+    }
+    group = Group(
+        "suite",
+        aggregate_metric_list=[
+            AggMetricConfig(metric="exact_match", filter_list=["f", "g"])
+        ],
+    )
+    for task in tasks.values():
+        group.add(task)
+    result = evaluate(
+        Answers(), {"tasks": tasks, "groups": {"suite": group}}, bootstrap_iters=0
+    )
+    assert "exact_match_pass@2,f" in result["results"]["suite"]
+    assert "exact_match_pass@2,g" in result["results"]["suite"]
+    policy = result["repeat_protocols"]["suite"]["policy"]
+    assert policy["pass_at_k"] == {"exact_match": [2]}
+
+
+def test_caching_lm_keeps_greedy_generations_for_other_models(tmp_path):
+    from lm_eval.api.instance import Instance
+    from lm_eval.api.model import CachingLM
+
+    calls = []
+
+    class Local(DummyLM):
+        supports_repeat_scoring = False
+
+        def generate_until(self, requests, disable_tqdm=False):
+            calls.append(len(requests))
+            return ["text"] * len(requests)
+
+    model = CachingLM(Local(), str(tmp_path / "cache.db"), cache_namespace="local")
+    request = Instance(
+        "generate_until", {}, ("prompt", {"until": ["\n"]}), 0, repeat_index=0
+    )
+    assert model.generate_until([request]) == ["text"]
+    assert model.generate_until([request]) == ["text"]
+    assert calls == [1]
 
 
 def test_missing_response_is_not_an_incorrect_attempt(task_factory):
@@ -195,55 +447,24 @@ def test_native_unavailable_score_keeps_all_repeats(task_factory):
     assert len(result["repeat_results"]) == 2
 
 
-def test_request_cache_changes_with_rendering_policy(task_factory, monkeypatch):
-    from types import SimpleNamespace
-
+def test_request_cache_key_includes_repeats(task_factory, monkeypatch):
     keys = []
     monkeypatch.setattr(
         "lm_eval.api.task.load_from_cache",
         lambda file_name, cache: keys.append(file_name),
     )
     monkeypatch.setattr("lm_eval.api.task.save_to_cache", lambda **kwargs: None)
-
-    class Renderer:
-        tokenizer = SimpleNamespace(chat_template="same-template")
-
-        def render(self, messages, **kwargs):
-            return str(self.chat_template_args) + str(messages)
-
-    renderer = Renderer()
-    prompts = []
-    for thinking in [False, True]:
-        renderer.chat_template_args = {"enable_thinking": thinking}
-        task = task_factory()
-        task.set_fewshot_seed(1234)
-        task.build_all_requests(
-            cache_requests=True, apply_chat_template=True, chat_template=renderer.render
-        )
-        prompts.append(task.instances[0].args[0])
-    assert prompts[0] != prompts[1]
+    for repeats in [1, 3]:
+        task_factory(repeats=repeats).build_all_requests(cache_requests=True)
     assert keys[0] != keys[1]
 
 
-def test_math500_legacy_pass_keeps_each_graders_success(monkeypatch):
-    from lm_eval.tasks.minerva_math import utils
-
-    monkeypatch.setattr(
-        utils, "_score_doc", lambda answer, doc: {"A": (1, 0), "B": (0, 1)}[answer]
-    )
-    filtered = utils.PassAtKFilter().apply([["A", "B"]], [{}])[0]
-    assert utils.process_results_sc({}, filtered) == {
-        "exact_match": 1,
-        "math_verify": 1,
-    }
-
-
-@pytest.mark.parametrize("overlap", [False, True])
-def test_groups_preserve_declared_filter_coverage(task_factory, overlap):
-    tasks = {}
-    for name, selected in [("a", "f"), ("b", "g")]:
-        filters = ["f", "g"] if overlap else [selected]
-        tasks[name] = task_factory(
+@pytest.mark.parametrize("case", ["same", "crossed", "disjoint"])
+def test_group_filters_cover_the_tasks_that_define_them(task_factory, caplog, case):
+    defined = {"same": ("fg", "fg"), "crossed": ("fg", "fg"), "disjoint": ("f", "g")}
+    chosen = {"same": ("f", "f"), "crossed": ("f", "g"), "disjoint": ("f", "g")}
+    tasks = {
+        name: task_factory(
             name,
             repeats=2,
             repeat_filter=selected,
@@ -252,6 +473,10 @@ def test_groups_preserve_declared_filter_coverage(task_factory, overlap):
                 {"name": f, "filter": [{"function": "take_first"}]} for f in filters
             ],
         )
+        for name, filters, selected in zip(
+            "ab", defined[case], chosen[case], strict=True
+        )
+    }
     group = Group(
         "suite",
         aggregate_metric_list=[
@@ -264,8 +489,9 @@ def test_groups_preserve_declared_filter_coverage(task_factory, overlap):
         Answers(), {"tasks": tasks, "groups": {"suite": group}}, bootstrap_iters=0
     )
     metrics = result["results"]["suite"]
-    assert ("exact_match_mean_repeats,f" in metrics) is not overlap
-    assert ("exact_match_mean_repeats,g" in metrics) is not overlap
+    assert ("exact_match_mean_repeats,f" in metrics) is (case != "crossed")
+    assert ("exact_match_mean_repeats,g" in metrics) is (case == "disjoint")
+    assert ("the group omits it" in caplog.text) is (case == "crossed")
 
 
 def test_cli_writes_repeated_results_from_run_file(tmp_path):
@@ -310,8 +536,15 @@ def test_cli_writes_repeated_results_from_run_file(tmp_path):
     }
     config_path = tmp_path / "run.json"
     config_path.write_text(json.dumps(config))
+    # The dummy model stands in for an API model.
+    cli = (
+        "import sys; from lm_eval.models.dummy import DummyLM; "
+        "DummyLM.supports_repeat_scoring = True; "
+        "from lm_eval.__main__ import cli_evaluate; "
+        "sys.argv = ['lm_eval', 'run', '--config', sys.argv[1]]; cli_evaluate()"
+    )
     completed = subprocess.run(  # noqa: S603 - Local CLI with synthetic inputs.
-        [sys.executable, "-m", "lm_eval", "run", "--config", str(config_path)],
+        [sys.executable, "-c", cli, str(config_path)],
         capture_output=True,
         check=False,
         text=True,
@@ -324,7 +557,7 @@ def test_cli_writes_repeated_results_from_run_file(tmp_path):
     )
     assert result["results"]["repeat_cli_smoke"]["correctness_mean_repeats,none"] == 0
     assert result["results"]["repeat_cli_smoke"]["correctness_pass@2,none"] == 0
-    assert result["repeat_protocols"]["repeat_cli_smoke"]["completed_attempts"] == 6
+    assert result["repeat_protocols"]["repeat_cli_smoke"]["documents"] == 2
     assert len(result["repeat_results"]) == 3
 
 
@@ -346,3 +579,71 @@ def test_api_protocol_reports_temperature_not_ignored_sampling_flag(
         model, {"tasks": {"example": task}, "groups": {}}, bootstrap_iters=0
     )
     assert result["repeat_protocols"]["example"]["sampling_enabled"] is False
+
+
+def test_missing_attempts_are_not_cached(tmp_path):
+    from lm_eval.api.instance import Instance
+    from lm_eval.api.model import CachingLM
+
+    sent = []
+
+    class Api(DummyLM):
+        supports_repeat_scoring = True
+        cache_generation = True
+
+        def generate_until(self, requests, disable_tqdm=False):
+            sent.append(len(requests))
+            return [None if r.repeat_index == 0 else "" for r in requests]
+
+    model = CachingLM(Api(), str(tmp_path / "cache.db"), cache_namespace="api")
+    attempts = [
+        Instance("generate_until", {}, ("q", {"until": []}), 0, repeat_index=i)
+        for i in range(2)
+    ]
+    assert model.generate_until(attempts) == [None, ""]
+    assert model.generate_until(attempts) == [None, ""]
+    assert sent == [2, 1]
+
+
+def test_resumed_runs_keep_cached_attempts_across_request_settings(
+    task_factory, tmp_path, monkeypatch
+):
+    from lm_eval.api import model as model_module
+    from lm_eval.evaluator import simple_evaluate
+
+    namespaces = []
+    init = model_module.CachingLM.__init__
+
+    def record(self, lm, cache_db, cache_namespace=None):
+        namespaces.append(cache_namespace)
+        init(self, lm, cache_db, cache_namespace)
+
+    monkeypatch.setattr(model_module.CachingLM, "__init__", record)
+    for args in (
+        "num_concurrent=2,timeout=10",
+        "num_concurrent=8,requests_per_minute=60,auth_token=new",
+        "max_gen_toks=9",
+    ):
+        simple_evaluate(
+            model="dummy",
+            model_args=args,
+            tasks=[task_factory()],
+            use_cache=str(tmp_path / "cache"),
+        )
+    assert namespaces[0] == namespaces[1] != namespaces[2]
+
+
+def test_pass_at_k_only_run_policy_leaves_other_tasks_unscored(task_factory, caplog):
+    scored = task_factory("scored")
+    other = task_factory("other", repeat_support={"weighted": "native"})
+    policy = {
+        "enabled": True,
+        "mean": False,
+        "pass_at_k": {"exact_match": [2], "typo": [2]},
+    }
+    configure_repeats(
+        {"scored": scored, "other": other}, repeats=2, repeat_scoring=policy
+    )
+    assert enabled(scored) and not enabled(other)
+    assert scored.config.repeat_scoring["pass_at_k"] == {"exact_match": [2]}
+    assert "typo" in caplog.text

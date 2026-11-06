@@ -42,11 +42,6 @@ class Instance:
         # unpack metadata field
         self.task_name, self.doc_id, self.repeats = self.metadata
 
-    def generation_seed(self, base=None):
-        seed = self.args[1].get("seed", base)
-        index = self.repeat_index if self.repeat_index is not None else self.episode
-        return None if seed is None else (seed + index + 2**63) % 2**64 - 2**63
-
     @property
     def args(self):
         """

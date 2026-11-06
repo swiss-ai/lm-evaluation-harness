@@ -7,13 +7,15 @@ import logging
 import random
 import time
 from collections import defaultdict
-from copy import copy, deepcopy
+from copy import deepcopy
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
 import lm_eval.api.model
 import lm_eval.api.registry
+from lm_eval import repeats as repeat_scoring_utils
 from lm_eval.api.instance import Instance
 from lm_eval.caching.cache import delete_cache
 from lm_eval.defaults import DEFAULT_OTHER_SEED, DEFAULT_RANDOM_SEED, LMEVAL_HASHMM
@@ -51,10 +53,15 @@ if TYPE_CHECKING:
 
     _NestedDict = dict[Group, dict[str, Task] | Group] | dict[str, Task]
 
-from lm_eval import repeats as repeat_scoring_utils
-
-
 eval_logger = logging.getLogger(__name__)
+
+
+def _attempts(req):
+    """One request per repeat, each with its own repeat index and responses."""
+    return [
+        replace(req, repeat_index=index, resps=[], length_info=[])
+        for index in range(req.repeats)
+    ]
 
 
 def _request_group_key(instance) -> tuple[str, str, int]:
@@ -167,8 +174,6 @@ def run_multi_turn_rollout(
         )
         responses = lm.generate_until(wave_requests)
         for response, (episode, request) in zip(responses, active, strict=True):
-            if response is None:
-                raise RuntimeError("Model returned a missing attempt")
             request.resps.append(response)
             episode["instance"].length_info.extend(request.length_info)
             episode["task"].multiturn_consume_response(episode["state"], response)
@@ -318,6 +323,11 @@ def simple_evaluate(
             multiturn conversation or a single user turn.
         gen_kwargs (dict | str | None): Arguments for model generation. Ignored
             for all tasks with loglikelihood output_type.
+        repeats (int | None): Attempts per document for generative tasks.
+        repeat_scoring (dict | None): Run-level repeat scoring policy
+            (``enabled``, ``mean``, ``pass_at_k``); see docs/repeated_sampling.md.
+        task_overrides (dict | None): Per-task ``repeats`` and ``repeat_scoring``,
+            keyed by leaf task name.
         task_manager (TaskManager | None): Task manager instance to use.
         verbosity (str | None): Verbosity level for logging.
         predict_only (bool): If True, only model outputs will be generated and
@@ -461,19 +471,31 @@ def simple_evaluate(
         eval_logger.info(
             f"Using cache at {use_cache + '_rank' + str(cache_rank) + '.db'}"
         )
-        lm = lm_eval.api.model.CachingLM(
-            lm,
-            use_cache
-            # each rank receives a different cache db.
-            # necessary to avoid multiple writes to cache at once
-            + "_rank"
-            + str(cache_rank)
-            + ".db",
-            cache_namespace=hash_string(
+        cache_namespace = None
+        if isinstance(model, str):
+            answer_args = (
+                simple_parse_args_string(model_args)
+                if isinstance(model_args, str)
+                else dict(model_args or {})
+            )
+            # Request handling and credentials do not change answers, so a
+            # resumed run may retune them and keep its cached attempts.
+            for key in (
+                "num_concurrent",
+                "timeout",
+                "max_retries",
+                "requests_per_minute",
+                "auth_token",
+                "header",
+                "verify_certificate",
+                "ca_cert_path",
+            ):
+                answer_args.pop(key, None)
+            cache_namespace = hash_string(
                 json.dumps(
                     {
                         "model": model,
-                        "args": model_args,
+                        "args": answer_args,
                         "template": apply_chat_template,
                         "fewshot_as_multiturn": fewshot_as_multiturn,
                         "system": system_instruction,
@@ -482,8 +504,15 @@ def simple_evaluate(
                     default=handle_non_serializable,
                 )
             )
-            if isinstance(model, str)
-            else None,
+        lm = lm_eval.api.model.CachingLM(
+            lm,
+            use_cache
+            # each rank receives a different cache db.
+            # necessary to avoid multiple writes to cache at once
+            + "_rank"
+            + str(cache_rank)
+            + ".db",
+            cache_namespace=cache_namespace,
         )
 
     if task_manager is None:
@@ -500,8 +529,18 @@ def simple_evaluate(
     loaded = task_manager.load(tasks)
 
     repeat_scoring_utils.configure_repeats(
-        loaded["tasks"], repeats, repeat_scoring, task_overrides
+        loaded["tasks"],
+        repeats,
+        repeat_scoring,
+        task_overrides,
+        loaded["groups"].values(),
     )
+    if predict_only and any(
+        repeat_scoring_utils.enabled(task) for task in loaded["tasks"].values()
+    ):
+        raise ValueError(
+            "Repeat scoring grades every attempt; it cannot run with predict_only"
+        )
 
     # Log selected tasks with hierarchy
     _log_selected_tasks(loaded["tasks"], loaded["groups"], task_manager)
@@ -708,6 +747,7 @@ def evaluate(
         groups, eval_tasks = task_dict.get("groups", {}), task_dict.get("tasks", {})
 
     repeat_scoring_utils.configure_repeats(eval_tasks)
+    repeat_scoring_utils.check_scope(eval_tasks, groups, lm)
 
     # Initialize accumulators for per-sample metrics and logged samples
     eval_results_acc: dict[str, ResultAcc] = {
@@ -765,9 +805,6 @@ def evaluate(
             chat_template=getattr(lm, "apply_chat_template", None)
             if apply_chat_template
             else None,
-            chat_template_cache_key=lm.chat_template(apply_chat_template)
-            if apply_chat_template
-            else None,
             tokenizer_name=getattr(lm, "tokenizer_name", "")
             if apply_chat_template
             else "",
@@ -801,11 +838,9 @@ def evaluate(
                     if group_key in groups
                 )
                 requests[group_key[0]].extend(local_group)
-                for _ in range(group_size - len(local_group)):
-                    padding = copy(padding_example)
-                    padding.resps = []
-                    padding.length_info = []
-                    requests[group_key[0]].append(padding)
+                requests[group_key[0]].extend(
+                    [padding_example] * (group_size - len(local_group))
+                )
         else:
             # Aggregate Instances by LM method requested to get output.
             for instance in task.instances:
@@ -872,13 +907,9 @@ def evaluate(
         cloned_reqs = []
         originals = []
         for req in reqs:
-            for index in range(req.repeats):
-                attempt = copy(req)
-                attempt.repeat_index = index
-                attempt.resps = []
-                attempt.length_info = []
-                cloned_reqs.append(attempt)
-                originals.append(req)
+            attempts = [req] if req.repeats == 1 else _attempts(req)
+            cloned_reqs.extend(attempts)
+            originals.extend([req] * len(attempts))
 
         if (lm.world_size > 1) and (padding_requests[reqtype] > 0):
             padding_req = reqs[-1] if reqs else padding_examples[reqtype]
@@ -887,24 +918,19 @@ def evaluate(
                     f"Could not find a padding request for distributed reqtype {reqtype}"
                 )
             for _ in range(padding_requests[reqtype]):
-                for index in range(padding_req.repeats):
-                    padding = copy(padding_req)
-                    padding.repeat_index = index
-                    padding.resps = []
-                    padding.length_info = []
-                    cloned_reqs.append(padding)
-                    originals.append(None)
+                attempts = _attempts(padding_req)
+                cloned_reqs.extend(attempts)
+                originals.extend([None] * len(attempts))
 
         # run requests through model
         resps = getattr(lm, reqtype)(cloned_reqs)
 
         # put responses from model into a list of length K for each request.
         for x, attempt, req in zip(resps, cloned_reqs, originals, strict=True):
-            if x is None:
-                raise RuntimeError("Model returned a missing attempt")
             if req is not None:
                 req.resps.append(x)
-                req.length_info.extend(attempt.length_info)
+                if attempt is not req:
+                    req.length_info.extend(attempt.length_info)
 
         if lm.world_size > 1:
             lm.barrier()
@@ -925,7 +951,8 @@ def evaluate(
         if len(task.instances) == 0:
             continue
 
-        if repeat_scoring_utils.enabled(task):
+        scored = repeat_scoring_utils.enabled(task)
+        if scored:
             repeat_scoring_utils.apply_repeat_filters(task)
         else:
             task.apply_filters()
@@ -954,7 +981,7 @@ def evaluate(
                 requests = instances_by_doc_id[doc_id]
                 metrics = (
                     repeat_scoring_utils.score_attempts(task, doc, requests, filter_key)
-                    if repeat_scoring_utils.enabled(task)
+                    if scored
                     else task.process_results(
                         doc, [req.filtered_resps[filter_key] for req in requests]
                     )
@@ -985,7 +1012,7 @@ def evaluate(
                         "prompt_hash": hash_string(requests[0].arguments[0]),
                         "target_hash": hash_string(str(target)),
                     }
-                    if repeat_scoring_utils.enabled(task):
+                    if scored:
                         example["repeat_indices"] = list(
                             range(task.get_config("repeats"))
                         )
@@ -1047,16 +1074,12 @@ def evaluate(
 
         results = res._to_eval_results(samples=samples)
         for name, protocol in results.get("repeat_protocols", {}).items():
-            protocol["seed_support"] = getattr(
-                lm, "repeat_seed_support", "backend-dependent"
-            )
-            protocol["default_seed"] = getattr(lm, "_seed", None)
-            if name in eval_tasks and callable(getattr(lm, "_sampling_enabled", None)):
-                protocol["sampling_enabled"] = lm._sampling_enabled(
-                    {
-                        **(eval_tasks[name].get_config("generation_kwargs") or {}),
-                        "do_sample": False,
-                    }
+            protocol["seed_support"] = lm.repeat_seed_support
+            if name in eval_tasks:
+                # API models sample by temperature; they do not send do_sample.
+                gen_kwargs = eval_tasks[name].get_config("generation_kwargs") or {}
+                protocol["sampling_enabled"] = (
+                    float(gen_kwargs.get("temperature") or 0) > 0
                 )
         model_metrics = lm.get_model_metrics()
         if model_metrics:

@@ -205,8 +205,15 @@ def create_image_prompt(
     return chat
 
 
+def rollout_seed(seed: int, repeat_index: int) -> int:
+    """Offset a seed by the repeat index within the signed 64-bit API range."""
+    return (seed + repeat_index + 2**63) % 2**64 - 2**63
+
+
 class TemplateAPI(TemplateLM):
     repeat_seed_support = "provider-dependent"
+    supports_repeat_scoring = True
+    cache_generation = True
 
     MULTIMODAL = True
 
@@ -679,11 +686,7 @@ class TemplateAPI(TemplateLM):
     ) -> dict | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
-        seed = (
-            gen_kwargs.pop("seed", self._seed)
-            if generate and gen_kwargs
-            else self._seed
-        )
+        seed = self._request_seed(gen_kwargs, generate)
         try:
             return self._send(
                 self._create_payload(
@@ -715,11 +718,7 @@ class TemplateAPI(TemplateLM):
     ) -> list[str] | list[tuple[float, bool]] | None:
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
-        seed = (
-            gen_kwargs.pop("seed", self._seed)
-            if generate and gen_kwargs
-            else self._seed
-        )
+        seed = self._request_seed(gen_kwargs, generate)
         payload = self._create_payload(
             self.create_message(messages),
             generate=generate,
@@ -807,8 +806,6 @@ class TemplateAPI(TemplateLM):
     ) -> list[list[str]] | list[list[tuple[float, bool]]]:
         # Distinct seeds require individual HTTP payloads, not batched prompts.
         batch_size = 1 if request_seeds is not None else self._batch_size
-        if request_seeds is not None and len(request_seeds) != len(requests):
-            raise ValueError("Expected one seed per request")
 
         ctxlens = ctxlens or [None] * len(requests)
         conn = TCPConnector(limit=self._concurrent, ssl=self.verify_certificate)
@@ -947,25 +944,24 @@ class TemplateAPI(TemplateLM):
             gen_kwargs["until"] = []
         return gen_kwargs
 
-    cache_generation = True
-
-    def _sampling_enabled(self, gen_kwargs: dict) -> bool:
-        return gen_kwargs.get("temperature", 0) > 0 or gen_kwargs.get(
-            "do_sample", False
+    def _request_seed(self, gen_kwargs: dict | None, generate: bool) -> int | None:
+        """A task's seed (offset per attempt) replaces the model seed; None sends none."""
+        return (
+            gen_kwargs.pop("seed", self._seed)
+            if generate and gen_kwargs
+            else self._seed
         )
 
     def _rollout_seed(self, seed: int, rollout_index: int) -> int:
-        """Offset a sampled rollout's seed within the signed 64-bit API range."""
-        return (seed + rollout_index + 2**63) % 2**64 - 2**63
+        return rollout_seed(seed, rollout_index)
 
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
-        """Generate completions with distinct seeds for repeated sampled inputs.
+        """Generate completions; each attempt's seed is offset by its repeat index.
 
-        Assign offsets before batching and retries. A task-level seed is the base
-        seed; seed=None leaves seed selection to the server. Greedy inputs retain
-        their existing seeds.
+        A task-level seed replaces the model seed; seed=None leaves seeding to the
+        server. The offset is set before batching, so retries keep it.
         """
         res = []
         instances = requests
@@ -998,23 +994,12 @@ class TemplateAPI(TemplateLM):
         else:
             requests, all_gen_kwargs = zip(*(req.args for req in requests))
 
-        # Direct backend callers without explicit attempt IDs retain occurrence offsets.
-        rollout_counts = {}
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
             seed = gen_kwargs.get("seed", self._seed)
-            if (
-                self._sampling_enabled(gen_kwargs) or instance.repeat_index is not None
-            ) and seed is not None:
+            if seed is not None:
+                seed = self._rollout_seed(seed, instance.repeat_index or 0)
                 gen_kwargs = {**gen_kwargs, "seed": seed}
-                key = id(instance)
-                rollout_index = (
-                    instance.repeat_index
-                    if instance.repeat_index is not None
-                    else instance.episode + rollout_counts.get(key, 0)
-                )
-                rollout_counts[key] = rollout_index + 1
-                gen_kwargs["seed"] = self._rollout_seed(seed, rollout_index)
             seeded_gen_kwargs.append(gen_kwargs)
         all_gen_kwargs = seeded_gen_kwargs
 
@@ -1024,14 +1009,15 @@ class TemplateAPI(TemplateLM):
             )
         else:
             encodings_list = [None] * len(requests)
-        request_args = [
+        requests = [
             (a, b, c) for a, b, c in zip(requests, all_gen_kwargs, encodings_list)
         ]
 
         re_ord = Collator(
-            request_args,
+            requests,
             sort_fn=_collate_gen,
-            # Async sampled rollouts share a scheduling group, if they have different generation settings (here the seed) it thinks it has to run them sequentially.
+            # Concurrent runs send each attempt's seed per request, so attempts that
+            # differ only in seed stay in one group instead of running group by group.
             group_fn=lambda req: (
                 {k: v for k, v in req[1].items() if k != "seed"}
                 if self._concurrent > 1
@@ -1130,26 +1116,15 @@ class TemplateAPI(TemplateLM):
                         )
 
                 req = encodings_list if self.tokenized_requests else contexts
+                seeds = [kw.get("seed") for kw in all_gen_kwargs]
                 results = itertools.chain.from_iterable(
                     asyncio.run(
                         self.get_batched_requests(
                             req,
-                            cache_keys=list(zip(contexts, all_gen_kwargs, strict=True)),
+                            cache_keys=[(ctx, all_gen_kwargs[0]) for ctx in contexts],
                             generate=True,
                             gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
-                            request_seeds=(
-                                [kw.get("seed", self._seed) for kw in all_gen_kwargs]
-                                if self._sampling_enabled(all_gen_kwargs[0])
-                                or any(i.repeat_index is not None for i in instances)
-                                or len(
-                                    {
-                                        kw.get("seed", self._seed)
-                                        for kw in all_gen_kwargs
-                                    }
-                                )
-                                > 1
-                                else None
-                            ),
+                            request_seeds=seeds if len(set(seeds)) > 1 else None,
                         )
                     )
                 )

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lm_eval.api.registry import register_model
-from lm_eval.models.api_models import Generation, JsonChatStr
+from lm_eval.models.api_models import Generation, JsonChatStr, rollout_seed
 from lm_eval.models.openai_completions import TOOL_CALLS_MARKER, LocalChatCompletion
 from lm_eval.models.utils import truncate_before_stops
 
@@ -213,6 +213,9 @@ class Apertus2Completions(LocalChatCompletion):
     """Apertus 2 chat format rendered client-side, sent as a text completion."""
 
     MULTIMODAL = False
+    repeat_seed_support = "request-seed"
+    # Its reasoning replay is stateful: a cached answer would skip it.
+    cache_generation = False
 
     def __init__(
         self,
@@ -351,11 +354,9 @@ class Apertus2Completions(LocalChatCompletion):
         texts = (json.dumps(messages, ensure_ascii=False), tools or "")
         return sum(len(self._literal.findall(text)) for text in texts)
 
-    repeat_seed_support = "request-seed"
-    cache_generation = False
-
     def _rollout_seed(self, seed: int, rollout_index: int) -> int:
-        # _create_payload applies the scoped repeat/episode offset exactly once.
+        # _create_payload offsets the seed: distinct seeds in the gen kwargs would
+        # split TemplateAPI's request groups and break the per-object queue order.
         return seed
 
     def generate_until(self, requests, disable_tqdm: bool = False) -> list[str]:
@@ -386,22 +387,17 @@ class Apertus2Completions(LocalChatCompletion):
         # Each request's context object reaches create_message unchanged, which
         # takes the next (scope, repeat) queued for it. The scope is the
         # conversation (task, document, episode) for reasoning replay; the repeat
-        # offsets the seed, or a seeded server would return one sample for all
-        # repeats. Single-turn repeats send one object several times; the
-        # evaluator numbers multi-turn episodes. Requests sharing an object are
-        # sent in queue order only if they share gen kwargs (TemplateAPI groups
-        # by them), which holds for every task here. Each multi-turn wave holds
-        # every ongoing conversation, so the others ended.
+        # index offsets the seed, or a seeded server would return one sample for
+        # all repeats. Requests sharing an object are sent in queue order only if
+        # they share gen kwargs (TemplateAPI groups by them), which holds for
+        # every task here. Each multi-turn wave holds every ongoing conversation,
+        # so the others ended.
         self._pending = {}
         for r in requests:
             scope = None if r.task_name is None else (r.task_name, r.doc_id, r.episode)
-            pending = self._pending.setdefault(id(r.args[0]), [])
-            repeat = (
-                r.repeat_index
-                if r.repeat_index is not None
-                else r.episode + sum(queued == scope for queued, _ in pending)
+            self._pending.setdefault(id(r.args[0]), []).append(
+                (scope, r.repeat_index or 0)
             )
-            pending.append((scope, repeat))
         active = {scope for queued in self._pending.values() for scope, _ in queued}
         self._memory = {s: m for s, m in self._memory.items() if s in active}
         try:
@@ -442,10 +438,8 @@ class Apertus2Completions(LocalChatCompletion):
             scope=getattr(messages, "scope", None),
         )
         temperature = gen_kwargs.pop("temperature", 0)
-        # A task's seed replaces the harness seed; None sends unseeded requests.
-        seed = gen_kwargs.pop("seed", seed)
         if seed is not None:
-            seed += getattr(messages, "repeat", 0)
+            seed = rollout_seed(seed, getattr(messages, "repeat", 0))
         try:
             self._prepare_request(request, list(messages), tools)
         except (self._lib.ApertusFormatError, ValueError) as error:
@@ -646,7 +640,9 @@ class Apertus2Completions(LocalChatCompletion):
             "max_tokens": budget,
             "stop_token_ids": [self._wait],
             # Phase one's seed would replay its sampling noise over the reply.
-            "seed": None if seed is None else seed + _PHASE_TWO_SEED_OFFSET,
+            "seed": None
+            if seed is None
+            else rollout_seed(seed, _PHASE_TWO_SEED_OFFSET),
         }
 
     # Response path
