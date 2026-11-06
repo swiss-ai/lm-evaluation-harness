@@ -162,16 +162,34 @@ def _strip_shell_quotes(value: str) -> str:
         return value
 
 
+def _container_literal(value: str) -> dict | list | tuple | None:
+    """`value` as a Python or JSON dict, list or tuple, else None."""
+    try:
+        v = ast.literal_eval(value)
+    except (ValueError, SyntaxError):
+        try:
+            v = json.loads(value)  # JSON true/false/null
+        except ValueError:
+            return None
+    return v if isinstance(v, (dict, list, tuple)) else None
+
+
 def key_val_to_dict(args: str) -> dict[str, Any]:
     """Parse model arguments from a string into a dictionary."""
     res = {}
     if not args:
         return res
 
-    for k, v in (item.split("=", 1) for item in _split_top_level_commas(args)):
-        v = handle_cli_value_string(v)
+    for k, raw in (item.split("=", 1) for item in _split_top_level_commas(args)):
+        v = handle_cli_value_string(raw)
         if isinstance(v, str):
-            v = _strip_shell_quotes(v)
+            # A JSON dict or list (`{"enable_thinking":false}`), or one that still
+            # carries shell quoting: `{\"reasoning_effort\":\"medium\"}` from
+            # evals-post-train's sbatch.
+            literal = _container_literal(raw)
+            if literal is None:
+                literal = _container_literal(_strip_shell_quotes(raw))
+            v = literal if literal is not None else _strip_shell_quotes(v)
         if k in res:
             eval_logger.warning(f"Overwriting key '{k}': {res[k]!r} -> {v!r}")
         res[k] = v
