@@ -84,7 +84,7 @@ def get_watsonx_credentials() -> dict[str, str | None]:
 
     try:
         from dotenv import load_dotenv
-    except ImportError:
+    except ImportError as e:
         raise ImportError(
             "Could not import dotenv: Please install lm_eval[ibm_watsonx_ai] package."
         ) from None
@@ -118,8 +118,6 @@ def get_watsonx_credentials() -> dict[str, str | None]:
 
 @register_model("watsonx_llm")
 class WatsonxLLM(LM):
-    repeat_seed_support = "request-seed"
-
     """
     Implementation of LM model interface for evaluating Watsonx model with the lm_eval framework.
     See https://github.com/EleutherAI/lm-evaluation-harness/blob/main/docs/model_guide.md for reference.
@@ -201,7 +199,7 @@ class WatsonxLLM(LM):
         try:
             from ibm_watsonx_ai import APIClient, Credentials
             from ibm_watsonx_ai.foundation_models import ModelInference
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
             ) from None
@@ -322,42 +320,28 @@ class WatsonxLLM(LM):
             List[str]: A List of generated responses.
         """
 
+        requests = [request.args for request in requests]
         results = []
-        aliases = {
-            "max_gen_toks": "max_new_tokens",
-            "max_tokens": "max_new_tokens",
-            "until": "stop_sequences",
-            "seed": "random_seed",
-        }
-        for request in tqdm(requests, desc="Running generate_until function ..."):
-            context, generation = request.args
-            params = dict(self.generate_params or {})
-            params.update(
-                {
-                    aliases.get(k, k): v
-                    for k, v in generation.items()
-                    if k != "do_sample"
-                }
-            )
-            if "temperature" in generation or "do_sample" in generation:
-                params["decoding_method"] = (
-                    "sample"
-                    if generation.get("temperature", 0) > 0
-                    or generation.get("do_sample", False)
-                    else "greedy"
-                )
-            seed = request.generation_seed(params.get("random_seed"))
-            params.pop("random_seed", None)
-            if seed is not None:
-                params["random_seed"] = seed
-            if isinstance(context, JsonChatStr):
-                response = self.model.chat(json.loads(context.prompt), params)
-                response = response["choices"][0]["message"]["content"]
-            else:
-                response = self.model.generate_text(context, params)
+
+        for request in tqdm(
+            requests,
+            desc="Running generate_until function ...",
+        ):
+            context, continuation = request
+            try:
+                if isinstance(context, JsonChatStr):
+                    context = json.loads(context.prompt)
+                    response = self.model.chat(context, self.generate_params)
+                    response = response["choices"][0]["message"]["content"]
+                else:
+                    response = self.model.generate_text(context, self.generate_params)
+            except Exception as exp:
+                eval_logger.error("Error while generating text.")
+                raise exp
+
             results.append(response)
             self.cache_hook.add_partial(
-                "generate_until", (context, generation), response
+                "generate_until", (context, continuation), response
             )
 
         return results
@@ -378,7 +362,7 @@ class WatsonxLLM(LM):
 
         try:
             from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Could not import ibm_watsonx_ai: Please install lm_eval[ibm_watsonx_ai] package."
             ) from None
@@ -400,9 +384,9 @@ class WatsonxLLM(LM):
                 tokenized_context = self.model.tokenize(
                     prompt=context, return_tokens=True
                 )["result"]["tokens"]
-            except Exception:
+            except Exception as exp:
                 eval_logger.error("Error while model tokenize.")
-                raise
+                raise exp
 
             input_prompt = context + continuation
 
@@ -410,9 +394,9 @@ class WatsonxLLM(LM):
                 response = self.model.generate_text(
                     prompt=input_prompt, params=generate_params, raw_response=True
                 )
-            except Exception:
+            except Exception as exp:
                 eval_logger.error("Error while model generate text.")
-                raise
+                raise exp
 
             log_likelihood_response = self._get_log_likelihood(
                 response["results"][0]["input_tokens"], tokenized_context
@@ -465,9 +449,9 @@ class WatsonxLLM(LM):
                 response = self.model.generate_text(
                     prompt=context, params=generate_params, raw_response=True
                 )
-            except Exception:
+            except Exception as exp:
                 eval_logger.error("Error while model generate text.")
-                raise
+                raise exp
 
             log_likelihood_response = self._get_log_likelihood(
                 response["results"][0]["input_tokens"], []

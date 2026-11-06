@@ -222,13 +222,11 @@ def retry_on_specific_exceptions(
                 try:
                     return func(*args, **kwargs)
                 except tuple(on_exceptions) as e:
-                    attempt += 1
-                    if max_retries is not None and attempt >= max_retries:
-                        raise
                     if on_exception_callback is not None:
                         on_exception_callback(e, sleep_time)
                     time.sleep(sleep_time)
                     sleep_time *= backoff_multiplier
+                    attempt += 1
 
         return wrapper
 
