@@ -973,7 +973,7 @@ class TemplateAPI(TemplateLM):
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
-        """Generate completions; each attempt's seed is offset by its repeat index.
+        """Generate completions; a sampled attempt's seed is offset by its repeat index.
 
         A task-level seed replaces the model seed; seed=None leaves seeding to the
         server. The offset is set before batching, so retries keep it.
@@ -1012,7 +1012,8 @@ class TemplateAPI(TemplateLM):
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
             seed = gen_kwargs.get("seed", self._seed)
-            if seed is not None:
+            # Greedy requests keep their seed: an offset would only split batches.
+            if seed is not None and float(gen_kwargs.get("temperature") or 0) > 0:
                 seed = self._rollout_seed(seed, instance.repeat_index or 0)
                 gen_kwargs = {**gen_kwargs, "seed": seed}
             seeded_gen_kwargs.append(gen_kwargs)
@@ -1024,12 +1025,12 @@ class TemplateAPI(TemplateLM):
             )
         else:
             encodings_list = [None] * len(requests)
-        requests = [
+        request_args = [
             (a, b, c) for a, b, c in zip(requests, all_gen_kwargs, encodings_list)
         ]
 
         re_ord = Collator(
-            requests,
+            request_args,
             sort_fn=_collate_gen,
             # Concurrent runs send each attempt's seed per request, so attempts that
             # differ only in seed stay in one group instead of running group by group.
@@ -1136,7 +1137,7 @@ class TemplateAPI(TemplateLM):
                     asyncio.run(
                         self.get_batched_requests(
                             req,
-                            cache_keys=[(ctx, all_gen_kwargs[0]) for ctx in contexts],
+                            cache_keys=list(zip(contexts, all_gen_kwargs, strict=True)),
                             generate=True,
                             gen_kwargs=self._sent_gen_kwargs(all_gen_kwargs[0]),
                             request_seeds=seeds if len(set(seeds)) > 1 else None,
