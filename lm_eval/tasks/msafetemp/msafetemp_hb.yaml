@@ -1,0 +1,8 @@
+group: msafetemp_hb
+task:
+  - msafetemp_hb_asr
+  - msafetemp_hb_or
+  - msafetemp_hb_asr_jb
+  - msafetemp_hb_or_jb
+metadata:
+  version: 1.0
