@@ -1,0 +1,6 @@
+dataset_name: jpn_Jpan
+dataset_path: CohereLabsCommunity/multilingual-reward-bench
+include: ../_rb_base_yaml
+process_docs: !function ../../utils.process_docs_safety
+task: reward_bench_jpn_Jpan_safety
+test_split: test
