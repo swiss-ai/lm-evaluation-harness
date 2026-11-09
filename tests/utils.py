@@ -27,6 +27,9 @@ def parser(full_path: list[str]) -> list[str]:
     for x in full_path:
         if x.endswith(".yaml") and os.path.exists(x):
             config = load_yaml(x, resolve_func=False)
+            # Shared templates (`include:` targets) define no task of their own.
+            if "task" not in config:
+                continue
             if isinstance(config["task"], str):
                 _output.add(config["task"])
             elif isinstance(config["task"], list):
