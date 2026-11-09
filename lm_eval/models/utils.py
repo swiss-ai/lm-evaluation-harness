@@ -856,6 +856,50 @@ def handle_stop_sequences(until: str | list[str] | None, eos: str | None) -> lis
     return until
 
 
+def cap_stop_sequences(
+    stop: list[str], limit: int | None, eos: str | None = None
+) -> list[str]:
+    """Trim `stop` to at most `limit` entries, dropping the least useful first.
+
+    Servers cap the number of stop strings per request (OpenAI: 4; vLLM >= 0.29
+    rejects more than 4 with a 400 unless VLLM_MAX_STOP_STRINGS is raised), and
+    tasks such as humaneval list more. Nothing happens when `stop` already fits
+    or `limit` is falsy. Otherwise, in order:
+
+    1. a stop that contains another stop as a substring: the shorter one always
+       fires first (or at the same place), so the longer is redundant;
+    2. special-token stops (`eos`, `<|eot_id|>`, `</s>`, ...): the model ends
+       its turn on those anyway;
+    3. only then entries from the end of the list, with a warning.
+    """
+    if not limit or len(stop) <= limit:
+        return stop
+    kept = list(stop)
+
+    def drop(candidates) -> None:
+        for s in candidates:
+            if len(kept) <= limit:
+                return
+            kept.remove(s)
+
+    drop([s for s in kept if any(o != s and o in s for o in kept)])
+    drop(
+        [
+            s
+            for s in reversed(kept)
+            if s == eos or (s.startswith("<") and s.endswith(">"))
+        ]
+    )
+    if len(kept) > limit:
+        eval_logger.warning(
+            "Dropping stop sequences %s: the server accepts at most %d.",
+            kept[limit:],
+            limit,
+        )
+        kept = kept[:limit]
+    return kept
+
+
 def normalize_gen_kwargs(
     gen_kwargs: dict,
     default_max_gen_toks: int = 256,
