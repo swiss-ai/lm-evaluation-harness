@@ -14,3 +14,6 @@ generation_kwargs:
   max_new_tokens: 512
 metadata:
   version: 1.0
+
+repeat_support:
+  score: native

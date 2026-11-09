@@ -28,6 +28,15 @@ DICT_KEYS = [
 ]
 
 
+def _merged(base: Any, update: Any, depth: int) -> Any:
+    """Update ``base`` with ``update``, merging nested dicts ``depth`` levels deep."""
+    if depth == 0 or not (isinstance(base, dict) and isinstance(update, dict)):
+        return update
+    return base | {
+        key: _merged(base.get(key), value, depth - 1) for key, value in update.items()
+    }
+
+
 @dataclass(slots=True)
 class EvaluatorConfig:
     """Configuration for language model evaluation runs.
@@ -75,6 +84,15 @@ class EvaluatorConfig:
     # Few-shot and batching
     num_fewshot: int | None = field(
         default=None, metadata={"help": "Number of examples in few-shot context"}
+    )
+    repeats: int | None = field(
+        default=None, metadata={"help": "Attempts per document"}
+    )
+    repeat_scoring: dict | None = field(
+        default=None, metadata={"help": "Repeat scoring policy"}
+    )
+    task_overrides: dict | None = field(
+        default=None, metadata={"help": "Per-task repeats and repeat_scoring"}
     )
     batch_size: int = field(default=1, metadata={"help": "Batch size for evaluation"})
     max_batch_size: int | None = field(
@@ -225,6 +243,15 @@ class EvaluatorConfig:
             for k, v in vars(namespace).items()
             if (v or v == 0) and k not in excluded_args
         }
+        # CLI fields update the config file's; configure_repeats validates the result.
+        if "repeat_scoring" in cli_args:
+            cli_args["repeat_scoring"] = _merged(
+                config.get("repeat_scoring"), cli_args["repeat_scoring"], 1
+            )
+        if "task_overrides" in cli_args:
+            cli_args["task_overrides"] = _merged(
+                config.get("task_overrides"), cli_args["task_overrides"], 3
+            )
         config.update(cli_args)
 
         # Create an instance and validate

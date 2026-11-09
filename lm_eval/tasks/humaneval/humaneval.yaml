@@ -35,3 +35,7 @@ filter_list:
         filter_fn: !function utils.build_predictions
 metadata:
   version: 1.0
+repeat_support:
+  pass@1: binary
+  degeneration: mean
+repeat_filter: create_test

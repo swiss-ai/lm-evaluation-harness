@@ -22,3 +22,6 @@ generation_kwargs:
     - "\n\n\n\n"
 metadata:
   version: 1.0
+repeat_support:
+  refusal: binary
+  degeneration: mean
