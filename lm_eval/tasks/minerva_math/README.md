@@ -60,6 +60,7 @@ Homepage: https://github.com/hendrycks/math
 - `minerva_math_prealgebra`
 - `minerva_math_precalc`
 - `minerva_math500`
+- `minerva_math500_cot_zeroshot`: MATH-500, zero-shot, answer in `\boxed{}` (for chat and thinking models)
 
 ### Checklist
 

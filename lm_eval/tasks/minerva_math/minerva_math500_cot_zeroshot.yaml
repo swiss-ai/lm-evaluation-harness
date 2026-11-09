@@ -1,0 +1,14 @@
+include: minerva_math500.yaml
+task: minerva_math500_cot_zeroshot
+# Zero-shot chat prompt for thinking and chat models: the 4-shot Minerva examples arrive as
+# earlier turns without reasoning. Scoring is unchanged (the last \boxed{} when the Minerva
+# "Final Answer" line is absent).
+num_fewshot: 0
+doc_to_text: "{{problem}}\n\nPlease reason step by step, and put your final answer within \\boxed{}."
+generation_kwargs:
+  until: []
+  do_sample: false
+  temperature: 0
+  max_gen_toks: 32768
+metadata:
+  version: 1.0

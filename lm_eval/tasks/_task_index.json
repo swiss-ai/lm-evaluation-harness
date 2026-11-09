@@ -76265,6 +76265,7 @@
         "hendrycks_math_precalc",
         "mathqa",
         "minerva_math500",
+        "minerva_math500_cot_zeroshot",
         "minerva_math500_self_consistency",
         "minerva_math_algebra",
         "minerva_math_counting_and_prob",
@@ -77147,6 +77148,13 @@
         "math_word_problems"
       ],
       "yaml_path": "minerva_math/minerva_math500.yaml"
+    },
+    "minerva_math500_cot_zeroshot": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "minerva_math/minerva_math500_cot_zeroshot.yaml"
     },
     "minerva_math500_self_consistency": {
       "kind": "TASK",
@@ -119461,6 +119469,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16310,
+  "entry_count": 16311,
   "schema_version": 1
 }
