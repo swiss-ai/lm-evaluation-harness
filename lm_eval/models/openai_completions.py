@@ -7,7 +7,7 @@ from typing import Any
 
 from lm_eval.api.registry import register_model
 from lm_eval.models.api_models import JsonChatStr, TemplateAPI
-from lm_eval.models.utils import handle_stop_sequences
+from lm_eval.models.utils import cap_stop_sequences, handle_stop_sequences
 
 
 eval_logger = logging.getLogger(__name__)
@@ -26,8 +26,13 @@ class LocalCompletionsAPI(TemplateAPI):
         verify_certificate=True,
         ca_cert_path=None,
         auth_token=None,
+        max_stop_sequences=4,
         **kwargs,
     ):
+        # Stop strings per request the server accepts (OpenAI's and vLLM's
+        # default: 4); a longer list is trimmed (cap_stop_sequences). 0 sends
+        # the task's list as it is.
+        self.max_stop_sequences = int(max_stop_sequences or 0)
         # Auto-detect tokenizer backend
         if tokenizer_backend == "auto":
             if base_url:
@@ -118,7 +123,11 @@ class LocalCompletionsAPI(TemplateAPI):
             else:
                 max_tokens = gen_kwargs.pop("max_gen_toks", self._max_gen_toks)
             temperature = gen_kwargs.pop("temperature", 0)
-            stop = handle_stop_sequences(gen_kwargs.pop("until", None), eos)
+            stop = cap_stop_sequences(
+                handle_stop_sequences(gen_kwargs.pop("until", None), eos),
+                self.max_stop_sequences,
+                eos,
+            )
             return {
                 "prompt": messages,
                 "model": self.model,

@@ -1034,3 +1034,65 @@ def test_postprocess_strips_the_reasoning_before_applying_the_stops():
         postprocess_generated_text("18\nQuestion: next", ["Question:"], "</think>")
         == "18\n"
     )
+
+
+HUMANEVAL_STOPS = [
+    "\nclass",
+    "\nif",
+    "\nprint",
+    "\n```",
+    "\n```\n\n",
+    "<|eot_id|>",
+    "</s>",
+]
+
+
+class TestCapStopSequences:
+    def test_humaneval_fits_in_four_without_losing_text_stops(self):
+        from lm_eval.models.utils import cap_stop_sequences
+
+        assert cap_stop_sequences(list(HUMANEVAL_STOPS), 4) == [
+            "\nclass",
+            "\nif",
+            "\nprint",
+            "\n```",
+        ]
+
+    def test_untouched_when_it_fits_or_disabled(self):
+        from lm_eval.models.utils import cap_stop_sequences
+
+        assert cap_stop_sequences(list(HUMANEVAL_STOPS), 10) == HUMANEVAL_STOPS
+        assert cap_stop_sequences(list(HUMANEVAL_STOPS), 0) == HUMANEVAL_STOPS
+        assert cap_stop_sequences(list(HUMANEVAL_STOPS), None) == HUMANEVAL_STOPS
+
+    def test_eos_dropped_before_text_stops(self):
+        from lm_eval.models.utils import cap_stop_sequences
+
+        got = cap_stop_sequences(["a", "b", "c", "d", "END"], 4, eos="END")
+        assert got == ["a", "b", "c", "d"]
+
+    def test_text_stops_cut_last_with_warning(self, caplog):
+        from lm_eval.models.utils import cap_stop_sequences
+
+        with caplog.at_level("WARNING"):
+            got = cap_stop_sequences(["a", "b", "c", "d", "e", "f"], 4)
+        assert got == ["a", "b", "c", "d"]
+        assert "['e', 'f']" in caplog.text
+
+    def test_local_completions_payload(self):
+        from lm_eval.models.openai_completions import LocalCompletionsAPI
+
+        for cap, n in ((4, 4), (0, 8)):
+            api = LocalCompletionsAPI(
+                base_url="http://x/v1/completions",
+                model="m",
+                tokenizer_backend=None,
+                max_stop_sequences=cap,
+            )
+            payload = api._create_payload(
+                "p",
+                generate=True,
+                gen_kwargs={"until": list(HUMANEVAL_STOPS)},
+                eos="<eos>",
+            )
+            assert len(payload["stop"]) == n
