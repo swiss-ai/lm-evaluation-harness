@@ -1227,6 +1227,13 @@ def test_text_prompts_get_the_bos_text_with_add_bos_token():
     assert sorted(sent) == ["<bos>Q: 12 * 7?", "<bos>Q: hi"]
 
 
+def test_text_prompts_unchanged_when_the_tokenizer_adds_bos_itself():
+    # The server tokenizes with the same tokenizer and adds BOS itself: prepending
+    # the text as well would give two.
+    sent = _sent_prompts(_gemma_api(adds_bos=True), ["Q: 12 * 7?"])
+    assert sent == ["Q: 12 * 7?"]
+
+
 def test_text_prompts_unchanged_without_add_bos_token():
     sent = _sent_prompts(
         _gemma_api(adds_bos=False, add_bos_token=False), ["Q: 12 * 7?"]
@@ -1243,3 +1250,14 @@ def test_rolling_does_not_score_bos_given_bos():
     ) as score:
         api.loglikelihood_rolling([MagicMock(args=("The capital",))], disable_tqdm=True)
     score.assert_called_once_with([(None, [2], [103, 107])], disable_tqdm=True)
+
+
+def test_rolling_unchanged_when_the_tokenizer_adds_bos_itself():
+    api = _gemma_api(adds_bos=True)
+    api.max_length = 16
+    api.cache_hook = MagicMock()
+    with patch.object(
+        api, "_loglikelihood_tokens", return_value=[(-1.0, True)]
+    ) as score:
+        api.loglikelihood_rolling([MagicMock(args=("The capital",))], disable_tqdm=True)
+    score.assert_called_once_with([(None, [2], [2, 103, 107])], disable_tqdm=True)

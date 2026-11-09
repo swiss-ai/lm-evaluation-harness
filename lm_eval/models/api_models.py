@@ -647,13 +647,31 @@ class TemplateAPI(TemplateLM):
             return ids
         return [bos, *ids]
 
+    @cached_property
+    def _tokenizer_adds_bos(self) -> bool:
+        """Whether the tokenizer puts BOS in front by itself (add_special_tokens).
+        The server tokenizes text prompts with the same tokenizer, so for these it
+        adds BOS on its own and nothing may be prepended to text."""
+        bos = getattr(self.tokenizer, "bos_token_id", None)
+        if bos is None:
+            return False
+        ids = self.tokenizer("a", add_special_tokens=True).input_ids
+        return bool(ids) and ids[0] == bos
+
     def _with_bos_text(self, prompt):
         """A plain-text prompt with the BOS token's text in front, for prompts sent
         as text (``tokenized_requests=False``), which the server tokenizes itself
-        -- it reads the BOS text back as the BOS token. Chat-completions messages
-        (JsonChatStr) are left to the server's template."""
+        -- it reads the BOS text back as the BOS token. Only for tokenizers that
+        never add BOS themselves (the server's copy then wouldn't either); others
+        are unchanged. Chat-completions messages (JsonChatStr) are left to the
+        server's template."""
         bos = getattr(self.tokenizer, "bos_token", None)
-        if not bos or not isinstance(prompt, str) or prompt.startswith(bos):
+        if (
+            not bos
+            or not isinstance(prompt, str)
+            or prompt.startswith(bos)
+            or self._tokenizer_adds_bos
+        ):
             return prompt
         return bos + prompt
 
@@ -1224,10 +1242,13 @@ class TemplateAPI(TemplateLM):
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):
             token_list = self.tok_encode(string)
             # The first window is conditioned on prefix_token_id (the BOS token when
-            # there is one); with add_bos_token the text starts with BOS as well, which
-            # would then be scored as its own first token (BOS given BOS).
+            # there is one). The BOS put in front by _with_bos_ids would then be
+            # scored as its own first token (BOS given BOS): drop it again. Only
+            # where this class added it -- tokenizers that add BOS themselves keep
+            # their previous behaviour.
             if (
                 self.add_bos_token
+                and not self._tokenizer_adds_bos
                 and token_list
                 and token_list[0] == self.prefix_token_id
             ):
