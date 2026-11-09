@@ -1191,3 +1191,127 @@ def test_failed_request_log_does_not_contain_the_api_key(caplog, monkeypatch):
 
     assert "retrying" in caplog.text
     assert api_key not in caplog.text
+
+
+class _GemmaLikeTokenizer:
+    """Word-level stand-in for a Gemma tokenizer: BOS id 2 / text "<bos>", which it
+    adds for add_special_tokens only if adds_bos (Gemma 3 does, Gemma 4 never)."""
+
+    bos_token, bos_token_id, eos_token_id = "<bos>", 2, 1
+
+    def __init__(self, adds_bos):
+        self.adds_bos = adds_bos
+
+    def _ids(self, text, add_special_tokens):
+        words = text.split(" ") if text else []
+        ids = [self.bos_token_id if w == "<bos>" else 100 + len(w) for w in words]
+        return (
+            [self.bos_token_id] if add_special_tokens and self.adds_bos else []
+        ) + ids
+
+    def __call__(self, text, add_special_tokens=False, **kwargs):
+        if isinstance(text, str):
+            ids = self._ids(text, add_special_tokens)
+        else:
+            ids = [self._ids(t, add_special_tokens) for t in text]
+        return SimpleNamespace(input_ids=ids)
+
+
+def _gemma_api(adds_bos, add_bos_token=True):
+    api = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        tokenizer_backend=None,
+        model="gemma",
+        add_bos_token=add_bos_token,
+        tokenized_requests=False,
+    )
+    api.tokenizer_backend = "huggingface"
+    api.tokenizer = _GemmaLikeTokenizer(adds_bos)
+    return api
+
+
+@pytest.mark.parametrize("adds_bos", [True, False], ids=["gemma3", "gemma4"])
+def test_add_bos_token_puts_bos_in_front_even_if_the_tokenizer_does_not(adds_bos):
+    api = _gemma_api(adds_bos)
+    assert api.tok_encode("The capital") == [2, 103, 107]
+    assert api.tok_encode(["The capital", "of"]) == [[2, 103, 107], [2, 102]]
+
+
+def test_add_bos_token_never_doubles_a_bos_already_there():
+    api = _gemma_api(adds_bos=False)
+    assert api.tok_encode("<bos> The") == [2, 103]
+
+
+def test_without_add_bos_token_the_tokenizer_decides():
+    assert _gemma_api(adds_bos=False, add_bos_token=False).tok_encode("The") == [103]
+    assert _gemma_api(adds_bos=True, add_bos_token=False).tok_encode("The") == [103]
+
+
+@pytest.mark.parametrize("adds_bos", [True, False], ids=["gemma3", "gemma4"])
+def test_loglikelihood_scores_the_continuation_after_a_leading_bos(adds_bos):
+    api = _gemma_api(adds_bos)
+    context_enc, continuation_enc = api._encode_pair("The capital is", " Paris")
+    assert context_enc == [2, 103, 107, 102]
+    assert continuation_enc == [105]
+
+
+def _sent_prompts(api, prompts):
+    sent = []
+
+    def fake_call(messages, **kwargs):
+        sent.extend([messages] if isinstance(messages, str) else list(messages))
+        return {"choices": [{"index": 0, "text": "x", "finish_reason": "stop"}]}
+
+    reqs = [
+        Instance(
+            request_type="generate_until",
+            doc={},
+            arguments=(p, {"until": ["\n"]}),
+            idx=0,
+        )
+        for p in prompts
+    ]
+    with patch.object(api, "model_call", side_effect=fake_call):
+        api.generate_until(reqs, disable_tqdm=True)
+    return sent
+
+
+def test_text_prompts_get_the_bos_text_with_add_bos_token():
+    sent = _sent_prompts(_gemma_api(adds_bos=False), ["Q: 12 * 7?", "<bos>Q: hi"])
+    assert sorted(sent) == ["<bos>Q: 12 * 7?", "<bos>Q: hi"]
+
+
+def test_text_prompts_unchanged_when_the_tokenizer_adds_bos_itself():
+    # The server tokenizes with the same tokenizer and adds BOS itself: prepending
+    # the text as well would give two.
+    sent = _sent_prompts(_gemma_api(adds_bos=True), ["Q: 12 * 7?"])
+    assert sent == ["Q: 12 * 7?"]
+
+
+def test_text_prompts_unchanged_without_add_bos_token():
+    sent = _sent_prompts(
+        _gemma_api(adds_bos=False, add_bos_token=False), ["Q: 12 * 7?"]
+    )
+    assert sent == ["Q: 12 * 7?"]
+
+
+def test_rolling_does_not_score_bos_given_bos():
+    api = _gemma_api(adds_bos=False)
+    api.max_length = 16
+    api.cache_hook = MagicMock()
+    with patch.object(
+        api, "_loglikelihood_tokens", return_value=[(-1.0, True)]
+    ) as score:
+        api.loglikelihood_rolling([MagicMock(args=("The capital",))], disable_tqdm=True)
+    score.assert_called_once_with([(None, [2], [103, 107])], disable_tqdm=True)
+
+
+def test_rolling_unchanged_when_the_tokenizer_adds_bos_itself():
+    api = _gemma_api(adds_bos=True)
+    api.max_length = 16
+    api.cache_hook = MagicMock()
+    with patch.object(
+        api, "_loglikelihood_tokens", return_value=[(-1.0, True)]
+    ) as score:
+        api.loglikelihood_rolling([MagicMock(args=("The capital",))], disable_tqdm=True)
+    score.assert_called_once_with([(None, [2], [2, 103, 107])], disable_tqdm=True)

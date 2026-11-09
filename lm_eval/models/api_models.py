@@ -609,6 +609,11 @@ class TemplateAPI(TemplateLM):
                 truncation=truncation,
                 return_attention_mask=False,
             ).input_ids
+            if add_special_tokens and self.add_bos_token:
+                if isinstance(string, str):
+                    encoding = self._with_bos_ids(encoding)
+                else:
+                    encoding = [self._with_bos_ids(enc) for enc in encoding]
 
             # left-truncate the encoded context to be at most `left_truncate_len` tokens long
             if left_truncate_len:
@@ -637,6 +642,47 @@ class TemplateAPI(TemplateLM):
             except (TypeError, ValueError):
                 encoding = self.tokenizer.encode_batch(string)
             return encoding
+
+    def _with_bos_ids(self, ids: list[int]) -> list[int]:
+        """``ids`` with the BOS token in front, as ``add_bos_token`` asks.
+
+        Some tokenizers define a BOS token but never add it, whatever
+        ``add_special_tokens`` says (Gemma 4: ``add_bos_token`` unset in its
+        tokenizer_config, unlike Gemma 3's ``true``), so asking the tokenizer is
+        not enough. Already there (the tokenizer added it, or a chat template
+        wrote it): unchanged, never doubled."""
+        bos = getattr(self.tokenizer, "bos_token_id", None)
+        if bos is None or (ids and ids[0] == bos):
+            return ids
+        return [bos, *ids]
+
+    @cached_property
+    def _tokenizer_adds_bos(self) -> bool:
+        """Whether the tokenizer puts BOS in front by itself (add_special_tokens).
+        The server tokenizes text prompts with the same tokenizer, so for these it
+        adds BOS on its own and nothing may be prepended to text."""
+        bos = getattr(self.tokenizer, "bos_token_id", None)
+        if bos is None:
+            return False
+        ids = self.tokenizer("a", add_special_tokens=True).input_ids
+        return bool(ids) and ids[0] == bos
+
+    def _with_bos_text(self, prompt):
+        """A plain-text prompt with the BOS token's text in front, for prompts sent
+        as text (``tokenized_requests=False``), which the server tokenizes itself
+        -- it reads the BOS text back as the BOS token. Only for tokenizers that
+        never add BOS themselves (the server's copy then wouldn't either); others
+        are unchanged. Chat-completions messages (JsonChatStr) are left to the
+        server's template."""
+        bos = getattr(self.tokenizer, "bos_token", None)
+        if (
+            not bos
+            or not isinstance(prompt, str)
+            or prompt.startswith(bos)
+            or self._tokenizer_adds_bos
+        ):
+            return prompt
+        return bos + prompt
 
     def decode_batch(self, tokens: list[list[int]]) -> list[str]:
         if self.tokenizer_backend == "huggingface":
@@ -1024,6 +1070,8 @@ class TemplateAPI(TemplateLM):
                 requests, add_special_tokens=self.add_bos_token
             )
         else:
+            if self.add_bos_token and self.tokenizer_backend == "huggingface":
+                requests = tuple(self._with_bos_text(r) for r in requests)
             encodings_list = [None] * len(requests)
         request_args = [
             (a, b, c) for a, b, c in zip(requests, all_gen_kwargs, encodings_list)
@@ -1191,11 +1239,24 @@ class TemplateAPI(TemplateLM):
 
         # Flatten the windows of all documents, so we can evaluate all documents in parallel
         for (string,) in tqdm([req.args for req in requests], disable=disable_tqdm):
+            token_list = self.tok_encode(string)
+            # The first window is conditioned on prefix_token_id (the BOS token when
+            # there is one). The BOS put in front by _with_bos_ids would then be
+            # scored as its own first token (BOS given BOS): drop it again. Only
+            # where this class added it -- tokenizers that add BOS themselves keep
+            # their previous behaviour.
+            if (
+                self.add_bos_token
+                and not self._tokenizer_adds_bos
+                and token_list
+                and token_list[0] == self.prefix_token_id
+            ):
+                token_list = token_list[1:]
             rolling_token_windows = list(
                 map(
                     utils.make_disjoint_window,
                     utils.get_rolling_token_windows(
-                        token_list=self.tok_encode(string),
+                        token_list=token_list,
                         prefix_token=self.prefix_token_id,
                         # max_seq_len - (1 for context)
                         max_seq_len=self.max_length - 1,
