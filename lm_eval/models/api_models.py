@@ -113,6 +113,50 @@ def truncation_info(text: Any) -> dict:
 
 eval_logger = logging.getLogger(__name__)
 
+
+def _live_prompts(model: Any, messages: list, count: int) -> list[str]:
+    """The prompt text of each request in a batch, for the live view: a chat as
+    "role: text" lines, a string as it is, token ids decoded."""
+    if not messages:
+        return []
+    if isinstance(messages[0], JsonChatStr):
+        chat = json.loads(messages[0].prompt)
+        return [
+            "\n".join(
+                f"{m.get('role', '?')}: {m['content'] if isinstance(m.get('content'), str) else json.dumps(m.get('content'))}"
+                for m in chat
+            )
+        ]
+    if isinstance(messages[0], str):
+        return [str(m) for m in messages]
+    if (
+        isinstance(messages[0], list)
+        and messages[0]
+        and isinstance(messages[0][0], int)
+    ):
+        return list(model.decode_batch(messages))
+    return []
+
+
+def _live_details(outputs: Any) -> tuple[str, int | None, int | None]:
+    """(reasoning text, output tokens, reasoning tokens) of one API response, as far
+    as the server reported them."""
+    if isinstance(outputs, list):
+        outputs = outputs[0] if outputs else {}
+    if not isinstance(outputs, dict):
+        return "", None, None
+    choice = (outputs.get("choices") or [{}])[0] or {}
+    message = choice.get("message") or {}
+    reasoning = message.get("reasoning_content") or message.get("reasoning") or ""
+    usage = outputs.get("usage") or {}
+    details = usage.get("completion_tokens_details") or {}
+    return (
+        reasoning if isinstance(reasoning, str) else "",
+        usage.get("completion_tokens"),
+        details.get("reasoning_tokens"),
+    )
+
+
 LogLikelihoodInputs = tuple[tuple[str, str], list[int], list[int]]
 
 
@@ -765,6 +809,29 @@ class TemplateAPI(TemplateLM):
             )
             return None
 
+    def _record_live_view(self, messages: list, answers: list, outputs: Any) -> None:
+        """Hand the finished generation(s) to the live view (loggers/live_view.py),
+        which does nothing unless it is switched on."""
+        if not os.environ.get(
+            "LM_EVAL_LIVE_VIEW"
+        ):  # loggers.live_view.ENV, imported lazily
+            return
+        try:
+            from lm_eval.loggers import live_view
+
+            prompts = _live_prompts(self, messages, len(answers))
+            reasoning, output_tokens, reasoning_tokens = _live_details(outputs)
+            for index, answer in enumerate(answers):
+                live_view.record(
+                    prompts[index] if index < len(prompts) else "",
+                    str(answer),
+                    reasoning if len(answers) == 1 else "",
+                    output_tokens if len(answers) == 1 else None,
+                    reasoning_tokens if len(answers) == 1 else None,
+                )
+        except Exception as exc:  # noqa: BLE001 - never disturb the evaluation
+            eval_logger.debug("live view not recorded: %s", exc)
+
     async def amodel_call(
         self,
         session: ClientSession,
@@ -816,6 +883,7 @@ class TemplateAPI(TemplateLM):
                     answers.append(a)
             if generate:
                 answers = with_finish_reasons(answers, outputs)
+                self._record_live_view(messages, answers, outputs)
 
             # A thinking generation is cached once stripped (generate_until).
             if cache_keys and not (generate and self.think_end_token):
