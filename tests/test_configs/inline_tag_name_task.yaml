@@ -1,0 +1,4 @@
+# A task in the tag that inline_subgroup_tag_name.yaml also names a group after.
+include: simple_task.yaml
+task: inline_tag_name_task
+tag: inline_tag_name

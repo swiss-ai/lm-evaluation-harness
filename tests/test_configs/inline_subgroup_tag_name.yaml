@@ -1,0 +1,13 @@
+# An inline subgroup named like a tag, as in mmlu_flan_cot_zeroshot: its stem group
+# lists the tag of the same name as a child.
+group: inline_subgroup_tag_parent
+task:
+  - group: inline_tag_name
+    task:
+      - inline_tag_name
+    aggregate_metric_list:
+      - metric: acc
+        weight_by_size: true
+aggregate_metric_list:
+  - metric: acc
+    weight_by_size: true
