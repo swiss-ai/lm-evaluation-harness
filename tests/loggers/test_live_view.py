@@ -126,3 +126,36 @@ def test_a_chat_generation_carries_its_reasoning_and_tokens(tmp_path, monkeypatc
     assert line["answer"] == "42"
     assert line["reasoning"] == "six times seven"
     assert (line["output_tokens"], line["reasoning_tokens"]) == (30, 25)
+
+
+def test_the_request_body_is_kept_with_long_values_cut(tmp_path, monkeypatch):
+    path = tmp_path / "live_view.jsonl"
+    monkeypatch.setenv(live_view.ENV, str(path))
+    request = {
+        "model": "m",
+        "temperature": 0.6,
+        "messages": [{"role": "user", "content": "x" * (live_view.TEXT_CAP + 3)}],
+        "prompt": list(range(live_view.REQUEST_LIST_CAP + 4)),
+    }
+    live_view.record("p", "a", request=request)
+    kept = _lines(path)[0]["request"]
+    assert kept["model"] == "m" and kept["temperature"] == 0.6
+    assert kept["messages"][0]["content"].endswith("[... 3 more characters]")
+    assert len(kept["prompt"]) == live_view.REQUEST_LIST_CAP + 1
+    assert kept["prompt"][-1] == "[... 4 more items]"
+    # Without one, the line has no request key at all.
+    live_view.record("p2", "a2")
+    assert "request" not in _lines(path)[1]
+
+
+def test_a_chat_generation_records_the_body_it_sent(tmp_path, monkeypatch):
+    path = tmp_path / "live_view.jsonl"
+    monkeypatch.setenv(live_view.ENV, str(path))
+    model = LocalChatCompletion(base_url="http://x", tokenizer_backend=None, model="m")
+    chat = JsonChatStr(json.dumps([{"role": "user", "content": "6*7="}]))
+    session = _session({"choices": [{"index": 0, "message": {"content": "42"}}]})
+    asyncio.run(model.amodel_call(session, asyncio.Semaphore(1), [chat], gen_kwargs={}))
+    body = _lines(path)[0]["request"]
+    assert body["model"] == "m"
+    assert body["messages"] == [{"role": "user", "content": "6*7="}]
+    assert "api_key" not in json.dumps(body).lower()

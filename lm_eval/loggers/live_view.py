@@ -5,7 +5,8 @@ long run shows nothing until the end. An API model records, as each generation
 returns, into two small files next to the run's --output_path (set by the CLI,
 or by LM_EVAL_LIVE_VIEW):
 
-  live_view.jsonl           the first KEEP requests: prompt, answer, reasoning, tokens
+  live_view.jsonl           the first KEEP requests: prompt, answer, reasoning, tokens,
+                            and the request body that was sent (long values cut)
   live_view_progress.json   how many generation requests have finished, and when
 
 A reader outside the run (the evals service's status writer) picks them up while the
@@ -27,6 +28,7 @@ ENV = "LM_EVAL_LIVE_VIEW"
 KEEP = 20  # requests kept in full
 TEXT_CAP = 6000  # characters of one prompt / answer
 REASONING_CAP = 20000
+REQUEST_LIST_CAP = 500  # items kept of a list in the request (token ids, messages)
 PROGRESS_EVERY_SECONDS = 2.0
 
 _PROGRESS_NAME = "live_view_progress.json"
@@ -51,6 +53,25 @@ def _cap(text: str, cap: int) -> str:
     return text[:cap] + f"\n[... {len(text) - cap} more characters]"
 
 
+def _trim(value, depth: int = 0):
+    """`value` (a request body) with its long strings and lists cut, so a line stays
+    readable and small: still JSON, but not to be replayed once something was cut."""
+    if depth > 8:
+        return "..."
+    if isinstance(value, str):
+        return _cap(value, TEXT_CAP)
+    if isinstance(value, dict):
+        return {str(k): _trim(v, depth + 1) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        items = [_trim(v, depth + 1) for v in value[:REQUEST_LIST_CAP]]
+        if len(value) > REQUEST_LIST_CAP:
+            items.append(f"[... {len(value) - REQUEST_LIST_CAP} more items]")
+        return items
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)
+
+
 def _write_progress(path: str, done: int) -> None:
     progress_path = os.path.join(os.path.dirname(path), _PROGRESS_NAME)
     temporary = progress_path + ".tmp"
@@ -65,8 +86,10 @@ def record(
     reasoning: str = "",
     output_tokens: int | None = None,
     reasoning_tokens: int | None = None,
+    request: dict | None = None,
 ) -> None:
-    """One finished generation. A no-op unless the live view is switched on."""
+    """One finished generation, with the request body that produced it (for the
+    first KEEP). A no-op unless the live view is switched on."""
     global _warned
     path = os.environ.get(ENV)
     if not path:
@@ -84,6 +107,8 @@ def record(
                 "output_tokens": output_tokens,
                 "reasoning_tokens": reasoning_tokens,
             }
+            if request is not None:
+                line["request"] = _trim(request)
             with open(path, "a") as handle:
                 handle.write(json.dumps(line) + "\n")
         now = time.monotonic()
