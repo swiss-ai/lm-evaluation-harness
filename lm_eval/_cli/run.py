@@ -384,7 +384,12 @@ class Run(SubCommand):
         cfg = EvaluatorConfig.from_cli(args)
 
         from lm_eval import simple_evaluate
-        from lm_eval.loggers import EvaluationTracker, TrackioLogger, WandbLogger
+        from lm_eval.loggers import (
+            EvaluationTracker,
+            TrackioLogger,
+            WandbLogger,
+            live_view,
+        )
         from lm_eval.utils import handle_non_serializable, make_table
 
         # Set up logging
@@ -396,6 +401,11 @@ class Run(SubCommand):
         # Set up evaluation tracker
         if cfg.output_path:
             cfg.hf_hub_log_args["output_path"] = cfg.output_path
+            # A live view of the run's first requests and its progress, beside the
+            # results (loggers/live_view.py); a path set by the caller wins.
+            live_view_path = live_view.default_path(cfg.output_path)
+            if live_view_path:
+                os.environ.setdefault(live_view.ENV, live_view_path)
 
         if os.environ.get("HF_TOKEN", None):
             cfg.hf_hub_log_args["token"] = os.environ.get("HF_TOKEN")
@@ -490,6 +500,8 @@ class Run(SubCommand):
                         trackio_logger.log_eval_samples(samples)
                 except Exception as e:  # noqa: BLE001
                     eval_logger.info("Logging to Trackio failed: %s", e)
+
+            live_view.finish()  # the last request count, if the throttle held it back
 
             # Save results
             evaluation_tracker.save_results_aggregated(
