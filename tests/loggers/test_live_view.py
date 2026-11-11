@@ -159,3 +159,34 @@ def test_a_chat_generation_records_the_body_it_sent(tmp_path, monkeypatch):
     assert body["model"] == "m"
     assert body["messages"] == [{"role": "user", "content": "6*7="}]
     assert "api_key" not in json.dumps(body).lower()
+
+
+def test_the_response_is_kept_with_long_values_cut(tmp_path, monkeypatch):
+    path = tmp_path / "live_view.jsonl"
+    monkeypatch.setenv(live_view.ENV, str(path))
+    response = {
+        "choices": [{"text": "y" * (live_view.TEXT_CAP + 2), "finish_reason": "stop"}]
+    }
+    live_view.record("p", "a", response=response)
+    kept = _lines(path)[0]["response"]
+    assert kept["choices"][0]["finish_reason"] == "stop"
+    assert kept["choices"][0]["text"].endswith("[... 2 more characters]")
+    live_view.record("p2", "a2")
+    assert "response" not in _lines(path)[1]
+
+
+def test_a_chat_generation_records_the_response_it_got(tmp_path, monkeypatch):
+    path = tmp_path / "live_view.jsonl"
+    monkeypatch.setenv(live_view.ENV, str(path))
+    model = LocalChatCompletion(base_url="http://x", tokenizer_backend=None, model="m")
+    chat = JsonChatStr(json.dumps([{"role": "user", "content": "6*7="}]))
+    reply = {
+        "id": "chatcmpl-1",
+        "choices": [
+            {"index": 0, "finish_reason": "stop", "message": {"content": "42"}}
+        ],
+        "usage": {"completion_tokens": 1},
+    }
+    session = _session(reply)
+    asyncio.run(model.amodel_call(session, asyncio.Semaphore(1), [chat], gen_kwargs={}))
+    assert _lines(path)[0]["response"] == reply
