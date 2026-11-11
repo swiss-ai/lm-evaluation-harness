@@ -809,7 +809,9 @@ class TemplateAPI(TemplateLM):
             )
             return None
 
-    def _record_live_view(self, messages: list, answers: list, outputs: Any) -> None:
+    def _record_live_view(
+        self, messages: list, answers: list, outputs: Any, payload: Any = None
+    ) -> None:
         """Hand the finished generation(s) to the live view (loggers/live_view.py),
         which does nothing unless it is switched on."""
         if not os.environ.get(
@@ -821,6 +823,8 @@ class TemplateAPI(TemplateLM):
 
             prompts = _live_prompts(self, messages, len(answers))
             reasoning, output_tokens, reasoning_tokens = _live_details(outputs)
+            # The request body sent (one per call; a batch shares it).
+            request = payload if isinstance(payload, dict) else None
             for index, answer in enumerate(answers):
                 live_view.record(
                     prompts[index] if index < len(prompts) else "",
@@ -828,6 +832,7 @@ class TemplateAPI(TemplateLM):
                     reasoning if len(answers) == 1 else "",
                     output_tokens if len(answers) == 1 else None,
                     reasoning_tokens if len(answers) == 1 else None,
+                    request,
                 )
         except Exception as exc:  # noqa: BLE001 - never disturb the evaluation
             eval_logger.debug("live view not recorded: %s", exc)
@@ -883,7 +888,7 @@ class TemplateAPI(TemplateLM):
                     answers.append(a)
             if generate:
                 answers = with_finish_reasons(answers, outputs)
-                self._record_live_view(messages, answers, outputs)
+                self._record_live_view(messages, answers, outputs, payload)
 
             # A thinking generation is cached once stripped (generate_until).
             if cache_keys and not (generate and self.think_end_token):
