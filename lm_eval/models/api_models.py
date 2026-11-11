@@ -72,6 +72,25 @@ class Generation(str):
     generation_info: dict | None = None
 
 
+class PrefixedPrompt(str):
+    """A rendered chat prompt whose last turn is a task ``gen_prefix`` the model continues.
+
+    Behaves as the plain full prompt (``head`` + ``prefix``). ``head`` is the prompt
+    without the prefix, ending in the generation prompt. With a thinking model the
+    prefix belongs after the closed reasoning, not before it, so ``generate_until``
+    sends ``head`` first and then continues from ``head + reasoning + prefix``.
+    """
+
+    head: str
+    prefix: str
+
+    def __new__(cls, full: str, head: str, prefix: str):
+        obj = super().__new__(cls, full)
+        obj.head = head
+        obj.prefix = prefix
+        return obj
+
+
 def parse_finish_reasons(outputs: Any) -> list[str | None]:
     """Each choice's ``finish_reason``, in the order ``parse_generations`` returns
     the texts (by choice index, across a batch of responses). Never raises."""
@@ -329,6 +348,13 @@ class TemplateAPI(TemplateLM):
         autodetect_think_tokens: bool = False,
         # force the thinking metrics on/off; None = on iff a close token is known
         track_thinking_metrics: bool | None = None,
+        # With a reasoning close known, a task's gen_prefix (e.g. "The best answer is")
+        # is placed after the closed reasoning (a second request) instead of before it,
+        # where it would stop the model thinking. Needs the chat template rendered
+        # client-side; False restores the prefix-first behaviour.
+        after_think_prefix: bool = True,
+        # token budget of that second request (the answer after the reasoning)
+        after_think_max_gen_toks: int = 4096,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -391,6 +417,8 @@ class TemplateAPI(TemplateLM):
         self._eos_string = eos_string
         self.timeout = int(timeout)
         self.max_images = int(max_images)
+        self.after_think_prefix = bool(after_think_prefix)
+        self.after_think_max_gen_toks = int(after_think_max_gen_toks)
         self.chat_template_args = dict(chat_template_args or {})
         if enable_thinking is not None:
             self.chat_template_args["enable_thinking"] = enable_thinking
@@ -1089,6 +1117,100 @@ class TemplateAPI(TemplateLM):
     def _rollout_seed(self, seed: int, rollout_index: int) -> int:
         return rollout_seed(seed, rollout_index)
 
+    def _prefixed_prompt(self, chat_history, render, full):
+        """``full`` as a PrefixedPrompt when its last turn is a gen_prefix to move
+        after the reasoning; otherwise ``full`` itself. ``render`` renders messages
+        with the model's template (add_generation_prompt, continue_final_message)."""
+        if not (
+            self.after_think_prefix
+            and self.think_end_token
+            and chat_history
+            and chat_history[-1].get("role") == "assistant"
+            and isinstance(chat_history[-1].get("content"), str)
+            and chat_history[-1]["content"]
+        ):
+            return full
+        prefix = chat_history[-1]["content"]
+        head = render(chat_history[:-1])
+        if not (full.startswith(head) and full[len(head) :] == prefix):
+            eval_logger.warning(
+                "after_think_prefix: the template does not render the prefix as a plain "
+                "suffix of the prompt; sending it before the reasoning as before."
+            )
+            return full
+        return PrefixedPrompt(full, head, prefix)
+
+    def _continue_after_think(self, texts, prefixed, gen_kwargs_list):
+        """Second pass for requests whose gen_prefix was held back: continue each from
+        ``head + reasoning + prefix`` and return ``reasoning + continuation`` (the prefix
+        itself is not part of a generation, as when it is sent up front). A generation
+        that never closed its reasoning keeps its text: nothing to continue from."""
+        todo = []
+        for i, (text, held) in enumerate(zip(texts, prefixed, strict=True)):
+            if held is None:
+                continue
+            text = str(text)
+            if self.think_end_token in text:
+                reasoning = text[
+                    : text.index(self.think_end_token) + len(self.think_end_token)
+                ]
+            elif getattr(texts[i], "finish_reason", None) == "length":
+                continue
+            else:
+                reasoning = ""  # answered without reasoning: the prefix goes up front
+            todo.append((i, reasoning, held))
+        if not todo:
+            return texts
+        groups: dict[str, list] = {}
+        for i, reasoning, held in todo:
+            kw = {k: v for k, v in gen_kwargs_list[i].items() if k != "seed"}
+            kw["max_gen_toks"] = self.after_think_max_gen_toks
+            groups.setdefault(json.dumps(kw, sort_keys=True, default=str), []).append(
+                (i, reasoning, held, kw)
+            )
+        texts = list(texts)
+        for members in groups.values():
+            kw = members[0][3]
+            contexts = []
+            for _, reasoning, held, _ in members:
+                head = held.head
+                if self.add_bos_token and self.tokenizer_backend == "huggingface":
+                    head = self._with_bos_text(head)
+                contexts.append(head + reasoning + held.prefix)
+            seeds = [gen_kwargs_list[i].get("seed") for i, *_ in members]
+            sent = self._sent_gen_kwargs(kw)
+            if self._concurrent <= 1:
+                answers = []
+                for ctx, seed in zip(contexts, seeds, strict=True):
+                    outputs = retry(
+                        stop=stop_after_attempt(self.max_retries),
+                        wait=wait_exponential(multiplier=0.5, min=1, max=10),
+                        reraise=True,
+                    )(self.model_call)(
+                        messages=[ctx],
+                        generate=True,
+                        gen_kwargs={**sent, "seed": seed} if seed is not None else sent,
+                    )
+                    generated = self.parse_generations(outputs=outputs)
+                    answers.extend(with_finish_reasons(generated, outputs))
+            else:
+                results = asyncio.run(
+                    self.get_batched_requests(
+                        contexts,
+                        cache_keys=[None] * len(contexts),
+                        generate=True,
+                        gen_kwargs=sent,
+                        request_seeds=seeds if len(set(seeds)) > 1 else None,
+                    )
+                )
+                answers = list(itertools.chain.from_iterable(results))
+            for (i, reasoning, _, _), answer in zip(members, answers, strict=True):
+                merged = Generation(reasoning + ("" if answer is None else str(answer)))
+                merged.finish_reason = getattr(answer, "finish_reason", None)
+                merged.generation_info = getattr(texts[i], "generation_info", None)
+                texts[i] = merged
+        return texts
+
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
@@ -1127,6 +1249,14 @@ class TemplateAPI(TemplateLM):
             )
         else:
             requests, all_gen_kwargs = zip(*(req.args for req in requests))
+
+        # A gen_prefix held back until the reasoning is closed: send the prompt without it.
+        prefixed = [r if isinstance(r, PrefixedPrompt) else None for r in requests]
+        if any(p is not None for p in prefixed):
+            requests = tuple(
+                str(r.head) if p is not None else r
+                for r, p in zip(requests, prefixed, strict=True)
+            )
 
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
@@ -1269,6 +1399,8 @@ class TemplateAPI(TemplateLM):
                 res.extend(results)
 
         res = re_ord.get_original(res)
+        if any(p is not None for p in prefixed):
+            res = self._continue_after_think(res, prefixed, list(all_gen_kwargs))
         # Per-response length and thinking-format info on the raw generation, as on
         # vllm/sglang (thinking_* only with a close token known).
         hf_tokenizer = (
