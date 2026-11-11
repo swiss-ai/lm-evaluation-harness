@@ -851,8 +851,12 @@ class TemplateAPI(TemplateLM):
 
             prompts = _live_prompts(self, messages, len(answers))
             reasoning, output_tokens, reasoning_tokens = _live_details(outputs)
-            # The request body sent (one per call; a batch shares it).
+            # The request body sent (one per call; a batch shares it) and, for a single
+            # generation, the response it got.
             request = payload if isinstance(payload, dict) else None
+            response = outputs[0] if isinstance(outputs, list) and outputs else outputs
+            if len(answers) != 1 or not isinstance(response, dict):
+                response = None
             for index, answer in enumerate(answers):
                 live_view.record(
                     prompts[index] if index < len(prompts) else "",
@@ -861,6 +865,7 @@ class TemplateAPI(TemplateLM):
                     output_tokens if len(answers) == 1 else None,
                     reasoning_tokens if len(answers) == 1 else None,
                     request,
+                    response,
                 )
         except Exception as exc:  # noqa: BLE001 - never disturb the evaluation
             eval_logger.debug("live view not recorded: %s", exc)

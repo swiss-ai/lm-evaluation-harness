@@ -6,7 +6,8 @@ returns, into two small files next to the run's --output_path (set by the CLI,
 or by LM_EVAL_LIVE_VIEW):
 
   live_view.jsonl           the first KEEP requests: prompt, answer, reasoning, tokens,
-                            and the request body that was sent (long values cut)
+                            the request body that was sent and the response that came
+                            back (long values cut)
   live_view_progress.json   how many generation requests have finished, and when
 
 A reader outside the run (the evals service's status writer) picks them up while the
@@ -87,9 +88,10 @@ def record(
     output_tokens: int | None = None,
     reasoning_tokens: int | None = None,
     request: dict | None = None,
+    response: dict | None = None,
 ) -> None:
-    """One finished generation, with the request body that produced it (for the
-    first KEEP). A no-op unless the live view is switched on."""
+    """One finished generation, with the request body that produced it and the
+    response it got (for the first KEEP). A no-op unless the live view is switched on."""
     global _warned
     path = os.environ.get(ENV)
     if not path:
@@ -109,6 +111,8 @@ def record(
             }
             if request is not None:
                 line["request"] = _trim(request)
+            if response is not None:
+                line["response"] = _trim(response)
             with open(path, "a") as handle:
                 handle.write(json.dumps(line) + "\n")
         now = time.monotonic()
