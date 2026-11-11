@@ -95,13 +95,27 @@ class LocalCompletionsAPI(TemplateAPI):
         # Extra kwargs come from tasks that render tool schemas into the prompt
         # (e.g. bfcl_v3_apertus passes tools=[...]).
         if self.tokenizer_backend == "huggingface":
-            return self.tokenizer.apply_chat_template(
+            full = self.tokenizer.apply_chat_template(
                 chat_history,
                 tokenize=False,
                 add_generation_prompt=add_generation_prompt,
                 continue_final_message=not add_generation_prompt,
                 **self.chat_template_args,
                 **kwargs,
+            )
+            if add_generation_prompt:
+                return full
+            return self._prefixed_prompt(
+                chat_history,
+                lambda history: self.tokenizer.apply_chat_template(
+                    history,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    continue_final_message=False,
+                    **self.chat_template_args,
+                    **kwargs,
+                ),
+                full,
             )
         return super().apply_chat_template(
             chat_history, add_generation_prompt, **kwargs
