@@ -861,6 +861,21 @@ metadata:
             # Verify aggregation was parsed
             assert subgroup.aggregate_metric_list is not None
 
+    def test_inline_subgroup_named_like_a_tag(self, test_configs_task_manager):
+        """An inline subgroup named like a tag is a subgroup, not the tag.
+
+        mmlu_flan_cot_zeroshot's stem group is named like the tag it lists as its
+        child; its aggregate_metric_list used to reach the tasks' TaskConfig.
+        """
+        loaded = test_configs_task_manager.load(["inline_subgroup_tag_parent"])
+        parent = loaded["groups"]["inline_subgroup_tag_parent"]
+        (subgroup,) = parent.get_all_groups(recursive=False)
+        assert subgroup.name == "inline_subgroup_tag_parent::inline_tag_name"
+        assert subgroup.aggregate_metric_list is not None
+        assert [t.task_name for t in subgroup.get_all_tasks(recursive=False)] == [
+            "inline_tag_name_task"
+        ]
+
 
 # =============================================================================
 # Same integration tests using load() instead of load_task_or_group()

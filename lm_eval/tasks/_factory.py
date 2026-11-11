@@ -154,7 +154,7 @@ class TaskFactory:
                 # existing group (with overrides) or a true inline definition.
                 if "group" in item:
                     name = item["group"]
-                    if name in registry:
+                    if name in registry and registry[name].kind == Kind.GROUP:
                         # Existing group referenced with overrides
                         inline_overrides = {
                             k: v for k, v in item.items() if k != "group"
@@ -167,7 +167,9 @@ class TaskFactory:
                         )
                         children.append(cast("Group", child_obj))
                     else:
-                        # True inline group (not in registry)
+                        # True inline group (not in registry, or the name is
+                        # a tag's: mmlu_flan_cot_zeroshot's stem group lists its
+                        # tag of the same name as a child)
                         name = f"{group_name}::{name}"
                         children.append(
                             self._build_group(name, item, overrides, registry)
