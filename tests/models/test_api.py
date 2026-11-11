@@ -1315,3 +1315,104 @@ def test_rolling_unchanged_when_the_tokenizer_adds_bos_itself():
     ) as score:
         api.loglikelihood_rolling([MagicMock(args=("The capital",))], disable_tqdm=True)
     score.assert_called_once_with([(None, [2], [2, 103, 107])], disable_tqdm=True)
+
+
+class _PrefixTokenizer:
+    """Renders "<user>{q}<assistant>"; a trailing assistant turn (the gen_prefix) is
+    continued, so the prompt ends with it."""
+
+    def apply_chat_template(
+        self, messages, tokenize=False, add_generation_prompt=True, **kwargs
+    ):
+        text = "".join(f"<{m['role']}>{m['content']}" for m in messages[:-1])
+        last = messages[-1]
+        if last["role"] == "assistant":
+            return text + f"<assistant>{last['content']}"
+        return (
+            text
+            + f"<{last['role']}>{last['content']}"
+            + ("<assistant>" if add_generation_prompt else "")
+        )
+
+
+def _prefix_model(**kwargs):
+    model = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        model="test-model",
+        tokenizer_backend=None,
+        tokenized_requests=False,
+        **kwargs,
+    )
+    model.tokenizer_backend = "huggingface"
+    model.tokenizer = _PrefixTokenizer()
+    return model
+
+
+def _prefix_instance(model):
+    prompt = model.apply_chat_template(
+        [
+            {"role": "user", "content": "Q?"},
+            {"role": "assistant", "content": "The best answer is"},
+        ],
+        add_generation_prompt=False,
+    )
+    return Instance(
+        request_type="generate_until",
+        doc={},
+        arguments=(prompt, {"until": ["."], "max_gen_toks": 100}),
+        idx=0,
+    )
+
+
+def test_gen_prefix_moves_after_the_closed_reasoning():
+    model = _prefix_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    instance = _prefix_instance(model)
+    # still the plain full prompt to anything that does not know about thinking
+    assert str(instance.args[0]) == "<user>Q?<assistant>The best answer is"
+    prompts: list[str] = []
+    replies = iter(["<think>it is B</think>Whatever.", " B."])
+
+    def model_call(messages, generate=True, gen_kwargs=None, **_):
+        prompts.append(messages[0])
+        payload = model._create_payload(messages, generate=True, gen_kwargs=gen_kwargs)
+        prompts.append(payload["max_tokens"])
+        return {
+            "choices": [{"index": 0, "text": next(replies), "finish_reason": "stop"}]
+        }
+
+    with patch.object(model, "model_call", side_effect=model_call):
+        result = model.generate_until([instance])
+
+    # first request: no prefix; second: head + reasoning + prefix, a small budget
+    assert prompts[0] == "<user>Q?<assistant>"
+    assert prompts[2] == "<user>Q?<assistant><think>it is B</think>The best answer is"
+    assert prompts[3] == model.after_think_max_gen_toks
+    # the prefix is not part of the generation; the reasoning is stripped for scoring
+    assert result == ["B"]
+
+
+def test_gen_prefix_stays_up_front_without_think_tokens():
+    model = _prefix_model()
+    prompt = _prefix_instance(model).args[0]
+    assert not hasattr(prompt, "head")
+    assert prompt == "<user>Q?<assistant>The best answer is"
+
+
+def test_truncated_reasoning_is_not_continued():
+    model = _prefix_model(think_start_token="<think>", think_end_token="</think>")  # noqa: S106
+    instance = _prefix_instance(model)
+    calls = []
+
+    def model_call(messages, generate=True, gen_kwargs=None, **_):
+        calls.append(messages[0])
+        return {
+            "choices": [
+                {"index": 0, "text": "<think>still going", "finish_reason": "length"}
+            ]
+        }
+
+    with patch.object(model, "model_call", side_effect=model_call):
+        result = model.generate_until([instance])
+    assert len(calls) == 1
+    assert instance.length_info[0]["generation_truncated"] == 1
+    assert result == ["<think>still going"]
