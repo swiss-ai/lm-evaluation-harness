@@ -317,6 +317,9 @@ class TemplateAPI(TemplateLM):
         batch_size: str | int = 1,
         seed: int = 1234,
         max_length: int | None = 2048,
+        # lower each generation request's max_tokens to what the server's context
+        # (max_length) leaves after the prompt; off: the request is sent as it is
+        clamp_gen_toks: bool = False,
         add_bos_token: bool = False,
         custom_prefix_token_id: int | None = None,
         # send the requests as tokens or strings
@@ -390,6 +393,10 @@ class TemplateAPI(TemplateLM):
         # max_length - 1 as we always have 1 token for generation
         eval_logger.info(f"Using max length {max_length} - 1")
         self.max_length = max_length - 1
+        self.clamp_gen_toks = bool(clamp_gen_toks)
+        self._context_limit = max_length
+        self._n_clamped = 0
+        self._clamp_count_failed = False
         if int(num_concurrent) <= 1:
             eval_logger.info(
                 "Concurrent requests are disabled. To enable concurrent requests, set `num_concurrent` > 1."
@@ -809,6 +816,79 @@ class TemplateAPI(TemplateLM):
         """Async counterpart of ``_send``."""
         return await self._apost(session, payload)
 
+    def _prompt_token_count(self, message) -> int | None:
+        """The prompt's token count by the client tokenizer; None if it can't tell
+        (only the huggingface tokenizer is counted with)."""
+        tok = self.tokenizer
+        if self.tokenizer_backend != "huggingface" or tok is None:
+            return None
+        try:
+            if isinstance(message, list) and message and isinstance(message[0], dict):
+                # A chat message list: render it with the model's template, as the
+                # server does, then count the text. Without a template, count the
+                # contents.
+                if getattr(tok, "chat_template", None):
+                    message = tok.apply_chat_template(
+                        message, add_generation_prompt=True, tokenize=False
+                    )
+                else:
+                    return sum(
+                        len(
+                            tok.encode(
+                                str(m.get("content", "")), add_special_tokens=False
+                            )
+                        )
+                        + 8
+                        for m in message
+                    )
+            if isinstance(message, str):
+                return len(tok.encode(message, add_special_tokens=False))
+            if isinstance(message, list) and message and isinstance(message[0], str):
+                return max(
+                    len(tok.encode(m, add_special_tokens=False)) for m in message
+                )
+        except Exception as e:  # noqa: BLE001 - a failed count must not fail the request
+            if not self._clamp_count_failed:
+                self._clamp_count_failed = True
+                eval_logger.warning(
+                    f"clamp_gen_toks: could not count a prompt ({e!r}); "
+                    "such requests are sent unclamped."
+                )
+        return None
+
+    def _clamp_gen_toks(self, message, gen_kwargs: dict | None, generate: bool) -> None:
+        """With clamp_gen_toks, lower the request's token budget to what the context
+        (max_length) leaves after the prompt, so a long prompt gets a shorter answer
+        instead of the server's 400 "maximum context length". Short prompts keep the
+        full budget. Without a token count the request is left as it is."""
+        if not (self.clamp_gen_toks and generate and gen_kwargs is not None):
+            return
+        used = self._prompt_token_count(message)
+        if used is None:
+            return
+        key = "max_tokens" if gen_kwargs.get("max_tokens") else "max_gen_toks"
+        budget = int(gen_kwargs.get(key) or self._max_gen_toks)
+        # slack for tokens the client count misses (special tokens, template wrapper)
+        room = self._context_limit - used - 32
+        if budget <= room:
+            return
+        if room < 1:
+            # The prompt alone fills the context: sending 1 token would score a
+            # silent non-answer, so leave the request to the server's clear 400.
+            eval_logger.warning(
+                f"clamp_gen_toks: a prompt of ~{used} tokens leaves no room in the "
+                f"context of {self._context_limit}; sent unclamped."
+            )
+            return
+        self._n_clamped += 1
+        if self._n_clamped <= 3 or self._n_clamped % 100 == 0:
+            eval_logger.warning(
+                f"clamp_gen_toks: prompt of ~{used} tokens leaves {room} of "
+                f"the requested {budget} (context {self._context_limit}); "
+                f"{self._n_clamped} requests clamped so far."
+            )
+        gen_kwargs[key] = room
+
     def model_call(
         self,
         messages: list[list[int]] | list[str] | list[JsonChatStr],
@@ -820,10 +900,12 @@ class TemplateAPI(TemplateLM):
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         seed = self._request_seed(gen_kwargs, generate)
+        message = self.create_message(messages)
+        self._clamp_gen_toks(message, gen_kwargs, generate)
         try:
             return self._send(
                 self._create_payload(
-                    self.create_message(messages),
+                    message,
                     generate=generate,
                     gen_kwargs=gen_kwargs,
                     seed=seed,
@@ -885,8 +967,10 @@ class TemplateAPI(TemplateLM):
         # !!! Copy: shared dict for each request, need new object !!!
         gen_kwargs = copy.deepcopy(gen_kwargs)
         seed = self._request_seed(gen_kwargs, generate)
+        message = self.create_message(messages)
+        self._clamp_gen_toks(message, gen_kwargs, generate)
         payload = self._create_payload(
-            self.create_message(messages),
+            message,
             generate=generate,
             gen_kwargs=gen_kwargs,
             seed=seed,
