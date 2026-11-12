@@ -1421,8 +1421,15 @@ def test_truncated_reasoning_is_not_continued():
 class _WordTokenizer:
     """One token per word; enough to count a prompt."""
 
+    @property
+    def eos_token(self):
+        return "</s>"
+
     def encode(self, text, add_special_tokens=True):
         return text.split()
+
+    def decode(self, ids):
+        return " ".join(ids)
 
 
 def _clamping_api(clamp=True):
@@ -1434,6 +1441,7 @@ def _clamping_api(clamp=True):
         clamp_gen_toks=clamp,
     )
     api.tokenizer = _WordTokenizer()
+    api.tokenizer_backend = "huggingface"
     return api
 
 
@@ -1461,9 +1469,44 @@ def test_clamp_gen_toks_clamps_an_explicit_max_tokens():
     assert _sent_max_tokens(api, "word " * 700, {"max_tokens": 500}) == 268
 
 
-def test_clamp_gen_toks_leaves_at_least_one_token():
+def test_clamp_gen_toks_leaves_a_prompt_that_fills_the_context_unclamped():
+    # sending 1 token would score a silent non-answer; the server's 400 is clearer
     api = _clamping_api()
-    assert _sent_max_tokens(api, "word " * 5000, {"max_gen_toks": 500}) == 1
+    assert _sent_max_tokens(api, "word " * 5000, {"max_gen_toks": 500}) == 500
+    assert api._n_clamped == 0
+
+
+def test_clamp_gen_toks_counts_a_chat_message_list_through_the_template():
+    class Templated(_WordTokenizer):
+        chat_template = "x"
+
+        def apply_chat_template(self, messages, add_generation_prompt, tokenize):
+            assert tokenize is False
+            return " ".join(m["content"] for m in messages) + " <|assistant|>"
+
+    api = _clamping_api()
+    api.tokenizer = Templated()
+    message = [{"role": "user", "content": "word " * 700}]
+    kw = {"max_gen_toks": 500}
+    api._clamp_gen_toks(message, kw, generate=True)
+    assert kw["max_gen_toks"] == 1000 - 701 - 32
+
+
+def test_clamp_gen_toks_only_counts_with_the_huggingface_tokenizer():
+    api = _clamping_api()
+    api.tokenizer_backend = "remote"
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 500
+
+
+def test_clamp_gen_toks_survives_a_failing_tokenizer():
+    class Broken(_WordTokenizer):
+        def encode(self, *a, **k):
+            raise RuntimeError("boom")
+
+    api = _clamping_api()
+    api.tokenizer = Broken()
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 500
+    assert api._clamp_count_failed
 
 
 def test_clamp_gen_toks_is_off_by_default():

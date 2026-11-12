@@ -396,6 +396,7 @@ class TemplateAPI(TemplateLM):
         self.clamp_gen_toks = bool(clamp_gen_toks)
         self._context_limit = max_length
         self._n_clamped = 0
+        self._clamp_count_failed = False
         if int(num_concurrent) <= 1:
             eval_logger.info(
                 "Concurrent requests are disabled. To enable concurrent requests, set `num_concurrent` > 1."
@@ -816,32 +817,43 @@ class TemplateAPI(TemplateLM):
         return await self._apost(session, payload)
 
     def _prompt_token_count(self, message) -> int | None:
-        """The prompt's token count by the client tokenizer; None if it can't tell."""
+        """The prompt's token count by the client tokenizer; None if it can't tell
+        (only the huggingface tokenizer is counted with)."""
         tok = self.tokenizer
-        if tok is None or not hasattr(tok, "encode"):
+        if self.tokenizer_backend != "huggingface" or tok is None:
             return None
         try:
-            if isinstance(message, str):
-                return len(tok.encode(message, add_special_tokens=False))
             if isinstance(message, list) and message and isinstance(message[0], dict):
-                if hasattr(tok, "apply_chat_template"):
-                    try:
-                        return len(
-                            tok.apply_chat_template(
-                                message, add_generation_prompt=True, tokenize=True
+                # A chat message list: render it with the model's template, as the
+                # server does, then count the text. Without a template, count the
+                # contents.
+                if getattr(tok, "chat_template", None):
+                    message = tok.apply_chat_template(
+                        message, add_generation_prompt=True, tokenize=False
+                    )
+                else:
+                    return sum(
+                        len(
+                            tok.encode(
+                                str(m.get("content", "")), add_special_tokens=False
                             )
                         )
-                    except Exception:  # no chat template: count the contents
-                        pass
-                return sum(
-                    len(tok.encode(str(m.get("content", "")), add_special_tokens=False))
-                    + 8
-                    for m in message
-                )
+                        + 8
+                        for m in message
+                    )
+            if isinstance(message, str):
+                return len(tok.encode(message, add_special_tokens=False))
             if isinstance(message, list) and message and isinstance(message[0], str):
-                return max(len(tok.encode(m, add_special_tokens=False)) for m in message)
-        except Exception as e:  # never fail a request over the count
-            eval_logger.warning(f"clamp_gen_toks: could not count the prompt ({e!r})")
+                return max(
+                    len(tok.encode(m, add_special_tokens=False)) for m in message
+                )
+        except Exception as e:  # noqa: BLE001 - a failed count must not fail the request
+            if not self._clamp_count_failed:
+                self._clamp_count_failed = True
+                eval_logger.warning(
+                    f"clamp_gen_toks: could not count a prompt ({e!r}); "
+                    "such requests are sent unclamped."
+                )
         return None
 
     def _clamp_gen_toks(self, message, gen_kwargs: dict | None, generate: bool) -> None:
@@ -860,14 +872,22 @@ class TemplateAPI(TemplateLM):
         room = self._context_limit - used - 32
         if budget <= room:
             return
+        if room < 1:
+            # The prompt alone fills the context: sending 1 token would score a
+            # silent non-answer, so leave the request to the server's clear 400.
+            eval_logger.warning(
+                f"clamp_gen_toks: a prompt of ~{used} tokens leaves no room in the "
+                f"context of {self._context_limit}; sent unclamped."
+            )
+            return
         self._n_clamped += 1
         if self._n_clamped <= 3 or self._n_clamped % 100 == 0:
             eval_logger.warning(
-                f"clamp_gen_toks: prompt of ~{used} tokens leaves {max(room, 1)} of "
+                f"clamp_gen_toks: prompt of ~{used} tokens leaves {room} of "
                 f"the requested {budget} (context {self._context_limit}); "
                 f"{self._n_clamped} requests clamped so far."
             )
-        gen_kwargs[key] = max(room, 1)
+        gen_kwargs[key] = room
 
     def model_call(
         self,
