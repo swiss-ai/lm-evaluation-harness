@@ -1237,6 +1237,7 @@ def compute_generation_length_info(
     think_end_token: str | None = None,
     tokenizer: Any = None,
     measure_thinking: bool = True,
+    include_thinking_text: bool = False,
 ) -> dict:
     """Length of a generation, and of its thinking span, for per-sample logging.
 
@@ -1250,6 +1251,14 @@ def compute_generation_length_info(
     contains a close. Callers set ``measure_thinking`` only for well-formed responses, so
     the span is never mis-attributed (e.g. a turn closing a block opened in a prior turn).
 
+    With ``include_thinking_text`` it also emits ``thinking_text``: the generation up to
+    and including the LAST ``think_end_token``, as the model wrote it. The strip drops
+    it from ``resps`` before scoring, so this is where a sample keeps the reasoning.
+    Unlike the lengths it is not gated on ``measure_thinking``: a response the format
+    check calls malformed (e.g. an open the template prefilled) is the one whose text is
+    worth reading. It is text, so it is never promoted to a metric (only numeric values
+    are).
+
     ``raw_text``/``token_ids`` are the caller's view: vllm/sglang pass the engine's
     per-response text and exact ids; hf passes a view bounded to the response (pad/eos
     tail and post-stop over-generation removed). Never raises.
@@ -1260,17 +1269,20 @@ def compute_generation_length_info(
         info["response_length_chars"] = len(raw_text)
         if token_ids is not None:
             info["response_length_tokens"] = len(token_ids)
-        if measure_thinking and think_end_token and think_end_token in raw_text:
+        if think_end_token and think_end_token in raw_text:
             # up to and including the LAST close, matching the strip
             thinking_text = raw_text.rsplit(think_end_token, 1)[0] + think_end_token
-            info["thinking_length_words"] = len(thinking_text.split())
-            info["thinking_length_chars"] = len(thinking_text)
-            if tokenizer is not None:
-                # token count is best-effort
-                with contextlib.suppress(Exception):
-                    info["thinking_length_tokens"] = len(
-                        tokenizer.encode(thinking_text, add_special_tokens=False)
-                    )
+            if include_thinking_text:
+                info["thinking_text"] = thinking_text
+            if measure_thinking:
+                info["thinking_length_words"] = len(thinking_text.split())
+                info["thinking_length_chars"] = len(thinking_text)
+                if tokenizer is not None:
+                    # token count is best-effort
+                    with contextlib.suppress(Exception):
+                        info["thinking_length_tokens"] = len(
+                            tokenizer.encode(thinking_text, add_special_tokens=False)
+                        )
     return info
 
 
@@ -1376,6 +1388,8 @@ def build_length_info(
         think_end_token=think_end_token,
         tokenizer=tokenizer,
         measure_thinking=bool(fmt.get("thinking_format_correct", 0)),
+        # a thinking run only: otherwise no thinking_* keys at all
+        include_thinking_text=track_thinking_metrics,
     )
     info.update(fmt)
     return info
