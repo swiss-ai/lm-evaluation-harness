@@ -730,6 +730,36 @@ class TestComputeGenerationLengthInfo:
         assert "thinking_length_chars" not in info
         assert info["response_length_chars"] == len(gen)
 
+    def test_thinking_text_is_the_reasoning_up_to_the_last_close(self):
+        raw = "<think>a</think>b</think>c"
+        info = compute_generation_length_info(
+            raw, think_end_token=CLOSE_T, include_thinking_text=True
+        )
+        assert info["thinking_text"] == "<think>a</think>b</think>"
+
+    def test_thinking_text_kept_when_the_format_check_says_malformed(self):
+        # measure_thinking=False (e.g. the open was prefilled by the template and is not
+        # in the text): the lengths stay off, the text is still there to read.
+        info = compute_generation_length_info(
+            "reasoning</think>answer",
+            think_end_token=CLOSE_T,
+            measure_thinking=False,
+            include_thinking_text=True,
+        )
+        assert info["thinking_text"] == "reasoning</think>"
+        assert "thinking_length_chars" not in info
+
+    def test_thinking_text_is_opt_in(self):
+        info = compute_generation_length_info("r</think>a", think_end_token=CLOSE_T)
+        assert "thinking_text" not in info
+
+    def test_no_close_has_no_thinking_text(self):
+        for raw in ("<think>no close", "plain answer"):
+            info = compute_generation_length_info(
+                raw, think_end_token=CLOSE_T, include_thinking_text=True
+            )
+            assert "thinking_text" not in info
+
     def test_measure_thinking_false_suppresses_span(self):
         # The backend passes measure_thinking only for well-formed responses; when
         # False, the thinking span is not recorded even though a close is present.
@@ -814,6 +844,19 @@ class TestBuildLengthInfo:
         )
         assert not any(k.startswith("thinking_") for k in info)
         assert info["response_length_chars"] == len("<think>reason</think>ans")
+
+    def test_tracked_keeps_the_reasoning_text_even_when_malformed(self):
+        # no open in the text and none prefilled -> correct=0, no lengths; the text stays.
+        info = build_length_info(
+            "reason</think>ans",
+            think_start_token=OPEN_T,
+            think_end_token=CLOSE_T,
+            open_prefilled=False,
+            track_thinking_metrics=True,
+        )
+        assert info["thinking_format_correct"] == 0
+        assert "thinking_length_chars" not in info
+        assert info["thinking_text"] == "reason</think>"
 
     def test_absent_open_degrades_to_close_only(self):
         # The close alone is enough to track: `correct` reduces to `has_close`, the
