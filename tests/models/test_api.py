@@ -1416,3 +1416,69 @@ def test_truncated_reasoning_is_not_continued():
     assert len(calls) == 1
     assert instance.length_info[0]["generation_truncated"] == 1
     assert result == ["<think>still going"]
+
+
+class _WordTokenizer:
+    """One token per word; enough to count a prompt."""
+
+    def encode(self, text, add_special_tokens=True):
+        return text.split()
+
+
+def _clamping_api(clamp=True):
+    api = LocalCompletionsAPI(
+        base_url="http://test-url.com",
+        tokenizer_backend=None,
+        model="m",
+        max_length=1000,
+        clamp_gen_toks=clamp,
+    )
+    api.tokenizer = _WordTokenizer()
+    return api
+
+
+def _sent_max_tokens(api, prompt, gen_kwargs):
+    with patch.object(api, "_send", return_value={}) as send:
+        api.model_call([prompt], gen_kwargs=gen_kwargs)
+    return send.call_args.args[0]["max_tokens"]
+
+
+def test_clamp_gen_toks_keeps_the_budget_when_the_prompt_is_short():
+    api = _clamping_api()
+    assert _sent_max_tokens(api, "word " * 100, {"max_gen_toks": 500}) == 500
+    assert api._n_clamped == 0
+
+
+def test_clamp_gen_toks_lowers_the_budget_to_what_the_context_leaves():
+    api = _clamping_api()
+    # 700 prompt tokens + 32 slack leave 1000 - 732 = 268 of the 500 asked for
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 268
+    assert api._n_clamped == 1
+
+
+def test_clamp_gen_toks_clamps_an_explicit_max_tokens():
+    api = _clamping_api()
+    assert _sent_max_tokens(api, "word " * 700, {"max_tokens": 500}) == 268
+
+
+def test_clamp_gen_toks_leaves_at_least_one_token():
+    api = _clamping_api()
+    assert _sent_max_tokens(api, "word " * 5000, {"max_gen_toks": 500}) == 1
+
+
+def test_clamp_gen_toks_is_off_by_default():
+    api = _clamping_api(clamp=False)
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 500
+
+
+def test_clamp_gen_toks_without_a_tokenizer_sends_the_request_as_it_is():
+    api = _clamping_api()
+    api.tokenizer = None
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 500
+
+
+def test_clamp_gen_toks_never_touches_loglikelihood_requests():
+    api = _clamping_api()
+    gen_kwargs = {"max_gen_toks": 500}
+    api._clamp_gen_toks("word " * 700, gen_kwargs, generate=False)
+    assert gen_kwargs == {"max_gen_toks": 500}
