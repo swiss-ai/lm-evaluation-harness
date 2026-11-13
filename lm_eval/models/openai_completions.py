@@ -151,6 +151,7 @@ class LocalCompletionsAPI(TemplateAPI):
                 "seed": seed,
                 # reasoning markers made of special tokens (see TemplateAPI)
                 **({"skip_special_tokens": False} if self.keep_special_tokens else {}),
+                **({"add_special_tokens": False} if self.bos_by_client else {}),
                 **gen_kwargs,
             }
         else:
@@ -162,6 +163,7 @@ class LocalCompletionsAPI(TemplateAPI):
                 "logprobs": 1,
                 "seed": seed,
                 "echo": True,
+                **({"add_special_tokens": False} if self.bos_by_client else {}),
             }
 
     @staticmethod

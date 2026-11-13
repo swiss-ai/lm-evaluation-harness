@@ -321,6 +321,13 @@ class TemplateAPI(TemplateLM):
         # (max_length) leaves after the prompt; off: the request is sent as it is
         clamp_gen_toks: bool = False,
         add_bos_token: bool = False,
+        # The server is told not to add special tokens (add_special_tokens=false, for APIs
+        # that tokenize text prompts themselves), so the BOS the model gets is exactly the
+        # one in the text sent: written here, once. A tokenizer that adds BOS itself then
+        # counts as add_bos_token=True, and a BOS the chat template already wrote is kept
+        # as the only one. Without it the server's tokenizer adds its own BOS next to
+        # whatever the client wrote: two after a template that starts with <s>.
+        bos_by_client: bool = False,
         custom_prefix_token_id: int | None = None,
         # send the requests as tokens or strings
         tokenized_requests: bool = True,
@@ -415,6 +422,7 @@ class TemplateAPI(TemplateLM):
             None if tokenizer_backend in ("None", "none") else tokenizer_backend
         )
         self.add_bos_token = add_bos_token
+        self.bos_by_client = bool(bos_by_client)
         self.custom_prefix_token_id = custom_prefix_token_id
         self.tokenized_requests = tokenized_requests
         self.max_retries = int(max_retries)
@@ -491,6 +499,14 @@ class TemplateAPI(TemplateLM):
         hf_tokenizer = (
             self.tokenizer if self.tokenizer_backend == "huggingface" else None
         )
+        if (
+            self.bos_by_client
+            and hf_tokenizer is not None
+            and not self.add_bos_token
+            and self._tokenizer_adds_bos
+        ):
+            # the server no longer adds the BOS this tokenizer would have added
+            self.add_bos_token = True
         self.think_start_token, self.think_end_token = resolve_think_tokens(
             getattr(hf_tokenizer, "chat_template", None),
             autodetect_think_tokens,
@@ -682,6 +698,15 @@ class TemplateAPI(TemplateLM):
             # by default for CausalLM - false or self.add_bos_token is set
             if not add_special_tokens:
                 add_special_tokens = False or self.add_bos_token
+            bos_text = getattr(self.tokenizer, "bos_token", None)
+            if (
+                self.bos_by_client
+                and isinstance(string, str)
+                and bos_text
+                and string.startswith(bos_text)
+            ):
+                # written by the chat template: the tokenizer must not add another
+                add_special_tokens = False
             encoding: list[list[int]] | list[int] = self.tokenizer(
                 string,
                 add_special_tokens=add_special_tokens,
@@ -758,7 +783,7 @@ class TemplateAPI(TemplateLM):
             not bos
             or not isinstance(prompt, str)
             or prompt.startswith(bos)
-            or self._tokenizer_adds_bos
+            or (self._tokenizer_adds_bos and not self.bos_by_client)
         ):
             return prompt
         return bos + prompt
