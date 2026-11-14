@@ -131,7 +131,9 @@ def harmfulness_score(doc, predictions, **kwargs):
     - split: which split to take from the behaviors
     """
     hf_repo = "swiss-ai/harmbench"
-    completion = predictions[0]
+    # A plain str: generate_until returns Generation(str) (it carries finish_reason),
+    # and spaCy's compiled tokenizer only accepts an exact str.
+    completion = str(predictions[0])
     metadata_path = "metadata.csv"
     copyright_path = "swiss-ai/harmbench_copyright_classifier_hashes"
     behaviors = load_dataset(hf_repo, data_files=metadata_path, split="train")
