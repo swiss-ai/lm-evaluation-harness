@@ -321,13 +321,15 @@ class TemplateAPI(TemplateLM):
         # (max_length) leaves after the prompt; off: the request is sent as it is
         clamp_gen_toks: bool = False,
         add_bos_token: bool = False,
-        # The server is told not to add special tokens (add_special_tokens=false, for APIs
-        # that tokenize text prompts themselves), so the BOS the model gets is exactly the
-        # one in the text sent: written here, once. A tokenizer that adds BOS itself then
-        # counts as add_bos_token=True, and a BOS the chat template already wrote is kept
-        # as the only one. Without it the server's tokenizer adds its own BOS next to
-        # whatever the client wrote: two after a template that starts with <s>.
-        bos_by_client: bool = False,
+        # What the request tells the server about special tokens (add_special_tokens on
+        # completions requests; APIs that tokenize text prompts themselves add the tokenizer's
+        # BOS by default): None sends nothing, True asks for them, False sends
+        # add_special_tokens=false, and then the BOS the model gets is exactly the one in the
+        # text sent, written here, once: a tokenizer that adds BOS itself counts as
+        # add_bos_token=True, and a BOS the chat template already wrote is kept as the only one.
+        # Without False the server's tokenizer adds its own BOS next to whatever the client
+        # wrote: two after a template that starts with <s>.
+        server_add_special_tokens: bool | None = None,
         custom_prefix_token_id: int | None = None,
         # send the requests as tokens or strings
         tokenized_requests: bool = True,
@@ -422,7 +424,9 @@ class TemplateAPI(TemplateLM):
             None if tokenizer_backend in ("None", "none") else tokenizer_backend
         )
         self.add_bos_token = add_bos_token
-        self.bos_by_client = bool(bos_by_client)
+        self.server_add_special_tokens = server_add_special_tokens
+        # the client writes the BOS (see above)
+        self.bos_by_client = server_add_special_tokens is False
         self.custom_prefix_token_id = custom_prefix_token_id
         self.tokenized_requests = tokenized_requests
         self.max_retries = int(max_retries)

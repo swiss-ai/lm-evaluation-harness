@@ -1,5 +1,5 @@
-"""bos_by_client: the server is told not to add special tokens, so the BOS the model gets is
-exactly the one the client wrote (API models that send text prompts)."""
+"""server_add_special_tokens=False: the server is told not to add special tokens, so the BOS the
+model gets is exactly the one the client wrote (API models that send text prompts)."""
 
 import pytest
 
@@ -71,25 +71,38 @@ def _loglik_text(model, context, continuation):
     return model.decode_batch(inputs)[0]
 
 
-def test_payloads_tell_the_server_not_to_add_special_tokens(tmp_path):
+@pytest.mark.parametrize("value", [False, True])
+def test_payloads_say_what_the_server_should_do_with_special_tokens(tmp_path, value):
     path = _tokenizer(tmp_path, "adds", adds_bos=True, with_template=False)
-    on, off = _model(path, bos_by_client=True), _model(path)
-    assert on._create_payload("p", generate=False)["add_special_tokens"] is False
-    assert (
-        on._create_payload("p", generate=True, gen_kwargs={})["add_special_tokens"]
-        is False
-    )
-    assert "add_special_tokens" not in off._create_payload("p", generate=False)
-    assert "add_special_tokens" not in off._create_payload(
+    model = _model(path, server_add_special_tokens=value)
+    loglik = model._create_payload("p", generate=False)
+    generation = model._create_payload("p", generate=True, gen_kwargs={})
+    assert loglik["add_special_tokens"] is value
+    assert generation["add_special_tokens"] is value
+
+
+def test_payloads_send_nothing_about_special_tokens_by_default(tmp_path):
+    path = _tokenizer(tmp_path, "adds", adds_bos=True, with_template=False)
+    model = _model(path)
+    assert "add_special_tokens" not in model._create_payload("p", generate=False)
+    assert "add_special_tokens" not in model._create_payload(
         "p", generate=True, gen_kwargs={}
     )
+
+
+def test_asking_the_server_for_special_tokens_leaves_the_client_alone(tmp_path):
+    # True: the server adds the tokenizer's BOS as before; nothing changes on the client
+    adds = _tokenizer(tmp_path, "adds", adds_bos=True, with_template=False)
+    model = _model(adds, server_add_special_tokens=True)
+    assert model.add_bos_token is False
+    assert model.bos_by_client is False
 
 
 def test_a_tokenizer_that_adds_bos_itself_counts_as_add_bos_token(tmp_path):
     adds = _tokenizer(tmp_path, "adds", adds_bos=True, with_template=False)
     never = _tokenizer(tmp_path, "never", adds_bos=False, with_template=False)
-    assert _model(adds, bos_by_client=True).add_bos_token is True
-    assert _model(never, bos_by_client=True).add_bos_token is False
+    assert _model(adds, server_add_special_tokens=False).add_bos_token is True
+    assert _model(never, server_add_special_tokens=False).add_bos_token is False
     assert _model(adds).add_bos_token is False  # unchanged without the option
 
 
@@ -97,7 +110,7 @@ def test_a_tokenizer_that_adds_bos_itself_counts_as_add_bos_token(tmp_path):
 def test_no_template_one_bos_reaches_the_server_when_asked_for(tmp_path, adds_bos):
     path = _tokenizer(tmp_path, "t", adds_bos=adds_bos, with_template=False)
     # --bos: forced on, also for a tokenizer that adds BOS itself: no double any more
-    model = _model(path, bos_by_client=True, add_bos_token=True)
+    model = _model(path, server_add_special_tokens=False, add_bos_token=True)
     loglik = _loglik_text(model, "The capital of France is", " Paris")
     generation = model._with_bos_text("The capital of France is")
     assert _server_bos(path, loglik, add_special_tokens=False) == 1
@@ -106,7 +119,7 @@ def test_no_template_one_bos_reaches_the_server_when_asked_for(tmp_path, adds_bo
 
 def test_no_template_a_tokenizer_that_never_adds_bos_gets_none_unless_asked(tmp_path):
     path = _tokenizer(tmp_path, "never", adds_bos=False, with_template=False)
-    model = _model(path, bos_by_client=True)
+    model = _model(path, server_add_special_tokens=False)
     assert (
         _server_bos(
             path, _loglik_text(model, "The capital", " Paris"), add_special_tokens=False
@@ -118,7 +131,9 @@ def test_no_template_a_tokenizer_that_never_adds_bos_gets_none_unless_asked(tmp_
 def test_a_tokenizer_that_adds_bos_still_delivers_one_without_the_server(tmp_path):
     # before: the server added it; now the client writes it
     path = _tokenizer(tmp_path, "adds", adds_bos=True, with_template=False)
-    model = _model(path, bos_by_client=True)  # add_bos_token resolves to True
+    model = _model(
+        path, server_add_special_tokens=False
+    )  # add_bos_token resolves to True
     loglik = _loglik_text(model, "The capital of France is", " Paris")
     generation = model._with_bos_text("The capital of France is")
     assert _server_bos(path, loglik, add_special_tokens=False) == 1
@@ -128,7 +143,7 @@ def test_a_tokenizer_that_adds_bos_still_delivers_one_without_the_server(tmp_pat
 @pytest.mark.parametrize("adds_bos", [True, False])
 def test_template_that_writes_bos_reaches_the_server_once(tmp_path, adds_bos):
     path = _tokenizer(tmp_path, "t", adds_bos=adds_bos, with_template=True)
-    model = _model(path, bos_by_client=True)
+    model = _model(path, server_add_special_tokens=False)
     rendered = model.apply_chat_template([{"role": "user", "content": "hi"}])
     assert rendered.startswith("<s>")
     loglik = _loglik_text(model, rendered, " Paris")
