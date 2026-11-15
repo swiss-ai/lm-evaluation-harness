@@ -3,7 +3,7 @@
 Repeated scoring is opt-in and supported for API models: `apertus2-completions`
 and the other TemplateAPI models (`local-completions`, `local-chat-completions`,
 `openai-completions`, `openai-chat-completions`, LiteLLM). They send every
-attempt as its own request, a sampled one with an offset seed (`anthropic-chat`
+attempt as its own request, a sampled one with its own seed (`anthropic-chat`
 and `sglang-generate` send no seed). Local backends (HF, vLLM, SGLang, Megatron)
 and API adapters outside TemplateAPI are rejected before any request. The
 harness sends `m` attempts per document (the task's `repeats`), runs the task's
@@ -176,6 +176,16 @@ repeat_filter: score-first
 - Repeated-score standard errors are currently `N/A`. Per-repeat variation is
   available from scalar artifacts; it is not a confidence interval over problems.
 
+A sampled request's seed is a hash of the base seed (the model's, or the task's
+`seed` gen kwarg), the task, the document, the request index (the turn in
+multi-turn rollouts) and the repeat index, in the non-negative 31-bit range.
+A seeded vLLM request draws its sampling noise from its seed alone: a seed per
+repeat index alone would give every document of a repeat the same noise, so
+they lean the same way wherever an early token decides the outcome (refuse or
+comply, short or long answer). Seeds are stable across runs and models, so
+checkpoints are compared on the same draws. `seed=None` sends unseeded requests.
+Without a task and document (direct calls), requests share a seed per repeat.
+
 Greedy repeats do not become independent samples merely because seeds differ.
 Set decoding settings explicitly and compare protocols with the same prompt,
 reasoning budget, grader and temperature. Provider seed support does not guarantee
@@ -221,8 +231,8 @@ caching:
 
 | Backend                           | Attempts and seeds                                                                                                               | Unit tests                                                                                        |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| Apertus 2 completions             | Seed offset by repeat index in its own payload; native reasoning replay                                                          | `tests/models/test_apertus2.py`: synthetic native format, sync/async, retries, multi-turn         |
-| Local/OpenAI completions and chat | Sampled attempts: seed offset by repeat index before batching, kept on retries; greedy requests keep their seed and stay batched | `tests/models/test_api.py`: mocked HTTP, concurrency, retries, attempt caching and partial resume |
+| Apertus 2 completions             | Seed per document, turn and repeat in its own payload; native reasoning replay                                                   | `tests/models/test_apertus2.py`: synthetic native format, sync/async, retries, multi-turn         |
+| Local/OpenAI completions and chat | Sampled attempts: seed per document, turn and repeat, set before batching, kept on retries; sync runs send them one per call; greedy requests keep their seed and stay batched | `tests/models/test_api.py`: mocked HTTP, concurrency, retries, attempt caching and partial resume |
 | LiteLLM chat                      | Shared attempt identity; SDK may drop unsupported seed parameters                                                                | `tests/models/test_repeat_backends.py`: mocked SDK, sync/async dispatch                           |
 
 Scoring itself (means, pass@k, precedence, groups and errors) is tested in

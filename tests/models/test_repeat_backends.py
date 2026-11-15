@@ -24,7 +24,7 @@ def attempts():
 def test_litellm_routes_distinct_seeds(monkeypatch, concurrency):
     import sys
 
-    from lm_eval.models.api_models import JsonChatStr
+    from lm_eval.models.api_models import JsonChatStr, rollout_seed
     from lm_eval.models.litellm_llms import LiteLLMChatCompletion
 
     sent = []
@@ -53,4 +53,5 @@ def test_litellm_routes_distinct_seeds(monkeypatch, concurrency):
             req.args[1],
         )
     assert model.generate_until(reqs) == ["answer"] * 3
-    assert sorted(p["seed"] for p in sent) == [7, 8, 9]
+    expected = [rollout_seed(7, i, ("task", 1, 0)) for i in range(3)]
+    assert sorted(p["seed"] for p in sent) == sorted(expected)

@@ -15,7 +15,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from lm_eval.api.registry import register_model
-from lm_eval.models.api_models import Generation, JsonChatStr, rollout_seed
+from lm_eval.models.api_models import (
+    Generation,
+    JsonChatStr,
+    request_key,
+    rollout_seed,
+)
 from lm_eval.models.openai_completions import TOOL_CALLS_MARKER, LocalChatCompletion
 from lm_eval.models.utils import truncate_before_stops
 
@@ -152,16 +157,13 @@ def _with_reasoning(prepared: list[dict], replays: dict[int, list[str]]) -> list
     return result
 
 
-# Above any repeat index, so phase-two seeds never meet phase-one seeds.
-_PHASE_TWO_SEED_OFFSET = 1 << 20
-
-
 class _ScopedMessages(list):
-    """Decoded chat messages with the conversation scope and repeat index of their
-    request."""
+    """Decoded chat messages with the conversation scope, repeat index and seed key
+    of their request."""
 
     scope: tuple | None = None
     repeat: int = 0
+    seed_key: tuple = ()
 
 
 def _first_choice(response: Any) -> dict | None:
@@ -354,8 +356,8 @@ class Apertus2Completions(LocalChatCompletion):
         texts = (json.dumps(messages, ensure_ascii=False), tools or "")
         return sum(len(self._literal.findall(text)) for text in texts)
 
-    def _rollout_seed(self, seed: int, rollout_index: int) -> int:
-        # _create_payload offsets the seed: distinct seeds in the gen kwargs would
+    def _rollout_seed(self, seed: int, instance) -> int:
+        # _create_payload derives the seed: distinct seeds in the gen kwargs would
         # split TemplateAPI's request groups and break the per-object queue order.
         return seed
 
@@ -385,20 +387,20 @@ class Apertus2Completions(LocalChatCompletion):
                     "special-token text"
                 )
         # Each request's context object reaches create_message unchanged, which
-        # takes the next (scope, repeat) queued for it. The scope is the
+        # takes the next (scope, repeat, seed key) queued for it. The scope is the
         # conversation (task, document, episode) for reasoning replay; the repeat
-        # index offsets the seed, or a seeded server would return one sample for
-        # all repeats. Requests sharing an object are sent in queue order only if
-        # they share gen kwargs (TemplateAPI groups by them), which holds for
-        # every task here. Each multi-turn wave holds every ongoing conversation,
-        # so the others ended.
+        # index and the request's identity pick the seed (rollout_seed), so
+        # repeats and documents sample independently. Requests sharing an object
+        # are sent in queue order only if they share gen kwargs (TemplateAPI
+        # groups by them), which holds for every task here. Each multi-turn wave
+        # holds every ongoing conversation, so the others ended.
         self._pending = {}
         for r in requests:
             scope = None if r.task_name is None else (r.task_name, r.doc_id, r.episode)
             self._pending.setdefault(id(r.args[0]), []).append(
-                (scope, r.repeat_index or 0)
+                (scope, r.repeat_index or 0, request_key(r))
             )
-        active = {scope for queued in self._pending.values() for scope, _ in queued}
+        active = {queued[0] for pending in self._pending.values() for queued in pending}
         self._memory = {s: m for s, m in self._memory.items() if s in active}
         try:
             return super().generate_until(requests, disable_tqdm)
@@ -407,14 +409,14 @@ class Apertus2Completions(LocalChatCompletion):
 
     def create_message(self, messages, generate=False):
         decoded = _ScopedMessages(super().create_message(messages, generate))
-        # A retry rebuilds the payload from the same list: keep its scope and
-        # repeat (and the list, so its id stays unique).
+        # A retry rebuilds the payload from the same list: keep its scope, repeat
+        # and seed key (and the list, so its id stays unique).
         attempt = self._attempts.get(id(messages))
         if attempt is None:
             pending = self._pending.get(id(messages[0]))
-            attempt = (messages, *(pending.pop(0) if pending else (None, 0)))
+            attempt = (messages, *(pending.pop(0) if pending else (None, 0, ())))
             self._attempts[id(messages)] = attempt
-        _, decoded.scope, decoded.repeat = attempt
+        _, decoded.scope, decoded.repeat, decoded.seed_key = attempt
         return decoded
 
     def _create_payload(
@@ -439,7 +441,9 @@ class Apertus2Completions(LocalChatCompletion):
         )
         temperature = gen_kwargs.pop("temperature", 0)
         if seed is not None:
-            seed = rollout_seed(seed, getattr(messages, "repeat", 0))
+            seed = rollout_seed(
+                seed, getattr(messages, "repeat", 0), getattr(messages, "seed_key", ())
+            )
         try:
             self._prepare_request(request, list(messages), tools)
         except (self._lib.ApertusFormatError, ValueError) as error:
@@ -640,9 +644,7 @@ class Apertus2Completions(LocalChatCompletion):
             "max_tokens": budget,
             "stop_token_ids": [self._wait],
             # Phase one's seed would replay its sampling noise over the reply.
-            "seed": None
-            if seed is None
-            else rollout_seed(seed, _PHASE_TWO_SEED_OFFSET),
+            "seed": None if seed is None else rollout_seed(seed, 0, ("reply",)),
         }
 
     # Response path

@@ -10,7 +10,7 @@ from tenacity import wait_none
 
 from lm_eval.api.instance import Instance
 from lm_eval.models import api_models
-from lm_eval.models.api_models import create_image_prompt
+from lm_eval.models.api_models import create_image_prompt, rollout_seed
 from lm_eval.models.openai_completions import LocalChatCompletion, LocalCompletionsAPI
 
 
@@ -942,10 +942,17 @@ def _seed_model(kind, concurrent=1, batch_size=1):
     )
 
 
-def _seed_instance(model, prompt, kwargs):
+def _seed_instance(model, prompt, kwargs, doc=0):
     if isinstance(model, LocalChatCompletion):
         prompt = model.apply_chat_template([{"role": "user", "content": prompt}])
-    return Instance("generate_until", {}, (prompt, kwargs), idx=0)
+    return Instance(
+        "generate_until", {}, (prompt, kwargs), idx=0, metadata=("task", doc, 1)
+    )
+
+
+def _seed(repeat, doc=0, base=1234):
+    """The seed of a `_seed_instance` request's attempt."""
+    return rollout_seed(base, repeat, ("task", doc, 0))
 
 
 def _attempts(instances, count):
@@ -1020,15 +1027,9 @@ def test_sampled_rollout_seeds(monkeypatch, kind, concurrent):
     model = _seed_model(kind, concurrent)
     kwargs = {"temperature": 0.8, "do_sample": True, "until": ["STOP"]}
     original_kwargs = copy.deepcopy(kwargs)
-    short = _seed_instance(model, "short", kwargs)
-    long = _seed_instance(model, "a much longer prompt", kwargs)
-    twin = _seed_instance(model, "short", kwargs)  # Same text, distinct request.
-    instances = _attempts([short, long, twin], 3)
-    expected = [
-        f"{prompt}:{1234 + rollout}"
-        for rollout in range(3)
-        for prompt in ("short", "a much longer prompt", "short")
-    ]
+    docs = [(0, "short"), (1, "a much longer prompt"), (2, "short")]  # 2: same text
+    instances = _attempts([_seed_instance(model, p, kwargs, d) for d, p in docs], 3)
+    expected = [f"{p}:{_seed(rollout, d)}" for rollout in range(3) for d, p in docs]
 
     first, payloads = _run_seed_requests(
         monkeypatch, model, instances, assert_concurrent=concurrent > 1
@@ -1039,7 +1040,30 @@ def test_sampled_rollout_seeds(monkeypatch, kind, concurrent):
     assert payloads == repeated_payloads
     assert kwargs == original_kwargs
     assert all("STOP" in payload["stop"] for payload in payloads)
-    assert {payload["seed"] for payload in payloads} == {1234, 1235, 1236}
+    # A seed shared by the documents of a repeat would make their samples lean
+    # the same way wherever an early token decides the outcome.
+    assert len({payload["seed"] for payload in payloads}) == 9
+
+
+def test_rollout_seeds_differ_by_document_turn_and_repeat():
+    keys = [
+        (t, doc, turn) for t in ("a", "b") for doc in range(50) for turn in range(3)
+    ]
+    seeds = {rollout_seed(1234, repeat, key) for key in keys for repeat in range(4)}
+    assert len(seeds) == len(keys) * 4
+    assert all(0 <= seed < 2**31 for seed in seeds)
+    assert rollout_seed(7, 1, ("a", 0, 0)) != rollout_seed(1234, 1, ("a", 0, 0))
+
+
+def test_sync_sampled_requests_go_one_per_call(monkeypatch):
+    # A batched HTTP call carries one seed, so it cannot hold several documents.
+    model = _seed_model("completions", concurrent=1, batch_size=2)
+    instances = [
+        _seed_instance(model, f"p{d}", {"temperature": 0.8}, d) for d in range(4)
+    ]
+    result, payloads = _run_seed_requests(monkeypatch, model, instances)
+    assert result == [f"p{d}:{_seed(0, d)}" for d in range(4)]
+    assert len(payloads) == 4
 
 
 @pytest.mark.parametrize("concurrent", [1, 3])
@@ -1049,8 +1073,10 @@ def test_retry_keeps_the_same_rollout_seed(monkeypatch, concurrent):
     result, payloads = _run_seed_requests(
         monkeypatch, model, _attempts([instance], 2), fail_first=True
     )
-    assert sorted(payload["seed"] for payload in payloads) == [1234, 1234, 1235]
-    assert result == ["prompt:1234", "prompt:1235"]
+    assert sorted(payload["seed"] for payload in payloads) == sorted(
+        [_seed(0), _seed(0), _seed(1)]
+    )
+    assert result == [f"prompt:{_seed(0)}", f"prompt:{_seed(1)}"]
 
 
 @pytest.mark.parametrize("asynchronous", [False, True])
@@ -1089,11 +1115,13 @@ def test_greedy_async_http_batching_is_unchanged(monkeypatch):
     assert [len(payload["prompt"]) for payload in payloads] == [2, 2]
 
 
-def test_rollout_seed_overflow(monkeypatch):
+def test_large_task_seed_is_the_base(monkeypatch):
     model = _seed_model("completions")
     instance = _seed_instance(model, "prompt", {"temperature": 0.8, "seed": 2**63 - 1})
     _, payloads = _run_seed_requests(monkeypatch, model, _attempts([instance], 2))
-    assert [payload["seed"] for payload in payloads] == [2**63 - 1, -(2**63)]
+    seeds = [payload["seed"] for payload in payloads]
+    assert seeds == [_seed(0, base=2**63 - 1), _seed(1, base=2**63 - 1)]
+    assert all(0 <= seed < 2**31 for seed in seeds)
 
 
 def test_cache_preserves_attempts_across_reordering_and_partial_resume(
@@ -1106,17 +1134,17 @@ def test_cache_preserves_attempts_across_reordering_and_partial_resume(
     attempts = [replace(source, repeat_index=i, length_info=[]) for i in range(3)]
     cached = CachingLM(model, str(tmp_path / "results.db"), cache_namespace="model-v1")
     first, sent = _run_seed_requests(monkeypatch, cached, attempts)
-    assert first == ["prompt:1234", "prompt:1235", "prompt:1236"]
+    assert first == [f"prompt:{_seed(i)}" for i in range(3)]
     assert len(sent) == 3
     second, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
     assert second == first[::-1] and not sent
     key = next(
-        key for key in cached.dbdict if cached.dbdict[key]["response"] == "prompt:1235"
+        key for key in cached.dbdict if cached.dbdict[key]["response"] == first[1]
     )
     del cached.dbdict[key]
     third, sent = _run_seed_requests(monkeypatch, cached, attempts[::-1])
     assert third == first[::-1]
-    assert [p["seed"] for p in sent] == [1235]
+    assert [p["seed"] for p in sent] == [_seed(1)]
     cached.cache_namespace = "model-v2"
     _, sent = _run_seed_requests(monkeypatch, cached, attempts)
     assert len(sent) == 3
@@ -1137,7 +1165,7 @@ def test_explicit_episode_seeds(monkeypatch):
         replace(source, episode=i, repeat_index=i, length_info=[]) for i in (2, 0)
     ]
     _, sent = _run_seed_requests(monkeypatch, model, episodes)
-    assert [p["seed"] for p in sent] == [1236, 1234]
+    assert [p["seed"] for p in sent] == [_seed(2), _seed(0)]
 
 
 def _unauthorized_error(api_key: str):

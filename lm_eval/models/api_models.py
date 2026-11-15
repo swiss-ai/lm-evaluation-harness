@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import copy
+import hashlib
 import itertools
 import json
 import logging
@@ -283,9 +284,23 @@ def create_image_prompt(
     return chat
 
 
-def rollout_seed(seed: int, repeat_index: int) -> int:
-    """Offset a seed by the repeat index within the signed 64-bit API range."""
-    return (seed + repeat_index + 2**63) % 2**64 - 2**63
+def request_key(instance: Instance) -> tuple:
+    """A request's identity for seeding: task, document and request index (the
+    turn in multi-turn rollouts)."""
+    return instance.task_name, instance.doc_id, instance.idx
+
+
+def rollout_seed(seed: int, repeat_index: int, key: tuple = ()) -> int:
+    """The seed of one sampled request: a hash of the base seed, the request's
+    identity and its repeat index, in the non-negative 31-bit range.
+
+    A seeded vLLM request draws its sampling noise from its seed alone, so
+    requests sharing a seed lean the same way wherever an early token decides
+    the outcome (refuse or comply, short or long answer). Seeds per document
+    and repeat keep the samples independent and reproducible.
+    """
+    data = json.dumps([seed, *key, repeat_index], default=str, separators=(",", ":"))
+    return int.from_bytes(hashlib.sha256(data.encode()).digest()[:4], "big") >> 1
 
 
 class TemplateAPI(TemplateLM):
@@ -1221,15 +1236,15 @@ class TemplateAPI(TemplateLM):
         return gen_kwargs
 
     def _request_seed(self, gen_kwargs: dict | None, generate: bool) -> int | None:
-        """A task's seed (offset per attempt) replaces the model seed; None sends none."""
+        """A task's seed (derived per request) replaces the model seed; None sends none."""
         return (
             gen_kwargs.pop("seed", self._seed)
             if generate and gen_kwargs
             else self._seed
         )
 
-    def _rollout_seed(self, seed: int, rollout_index: int) -> int:
-        return rollout_seed(seed, rollout_index)
+    def _rollout_seed(self, seed: int, instance: Instance) -> int:
+        return rollout_seed(seed, instance.repeat_index or 0, request_key(instance))
 
     def _prefixed_prompt(self, chat_history, render, full):
         """``full`` as a PrefixedPrompt when its last turn is a gen_prefix to move
@@ -1328,10 +1343,11 @@ class TemplateAPI(TemplateLM):
     def generate_until(
         self, requests: list[Instance], disable_tqdm: bool = False
     ) -> list[str]:
-        """Generate completions; a sampled attempt's seed is offset by its repeat index.
+        """Generate completions; a sampled request's seed is derived from its
+        document, request index and repeat index (`rollout_seed`).
 
-        A task-level seed replaces the model seed; seed=None leaves seeding to the
-        server. The offset is set before batching, so retries keep it.
+        A task-level seed replaces the model seed as the base; seed=None leaves
+        seeding to the server. Seeds are set before batching, so retries keep them.
         """
         res = []
         instances = requests
@@ -1375,9 +1391,9 @@ class TemplateAPI(TemplateLM):
         seeded_gen_kwargs = []
         for instance, gen_kwargs in zip(instances, all_gen_kwargs, strict=True):
             seed = gen_kwargs.get("seed", self._seed)
-            # Greedy requests keep their seed: an offset would only split batches.
+            # Greedy requests keep their seed: a derived one would only split batches.
             if seed is not None and float(gen_kwargs.get("temperature") or 0) > 0:
-                seed = self._rollout_seed(seed, instance.repeat_index or 0)
+                seed = self._rollout_seed(seed, instance)
                 gen_kwargs = {**gen_kwargs, "seed": seed}
             seeded_gen_kwargs.append(gen_kwargs)
         all_gen_kwargs = seeded_gen_kwargs
@@ -1397,8 +1413,9 @@ class TemplateAPI(TemplateLM):
         re_ord = Collator(
             request_args,
             sort_fn=_collate_gen,
-            # Concurrent runs send each attempt's seed per request, so attempts that
-            # differ only in seed stay in one group instead of running group by group.
+            # A batched HTTP call carries one seed, so sync runs group by the full
+            # kwargs (sampled requests go one per call). Concurrent runs send each
+            # request's seed on its own, so requests differing only in seed share a group.
             group_fn=lambda req: (
                 {k: v for k, v in req[1].items() if k != "seed"}
                 if self._concurrent > 1
