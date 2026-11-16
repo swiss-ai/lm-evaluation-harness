@@ -1,0 +1,7 @@
+include: _bouquet_yaml
+task: bouquet_eng_Latn-roh_Latn
+dataset_kwargs:
+  data_files:
+    test: benchmark_data/sentence_level/test/eng_Latn-roh_Latn.parquet
+tag:
+- bouquet

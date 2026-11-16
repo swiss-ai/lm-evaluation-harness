@@ -1,0 +1,21 @@
+group: bouquet
+task:
+- bouquet_eng_Latn-deu_Latn
+- bouquet_deu_Latn-eng_Latn
+- bouquet_eng_Latn-fra_Latn
+- bouquet_fra_Latn-eng_Latn
+- bouquet_eng_Latn-ita_Latn
+- bouquet_ita_Latn-eng_Latn
+- bouquet_eng_Latn-spa_Latn
+- bouquet_spa_Latn-eng_Latn
+- bouquet_eng_Latn-roh_Latn
+- bouquet_roh_Latn-eng_Latn
+aggregate_metric_list:
+  - metric: chrf
+    aggregation: mean
+    weight_by_size: false
+  - metric: bleu
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0
