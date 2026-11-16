@@ -1,0 +1,7 @@
+include: _flores200_chrf_yaml
+task: flores200_chrf_eng_Latn-deu_Latn
+dataset_kwargs:
+  src_lang: eng_Latn
+  tgt_lang: deu_Latn
+tag:
+- flores200_chrf

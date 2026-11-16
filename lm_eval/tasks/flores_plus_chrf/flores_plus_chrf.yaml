@@ -1,0 +1,19 @@
+group: flores_plus_chrf
+task:
+- flores_plus_chrf_eng_Latn-deu_Latn
+- flores_plus_chrf_deu_Latn-eng_Latn
+- flores_plus_chrf_eng_Latn-fra_Latn
+- flores_plus_chrf_fra_Latn-eng_Latn
+- flores_plus_chrf_eng_Latn-ita_Latn
+- flores_plus_chrf_ita_Latn-eng_Latn
+- flores_plus_chrf_eng_Latn-spa_Latn
+- flores_plus_chrf_spa_Latn-eng_Latn
+aggregate_metric_list:
+  - metric: chrf
+    aggregation: mean
+    weight_by_size: false
+  - metric: bleu
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0
