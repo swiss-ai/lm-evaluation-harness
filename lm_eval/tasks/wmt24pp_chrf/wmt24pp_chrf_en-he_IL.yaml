@@ -1,0 +1,5 @@
+include: _wmt24pp_chrf_yaml
+task: wmt24pp_chrf_en-he_IL
+dataset_name: en-he_IL
+tag:
+- wmt24pp_chrf

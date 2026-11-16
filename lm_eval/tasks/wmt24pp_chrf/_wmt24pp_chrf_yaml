@@ -1,0 +1,19 @@
+dataset_path: google/wmt24pp
+test_split: train
+output_type: generate_until
+process_docs: !function utils.process_docs
+doc_to_text: "{{prompt}}"
+doc_to_target: "{{target}}"
+metric_list:
+  - metric: chrf
+    aggregation: chrf
+    higher_is_better: true
+  - metric: bleu
+    aggregation: bleu
+    higher_is_better: true
+generation_kwargs:
+  do_sample: false
+  temperature: 0.0
+  max_gen_toks: 1024
+metadata:
+  version: 1.0
