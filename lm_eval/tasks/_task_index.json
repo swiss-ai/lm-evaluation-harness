@@ -76619,6 +76619,11 @@
       "tags": [],
       "yaml_path": "medqa/medqa.yaml"
     },
+    "medqa_4options_cot": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "medqa/medqa_4options_cot.yaml"
+    },
     "medtext": {
       "kind": "TASK",
       "tags": [],
@@ -119461,6 +119466,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16310,
+  "entry_count": 16311,
   "schema_version": 1
 }
