@@ -54,6 +54,30 @@ def process_docs(dataset):
     return dataset.map(to_doc, remove_columns=dataset.column_names)
 
 
+HALF_SEED = 1234
+
+
+def process_docs_half(dataset):
+    """A fixed half of each language (multi_if_3turn_half).
+
+    The dataset is sorted by language, so --limit would drop whole languages.
+    Each language's rows are shuffled with HALF_SEED and the first floor(n/2)
+    kept, in dataset order, so the language mix is the full set's and every
+    model gets the same conversations.
+    """
+    import random
+
+    by_language = {}
+    for index, language in enumerate(dataset["language"]):
+        by_language.setdefault(language, []).append(index)
+    keep = []
+    for language in sorted(by_language):
+        rows = by_language[language]
+        rng = random.Random(f"{HALF_SEED}:{language}")
+        keep.extend(rng.sample(rows, len(rows) // 2))
+    return process_docs(dataset.select(sorted(keep)))
+
+
 def _score_turn(spec, response):
     inp = InputExample(
         key=0,

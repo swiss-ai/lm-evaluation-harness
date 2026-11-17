@@ -1,0 +1,6 @@
+# multi_if_3turn on a fixed half of each language (utils.process_docs_half):
+# 2249 of the 4501 conversations, the full set's language mix.
+include: multi_if_3turn.yaml
+task: multi_if_3turn_half
+class: !function task.MultiIF3TurnTask
+process_docs: !function utils.process_docs_half

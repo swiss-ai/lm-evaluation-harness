@@ -25,5 +25,10 @@ which scores turn 1 only.
 - **Sampling:** generation defaults follow upstream's vLLM script (temperature
   0.6, top_p 0.9, 1024 new tokens). Thinking runs override them.
 
+`multi_if_3turn_half` is the same task on a fixed half of each language:
+2249 conversations, drawn with a fixed seed (`utils.process_docs_half`). Use it
+instead of `--limit`, which takes the first rows of a language-sorted dataset
+and so drops whole languages.
+
 Not included: per-language scores. Upstream also reports each turn per
 language.
