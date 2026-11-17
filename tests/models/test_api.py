@@ -1492,6 +1492,33 @@ def test_clamp_gen_toks_counts_a_chat_message_list_through_the_template():
     assert kw["max_gen_toks"] == 1000 - 701 - 32
 
 
+def test_clamp_gen_toks_counts_the_tools_the_server_adds_to_the_prompt():
+    # The tools travel as their own field (a JSON string in gen_kwargs); the server puts
+    # them into the prompt, so a clamp that counted only the messages left the answer a
+    # budget the real prompt then overflowed (a 400 on every bfcl request).
+    api = _clamping_api()
+    tools = json.dumps([{"name": "f", "description": "word " * 700}])
+    kw = {"max_gen_toks": 500, "tools": tools}
+    api._clamp_gen_toks([{"role": "user", "content": "go"}], kw, generate=True)
+    counted = (
+        len(_WordTokenizer().encode(json.dumps(json.loads(tools))))
+        + api._TOOL_WRAPPER_TOKENS
+    )
+    # message: 1 word + 8, plus the tools, plus the 32 slack
+    assert kw["max_gen_toks"] == 1000 - (1 + 8 + counted) - 32
+    # without tools the same request keeps its budget
+    kw = {"max_gen_toks": 500}
+    api._clamp_gen_toks([{"role": "user", "content": "go"}], kw, generate=True)
+    assert kw["max_gen_toks"] == 500
+
+
+def test_clamp_gen_toks_accepts_tools_as_a_list_and_an_empty_value():
+    api = _clamping_api()
+    assert api._tools_token_count(None) == 0
+    assert api._tools_token_count("[]") == 0
+    assert api._tools_token_count([{"name": "f"}]) > api._TOOL_WRAPPER_TOKENS
+
+
 def test_clamp_gen_toks_only_counts_with_the_huggingface_tokenizer():
     api = _clamping_api()
     api.tokenizer_backend = "remote"
