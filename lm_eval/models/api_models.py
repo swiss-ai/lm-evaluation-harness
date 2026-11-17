@@ -841,37 +841,34 @@ class TemplateAPI(TemplateLM):
         """Async counterpart of ``_send``."""
         return await self._apost(session, payload)
 
-    def _prompt_token_count(self, message) -> int | None:
+    # Tokens the server's template adds around each tool definition, on top of the
+    # tool's JSON text (the client can't render a template that has none).
+    _TOOL_WRAPPER_TOKENS = 16
+
+    def _tools_token_count(self, tools) -> int:
+        """Tokens the tool definitions add to a prompt: the JSON text of each tool plus
+        a margin for the server's formatting. Tasks pass tools as a JSON string."""
+        if isinstance(tools, str):
+            tools = json.loads(tools)
+        if not tools:
+            return 0
+        text = json.dumps(tools, ensure_ascii=False)
+        return len(
+            self.tokenizer.encode(text, add_special_tokens=False)
+        ) + self._TOOL_WRAPPER_TOKENS * len(tools)
+
+    def _prompt_token_count(self, message, tools=None) -> int | None:
         """The prompt's token count by the client tokenizer; None if it can't tell
-        (only the huggingface tokenizer is counted with)."""
+        (only the huggingface tokenizer is counted with). `tools` are the request's
+        tool definitions: the server adds them to the prompt, so they count too."""
         tok = self.tokenizer
         if self.tokenizer_backend != "huggingface" or tok is None:
             return None
         try:
-            if isinstance(message, list) and message and isinstance(message[0], dict):
-                # A chat message list: render it with the model's template, as the
-                # server does, then count the text. Without a template, count the
-                # contents.
-                if getattr(tok, "chat_template", None):
-                    message = tok.apply_chat_template(
-                        message, add_generation_prompt=True, tokenize=False
-                    )
-                else:
-                    return sum(
-                        len(
-                            tok.encode(
-                                str(m.get("content", "")), add_special_tokens=False
-                            )
-                        )
-                        + 8
-                        for m in message
-                    )
-            if isinstance(message, str):
-                return len(tok.encode(message, add_special_tokens=False))
-            if isinstance(message, list) and message and isinstance(message[0], str):
-                return max(
-                    len(tok.encode(m, add_special_tokens=False)) for m in message
-                )
+            used = self._message_token_count(message)
+            if used is None:
+                return None
+            return used + self._tools_token_count(tools)
         except Exception as e:  # noqa: BLE001 - a failed count must not fail the request
             if not self._clamp_count_failed:
                 self._clamp_count_failed = True
@@ -881,6 +878,28 @@ class TemplateAPI(TemplateLM):
                 )
         return None
 
+    def _message_token_count(self, message) -> int | None:
+        tok = self.tokenizer
+        if isinstance(message, list) and message and isinstance(message[0], dict):
+            # A chat message list: render it with the model's template, as the
+            # server does, then count the text. Without a template, count the
+            # contents.
+            if getattr(tok, "chat_template", None):
+                message = tok.apply_chat_template(
+                    message, add_generation_prompt=True, tokenize=False
+                )
+            else:
+                return sum(
+                    len(tok.encode(str(m.get("content", "")), add_special_tokens=False))
+                    + 8
+                    for m in message
+                )
+        if isinstance(message, str):
+            return len(tok.encode(message, add_special_tokens=False))
+        if isinstance(message, list) and message and isinstance(message[0], str):
+            return max(len(tok.encode(m, add_special_tokens=False)) for m in message)
+        return None
+
     def _clamp_gen_toks(self, message, gen_kwargs: dict | None, generate: bool) -> None:
         """With clamp_gen_toks, lower the request's token budget to what the context
         (max_length) leaves after the prompt, so a long prompt gets a shorter answer
@@ -888,7 +907,7 @@ class TemplateAPI(TemplateLM):
         full budget. Without a token count the request is left as it is."""
         if not (self.clamp_gen_toks and generate and gen_kwargs is not None):
             return
-        used = self._prompt_token_count(message)
+        used = self._prompt_token_count(message, gen_kwargs.get("tools"))
         if used is None:
             return
         key = "max_tokens" if gen_kwargs.get("max_tokens") else "max_gen_toks"
