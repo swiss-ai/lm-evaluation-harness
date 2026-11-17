@@ -1,0 +1,41 @@
+task: multi_if_3turn
+class: !function task.MultiIF3TurnTask
+dataset_path: facebook/Multi-IF
+output_type: multi_turn_generate
+test_split: train
+process_docs: !function utils.process_docs
+num_fewshot: 0
+# Ignored by the scripted rollout (task.MultiIF3TurnTask builds the messages),
+# but the task config requires them.
+description: ""
+doc_to_text: ""
+doc_to_target: ""
+process_results: !function utils.process_results
+# Upstream's vLLM script: temperature 0.6, top_p 0.9, 1024 new tokens; its API
+# script defaults to the same. Thinking runs override sampling and length.
+generation_kwargs:
+  until: []
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.9
+  max_gen_toks: 1024
+metric_list:
+  - metric: overall
+    aggregation: !function utils.agg_overall
+    higher_is_better: true
+  - metric: turn1_overall
+    aggregation: !function utils.agg_turn_overall
+    higher_is_better: true
+  - metric: turn2_overall
+    aggregation: !function utils.agg_turn_overall
+    higher_is_better: true
+  - metric: turn3_overall
+    aggregation: !function utils.agg_turn_overall
+    higher_is_better: true
+metadata:
+  version: 1.0
+repeat_support:
+  overall: native
+  turn1_overall: native
+  turn2_overall: native
+  turn3_overall: native
