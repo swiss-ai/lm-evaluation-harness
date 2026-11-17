@@ -404,6 +404,7 @@ class TemplateAPI(TemplateLM):
         self._context_limit = max_length
         self._n_clamped = 0
         self._clamp_count_failed = False
+        self._n_failed_logged = 0
         if int(num_concurrent) <= 1:
             eval_logger.info(
                 "Concurrent requests are disabled. To enable concurrent requests, set `num_concurrent` > 1."
@@ -811,8 +812,44 @@ class TemplateAPI(TemplateLM):
             eval_logger.warning(
                 f"API request failed with error message: {response.text}. Retrying..."
             )
+            self._log_failed_request(payload)
         response.raise_for_status()
         return response.json()
+
+    def _log_failed_request(self, payload: dict, max_logged: int = 3) -> None:
+        """What was sent when the server refused it (the first few times): each
+        message's role, and for assistant tool calls the type of every arguments
+        value. Never the contents or the tool definitions."""
+        if self._n_failed_logged >= max_logged:
+            return
+        self._n_failed_logged += 1
+        try:
+            parts = []
+            for i, m in enumerate(payload.get("messages") or []):
+                if not isinstance(m, dict):
+                    parts.append(f"{i}:{type(m).__name__}")
+                    continue
+                part = f"{i}:{m.get('role')}"
+                calls = m.get("tool_calls")
+                if isinstance(calls, list) and calls:
+                    kinds = [
+                        type((c.get("function") or {}).get("arguments")).__name__
+                        if isinstance(c, dict)
+                        else type(c).__name__
+                        for c in calls
+                    ]
+                    part += f"[tool_calls arguments: {','.join(kinds)}]"
+                parts.append(part)
+            summary = " ".join(parts)
+            if len(summary) > 1500:
+                summary = summary[:1500] + " ..."
+            eval_logger.warning(
+                f"Failed request ({self._n_failed_logged} of {max_logged} logged): "
+                f"messages [{summary}], tools {len(payload.get('tools') or [])}, "
+                f"max_tokens {payload.get('max_tokens')}"
+            )
+        except Exception as e:  # noqa: BLE001 - logging must not change the failure
+            eval_logger.debug(f"could not describe the failed request: {e!r}")
 
     async def _apost(self, session: ClientSession, payload: dict) -> dict:
         """Async counterpart of ``_post``; raising lets the caller retry."""
@@ -829,6 +866,7 @@ class TemplateAPI(TemplateLM):
                     f"API request failed! Status code: {response.status}, "
                     f"Response text: {error_text}. Retrying..."
                 )
+                self._log_failed_request(payload)
             response.raise_for_status()
             return await response.json()
 

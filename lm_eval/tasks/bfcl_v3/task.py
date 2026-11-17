@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
 import re
 from copy import deepcopy
 from pathlib import Path
@@ -362,6 +363,42 @@ def _fc_calls(tool_calls: list[dict], functions: list[dict]) -> list[dict]:
         if not isinstance(arguments, dict):
             raise TypeError(f"tool call arguments are not an object: {arguments!r}")
         calls.append({name: arguments})
+    return calls
+
+
+_log = logging.getLogger(__name__)
+_normalized_logged: set[str] = set()
+
+
+def _history_tool_calls(tool_calls: list[dict]) -> list[dict]:
+    """The model's tool calls as the API takes them back in the history: each
+    function.arguments a JSON string (the OpenAI schema). A server may return it
+    missing, null or as an object; apertus-common's server rejects the next request
+    then ("function.arguments must be a string", a 500). Copies; scoring reads
+    the raw calls."""
+    calls = []
+    for tool_call in tool_calls:
+        call = deepcopy(tool_call)
+        function = call.get("function")
+        if isinstance(function, dict) and not isinstance(
+            function.get("arguments"), str
+        ):
+            arguments = function.get("arguments")
+            kind = (
+                "missing" if "arguments" not in function else type(arguments).__name__
+            )
+            function["arguments"] = (
+                "{}" if arguments is None else json.dumps(arguments, ensure_ascii=False)
+            )
+            if kind not in _normalized_logged:
+                _normalized_logged.add(kind)
+                _log.warning(
+                    "bfcl_v3_fc: the server returned tool call arguments as %s; "
+                    "sent back as a string (%r). Further ones of this kind are not logged.",
+                    kind,
+                    call,
+                )
+        calls.append(call)
     return calls
 
 
@@ -953,7 +990,11 @@ class BFCLV3Task(ConfigurableTask):
         state["execution_results"][-1].append(execution_results)
         # The calls and one tool message per call, linked by id, as the API expects.
         state["history"].append(
-            {"role": "assistant", "content": content, "tool_calls": tool_calls}
+            {
+                "role": "assistant",
+                "content": content,
+                "tool_calls": _history_tool_calls(tool_calls),
+            }
         )
         state["history"].extend(
             {"role": "tool", "tool_call_id": tool_call.get("id"), "content": result}

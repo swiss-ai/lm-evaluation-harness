@@ -1519,6 +1519,35 @@ def test_clamp_gen_toks_accepts_tools_as_a_list_and_an_empty_value():
     assert api._tools_token_count([{"name": "f"}]) > api._TOOL_WRAPPER_TOKENS
 
 
+def test_failed_request_log_names_roles_and_argument_types_not_contents(caplog):
+    api = _clamping_api()
+    payload = {
+        "messages": [
+            {"role": "user", "content": "secret prompt"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "c0", "function": {"name": "f", "arguments": {"a": 1}}},
+                    {"id": "c1", "function": {"name": "g", "arguments": "{}"}},
+                ],
+            },
+            {"role": "tool", "tool_call_id": "c0", "content": "secret result"},
+        ],
+        "tools": [{"type": "function"}],
+        "max_tokens": 123,
+    }
+    with caplog.at_level("WARNING"):
+        for _ in range(5):
+            api._log_failed_request(payload)
+    lines = [r.message for r in caplog.records if "Failed request" in r.message]
+    assert len(lines) == 3  # the first few only
+    assert "1:assistant[tool_calls arguments: dict,str]" in lines[0]
+    assert "2:tool" in lines[0]
+    assert "max_tokens 123" in lines[0]
+    assert "secret" not in lines[0]
+
+
 def test_clamp_gen_toks_only_counts_with_the_huggingface_tokenizer():
     api = _clamping_api()
     api.tokenizer_backend = "remote"

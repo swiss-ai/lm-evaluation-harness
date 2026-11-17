@@ -763,6 +763,74 @@ def test_bfcl_v3_fc_multi_turn_executes_calls_and_links_tool_messages():
     assert state["turn_idx"] == 1
 
 
+@pytest.mark.parametrize(
+    ("returned", "sent"),
+    [
+        ('{"folder": "document"}', '{"folder": "document"}'),
+        ({"folder": "document"}, '{"folder": "document"}'),
+        (None, "{}"),
+        (MISSING := object(), "{}"),
+    ],
+    ids=["string", "object", "null", "missing"],
+)
+def test_bfcl_v3_fc_multi_turn_sends_tool_call_arguments_back_as_a_string(
+    returned, sent
+):
+    # A server may return function.arguments missing, null or as an object; the next
+    # request must carry a string (apertus-common's server answers 500 otherwise).
+    from lm_eval.tasks.bfcl_v3.task import TOOL_CALLS_MARKER
+
+    function = {"name": "cd"}
+    if returned is not MISSING:
+        function["arguments"] = returned
+    tool_calls = [{"id": "call0", "type": "function", "function": function}]
+    task = _make_fc_task("multi_turn_base")
+    seen = []
+    state = task.init_multiturn_state(
+        task.test_docs()[0],
+        ctx="",
+        gen_kwargs={"until": [], "max_gen_toks": 2048},
+        apply_chat_template=True,
+        chat_template=lambda messages, **kwargs: (
+            seen.append(messages) or _ChatPrompt("msgs")
+        ),
+    )
+    task.multiturn_next_request(state)
+    task.multiturn_consume_response(state, TOOL_CALLS_MARKER + json.dumps(tool_calls))
+    task.multiturn_next_request(state)
+
+    history_calls = seen[-1][1]["tool_calls"]
+    assert history_calls[0]["function"]["arguments"] == sent
+    assert history_calls[0]["id"] == "call0"
+    # The reply the model gave is not edited, and the tool message is still linked.
+    assert function.get("arguments", MISSING) is returned
+    assert seen[-1][2]["tool_call_id"] == "call0"
+
+
+def test_bfcl_v3_fc_history_tool_calls_are_accepted_by_apertus_common():
+    lib = pytest.importorskip("apertus_common")
+    from lm_eval.tasks.bfcl_v3.task import _history_tool_calls
+
+    for arguments in ({"a": 1}, None, "{}"):
+        calls = _history_tool_calls(
+            [
+                {
+                    "id": "c0",
+                    "type": "function",
+                    "function": {"name": "f", "arguments": arguments},
+                }
+            ]
+        )
+        lib.from_openai(
+            [
+                {"role": "user", "content": "go"},
+                {"role": "assistant", "content": "", "tool_calls": calls},
+                {"role": "tool", "tool_call_id": "c0", "content": "ok"},
+            ],
+            reasoning_effort="high",
+        )
+
+
 def test_bfcl_v3_fc_miss_func_sends_held_out_functions_as_tools():
     task = _make_fc_task("multi_turn_miss_func")
     doc = task.test_docs()[0]
