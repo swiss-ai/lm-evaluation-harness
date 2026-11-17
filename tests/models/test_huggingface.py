@@ -2,20 +2,19 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-from pathlib import Path
-
 import numpy as np
+import pytest
 import tokenizers
 import torch
 from packaging.version import parse as parse_version
 
 from lm_eval import tasks
+from lm_eval.api.instance import Instance
 from lm_eval.models.huggingface import HFLM
 
-from lm_eval.api.instance import Instance
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 task_manager = tasks.TaskManager()
