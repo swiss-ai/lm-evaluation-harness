@@ -120,6 +120,7 @@ def _resolve_private_saved_dataset_path(
 # Seed of the random subset that --limit selects.
 LIMIT_SEED = 42
 
+
 class Task(abc.ABC):
     """A task represents an entire benchmark including its dataset, problems,
     answers, and evaluation methods. See BoolQ for a simple example implementation
@@ -382,7 +383,9 @@ class Task(abc.ABC):
         if limit is not None and cache_requests:
             # The cache holds every doc and is sliced to the first `limit`; a random subset
             # would not match it.
-            eval_logger.warning("--limit selects a random subset: not using the request cache.")
+            eval_logger.warning(
+                "--limit selects a random subset: not using the request cache."
+            )
             cache_requests = False
 
         cache_key = f"requests-{self._config.task}-{self.config.num_fewshot}shot-rank{rank}-world_size{world_size}"
