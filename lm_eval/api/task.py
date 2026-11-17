@@ -117,6 +117,9 @@ def _resolve_private_saved_dataset_path(
     return None
 
 
+# Seed of the random subset that --limit selects.
+LIMIT_SEED = 42
+
 class Task(abc.ABC):
     """A task represents an entire benchmark including its dataset, problems,
     answers, and evaluation methods. See BoolQ for a simple example implementation
@@ -375,6 +378,12 @@ class Task(abc.ABC):
 
         # used with caching
         og_limit = limit
+
+        if limit is not None and cache_requests:
+            # The cache holds every doc and is sliced to the first `limit`; a random subset
+            # would not match it.
+            eval_logger.warning("--limit selects a random subset: not using the request cache.")
+            cache_requests = False
 
         cache_key = f"requests-{self._config.task}-{self.config.num_fewshot}shot-rank{rank}-world_size{world_size}"
         if cache_rank is not None and cache_rank != rank:
@@ -699,8 +708,22 @@ class Task(abc.ABC):
             )
         else:
             limit = int(limit) if limit else None
+            docs = self.eval_docs
+            n = len(docs)
+            if limit is not None and limit < n:
+                # A random subset, not the first `limit` docs (datasets are often sorted by
+                # subject or difficulty). Seeded, so every run and every rank picks the same
+                # docs; doc ids stay the indices in the full dataset, in dataset order.
+                picked = sorted(random.Random(LIMIT_SEED).sample(range(n), limit))
+                eval_logger.info(
+                    f"{self.config.task}: --limit {limit} of {n} docs: random subset, seed {LIMIT_SEED}"
+                )
+                raw_iterator = ((i, docs[i]) for i in picked)
+                limit = None
+            else:
+                raw_iterator = enumerate(docs)
             doc_iterator = utils.create_iterator(
-                enumerate(self.eval_docs),
+                raw_iterator,
                 rank=int(rank),
                 limit=limit,
                 world_size=int(world_size),
