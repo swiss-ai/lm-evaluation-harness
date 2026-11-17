@@ -20,3 +20,6 @@ generation_kwargs:
   max_gen_toks: 1024
 metadata:
   version: 1.0
+repeat_support:
+  chrf: native
+  bleu: native
