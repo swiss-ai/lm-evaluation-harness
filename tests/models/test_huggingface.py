@@ -49,7 +49,7 @@ class Test_HFLM:
     )  # the first 10 docs: the expected values below are theirs
     ROLLING: list[Instance] = rolling_task.instances
 
-    MULTIPLE_CH_RES = [
+    MULTIPLE_CH_RES = [  # noqa: RUF012
         -41.902435302734375,
         -42.939308166503906,
         -33.914180755615234,
@@ -91,7 +91,7 @@ class Test_HFLM:
         -52.70050811767578,
         -56.25089645385742,
     ]
-    generate_until_RES = [
+    generate_until_RES = [  # noqa: RUF012
         " The average of $2.50 each is $",
         " A robe takes 2 bolts of blue fiber and half",
         " $50,000 in repairs.\n\nQuestion",
@@ -103,7 +103,7 @@ class Test_HFLM:
         " John drives for 3 hours at a speed of 60",
         " Eliza sells 4 tickets to 5 friends so she",
     ]
-    ROLLING_RES = [
+    ROLLING_RES = [  # noqa: RUF012
         -3603.6328125,
         -19779.23974609375,
         -8834.16455078125,
