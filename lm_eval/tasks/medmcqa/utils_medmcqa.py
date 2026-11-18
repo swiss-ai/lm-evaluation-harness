@@ -22,3 +22,15 @@ def doc_to_text(doc) -> str:
         prompt += f"{choice.upper()}. {option}\n"
     prompt += "Answer:"
     return prompt
+
+
+def doc_to_text_cot(doc) -> str:
+    choices = [doc["opa"], doc["opb"], doc["opc"], doc["opd"]]
+    answers = "".join(f"{k}. {v}\n" for k, v in zip("ABCD", choices))
+    prompt = f"Question: {doc['question']}\n{answers}"
+    prompt += "First, think step-by-step. End your response with exactly this format:\nFinal Answer: X\n(where X is A, B, C, or D)."
+    return prompt
+
+
+def doc_to_target_cot(doc) -> str:
+    return "ABCD"[doc["cop"]]
