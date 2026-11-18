@@ -45,10 +45,33 @@ def _judge_model() -> str:
     )
 
 
-# Tokenizer for truncation only (no local model needed)
-tokenizer = AutoTokenizer.from_pretrained(
-    "cais/HarmBench-Llama-2-13b-cls", truncation_side="right", padding_side="left"
-)
+# Tokenizer for truncation only (no local model needed). The classifier's repo
+# ships only a SentencePiece tokenizer.model; without sentencepiece and
+# protobuf, transformers 5 falls back to its tiktoken reader, which can't parse
+# it ("Error parsing line b'\x0e'"). The fallback has the same tokenizer.model
+# (identical sha256) plus a tokenizer.json, so it loads without either. It
+# differs from the classifier's legacy tokenizer only on runs of spaces after a
+# newline, which shifts the token count (and so where truncation cuts) by a
+# few tokens at most.
+TOKENIZER_FALLBACK = "TheBloke/Llama-2-13B-fp16"
+
+
+def _load_tokenizer():
+    kwargs = {"truncation_side": "right", "padding_side": "left"}
+    try:
+        return AutoTokenizer.from_pretrained(DEFAULT_MODEL_NAME, **kwargs)
+    except ValueError as exc:
+        eval_logger.warning(
+            "Could not load the %s tokenizer (%s); using %s's, the same Llama-2 "
+            "tokenizer.",
+            DEFAULT_MODEL_NAME,
+            exc,
+            TOKENIZER_FALLBACK,
+        )
+        return AutoTokenizer.from_pretrained(TOKENIZER_FALLBACK, **kwargs)
+
+
+tokenizer = _load_tokenizer()
 
 
 def try_remote_generate(prompt, temperature=0.0, max_tokens=1, max_retries=6):
