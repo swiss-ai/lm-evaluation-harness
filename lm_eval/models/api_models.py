@@ -843,7 +843,7 @@ class TemplateAPI(TemplateLM):
 
     # Tokens the server's template adds around each tool definition, on top of the
     # tool's JSON text (the client can't render a template that has none).
-    _TOOL_WRAPPER_TOKENS = 16
+    _TOOL_WRAPPER_TOKENS = 4
 
     def _tools_token_count(self, tools) -> int:
         """Tokens the tool definitions add to a prompt: the JSON text of each tool plus
@@ -878,22 +878,55 @@ class TemplateAPI(TemplateLM):
                 )
         return None
 
+    # Margin left after the counted prompt (special tokens, the generation prompt).
+    _CLAMP_SLACK_TOKENS = 64
+
+    # Tokens the server adds around each tool call (its header and the matching
+    # result header both carry the name, plus counters), on top of the call's name
+    # and arguments. Measured as ~14 on the Apertus 2 format; counted generously.
+    _TOOL_CALL_FRAMING_TOKENS = 24
+
+    def _chat_message_tokens(self, message: dict) -> int:
+        """A chat message's tokens without a template: what the server renders from
+        it (content, reasoning, each tool call's name and arguments) plus a margin
+        for the role framing."""
+        tok = self.tokenizer
+
+        def count(text) -> int:
+            if not text:
+                return 0
+            if not isinstance(text, str):
+                text = json.dumps(text, ensure_ascii=False)
+            return len(tok.encode(text, add_special_tokens=False))
+
+        tokens = (
+            8 + count(message.get("content")) + count(message.get("reasoning_content"))
+        )
+        for call in message.get("tool_calls") or []:
+            function = call.get("function") or {}
+            tokens += (
+                count(function.get("name"))
+                + count(function.get("arguments"))
+                + self._TOOL_CALL_FRAMING_TOKENS
+            )
+        return tokens
+
     def _message_token_count(self, message) -> int | None:
         tok = self.tokenizer
         if isinstance(message, list) and message and isinstance(message[0], dict):
             # A chat message list: render it with the model's template, as the
-            # server does, then count the text. Without a template, count the
-            # contents.
+            # server does, then count the text. Without a template, or when it
+            # cannot render the history (some refuse tool calls), count what the
+            # messages carry.
             if getattr(tok, "chat_template", None):
-                message = tok.apply_chat_template(
-                    message, add_generation_prompt=True, tokenize=False
-                )
+                try:
+                    message = tok.apply_chat_template(
+                        message, add_generation_prompt=True, tokenize=False
+                    )
+                except Exception:  # noqa: BLE001 - fall back to the estimate
+                    return sum(self._chat_message_tokens(m) for m in message)
             else:
-                return sum(
-                    len(tok.encode(str(m.get("content", "")), add_special_tokens=False))
-                    + 8
-                    for m in message
-                )
+                return sum(self._chat_message_tokens(m) for m in message)
         if isinstance(message, str):
             return len(tok.encode(message, add_special_tokens=False))
         if isinstance(message, list) and message and isinstance(message[0], str):
@@ -913,7 +946,7 @@ class TemplateAPI(TemplateLM):
         key = "max_tokens" if gen_kwargs.get("max_tokens") else "max_gen_toks"
         budget = int(gen_kwargs.get(key) or self._max_gen_toks)
         # slack for tokens the client count misses (special tokens, template wrapper)
-        room = self._context_limit - used - 32
+        room = self._context_limit - used - self._CLAMP_SLACK_TOKENS
         if budget <= room:
             return
         if room < 1:
