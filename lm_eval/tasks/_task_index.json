@@ -76614,6 +76614,11 @@
       "tags": [],
       "yaml_path": "medmcqa/medmcqa.yaml"
     },
+    "medmcqa_cot": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "medmcqa/medmcqa_cot.yaml"
+    },
     "medqa_4options": {
       "kind": "TASK",
       "tags": [],
@@ -76633,6 +76638,11 @@
       "kind": "TASK",
       "tags": [],
       "yaml_path": "medtext/medtext_perplexity.yaml"
+    },
+    "medxpertqa_cot": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "medxpertqa/medxpertqa_cot.yaml"
     },
     "mela": {
       "kind": "GROUP",
@@ -119466,6 +119476,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16311,
+  "entry_count": 16313,
   "schema_version": 1
 }
