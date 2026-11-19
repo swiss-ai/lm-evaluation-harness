@@ -86464,6 +86464,36 @@
       "tags": [],
       "yaml_path": "mmlu_prox/fr/mmlu_prox_fr_psychology.yaml"
     },
+    "mmlu_prox_health_cot": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/_mmlu_prox_health_cot.yaml"
+    },
+    "mmlu_prox_health_cot_de": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/mmlu_prox_health_cot_de.yaml"
+    },
+    "mmlu_prox_health_cot_en": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/mmlu_prox_health_cot_en.yaml"
+    },
+    "mmlu_prox_health_cot_fr": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/mmlu_prox_health_cot_fr.yaml"
+    },
+    "mmlu_prox_health_cot_hi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/mmlu_prox_health_cot_hi.yaml"
+    },
+    "mmlu_prox_health_cot_sw": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "mmlu_prox_health_cot/mmlu_prox_health_cot_sw.yaml"
+    },
     "mmlu_prox_hi": {
       "kind": "GROUP",
       "tags": [],
@@ -119476,6 +119506,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16313,
+  "entry_count": 16319,
   "schema_version": 1
 }

@@ -1,0 +1,13 @@
+group: mmlu_prox_health_cot
+task:
+  - mmlu_prox_health_cot_en
+  - mmlu_prox_health_cot_fr
+  - mmlu_prox_health_cot_de
+  - mmlu_prox_health_cot_hi
+  - mmlu_prox_health_cot_sw
+aggregate_metric_list:
+  - metric: exact_match
+    aggregation: mean
+    weight_by_size: true
+metadata:
+  version: 1.0
