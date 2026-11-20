@@ -27493,6 +27493,76 @@
       ],
       "yaml_path": null
     },
+    "flores200_chrf": {
+      "kind": "GROUP",
+      "tags": [
+        "flores200_chrf_deu_Latn-eng_Latn",
+        "flores200_chrf_eng_Latn-deu_Latn",
+        "flores200_chrf_eng_Latn-fra_Latn",
+        "flores200_chrf_eng_Latn-ita_Latn",
+        "flores200_chrf_eng_Latn-spa_Latn",
+        "flores200_chrf_fra_Latn-eng_Latn",
+        "flores200_chrf_ita_Latn-eng_Latn",
+        "flores200_chrf_spa_Latn-eng_Latn"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf.yaml"
+    },
+    "flores200_chrf_deu_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_deu_Latn-eng_Latn.yaml"
+    },
+    "flores200_chrf_eng_Latn-deu_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_eng_Latn-deu_Latn.yaml"
+    },
+    "flores200_chrf_eng_Latn-fra_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_eng_Latn-fra_Latn.yaml"
+    },
+    "flores200_chrf_eng_Latn-ita_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_eng_Latn-ita_Latn.yaml"
+    },
+    "flores200_chrf_eng_Latn-spa_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_eng_Latn-spa_Latn.yaml"
+    },
+    "flores200_chrf_fra_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_fra_Latn-eng_Latn.yaml"
+    },
+    "flores200_chrf_ita_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_ita_Latn-eng_Latn.yaml"
+    },
+    "flores200_chrf_spa_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores200_chrf"
+      ],
+      "yaml_path": "flores200_chrf/flores200_chrf_spa_Latn-eng_Latn.yaml"
+    },
     "flores_ace_Arab-eng_Latn_prompt_1": {
       "kind": "TASK",
       "tags": [
@@ -31394,6 +31464,76 @@
         "flores_afr-eng_prompt_3"
       ],
       "yaml_path": "afrobench/flores/prompt_3/african-english/flores_plt_Latn-eng_Latn.yaml"
+    },
+    "flores_plus_chrf": {
+      "kind": "GROUP",
+      "tags": [
+        "flores_plus_chrf_deu_Latn-eng_Latn",
+        "flores_plus_chrf_eng_Latn-deu_Latn",
+        "flores_plus_chrf_eng_Latn-fra_Latn",
+        "flores_plus_chrf_eng_Latn-ita_Latn",
+        "flores_plus_chrf_eng_Latn-spa_Latn",
+        "flores_plus_chrf_fra_Latn-eng_Latn",
+        "flores_plus_chrf_ita_Latn-eng_Latn",
+        "flores_plus_chrf_spa_Latn-eng_Latn"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf.yaml"
+    },
+    "flores_plus_chrf_deu_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_deu_Latn-eng_Latn.yaml"
+    },
+    "flores_plus_chrf_eng_Latn-deu_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_eng_Latn-deu_Latn.yaml"
+    },
+    "flores_plus_chrf_eng_Latn-fra_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_eng_Latn-fra_Latn.yaml"
+    },
+    "flores_plus_chrf_eng_Latn-ita_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_eng_Latn-ita_Latn.yaml"
+    },
+    "flores_plus_chrf_eng_Latn-spa_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_eng_Latn-spa_Latn.yaml"
+    },
+    "flores_plus_chrf_fra_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_fra_Latn-eng_Latn.yaml"
+    },
+    "flores_plus_chrf_ita_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_ita_Latn-eng_Latn.yaml"
+    },
+    "flores_plus_chrf_spa_Latn-eng_Latn": {
+      "kind": "TASK",
+      "tags": [
+        "flores_plus_chrf"
+      ],
+      "yaml_path": "flores_plus_chrf/flores_plus_chrf_spa_Latn-eng_Latn.yaml"
     },
     "flores_pt": {
       "kind": "GROUP",
@@ -119475,6 +119615,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16311,
+  "entry_count": 16329,
   "schema_version": 1
 }
