@@ -1,0 +1,5 @@
+include: _wmt24pp_chrf_yaml
+task: wmt24pp_chrf_en-fa_IR
+dataset_name: en-fa_IR
+tag:
+- wmt24pp_chrf

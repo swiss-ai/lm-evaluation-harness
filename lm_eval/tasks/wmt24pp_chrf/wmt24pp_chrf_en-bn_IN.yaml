@@ -1,0 +1,5 @@
+include: _wmt24pp_chrf_yaml
+task: wmt24pp_chrf_en-bn_IN
+dataset_name: en-bn_IN
+tag:
+- wmt24pp_chrf

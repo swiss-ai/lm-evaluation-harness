@@ -1,0 +1,5 @@
+include: _wmt24pp_chrf_yaml
+task: wmt24pp_chrf_en-ca_ES
+dataset_name: en-ca_ES
+tag:
+- wmt24pp_chrf
