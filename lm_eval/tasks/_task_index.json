@@ -12875,21 +12875,6 @@
       ],
       "yaml_path": "aime/aime25_think.yaml"
     },
-    "aime_2022": {
-      "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2022.yaml"
-    },
-    "aime_2023": {
-      "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2023.yaml"
-    },
-    "aime_2024": {
-      "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2024.yaml"
-    },
     "alpaca_eval": {
       "kind": "TASK",
       "tags": [],
@@ -119482,6 +119467,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16313,
+  "entry_count": 16310,
   "schema_version": 1
 }
