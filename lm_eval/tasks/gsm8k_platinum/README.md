@@ -52,3 +52,4 @@ Homepage: http://platinum-bench.csail.mit.edu/
 - `gsm8k_platinum_cot_self_consistency`: GSM8K Platinum with Chain-of-Thought and Self-Consistency
 - `gsm8k_platinum_cot_llama`: GSM8K Platinum with prompt formatting modified to conform to the evaluation settings described by Meta here: https://huggingface.co/datasets/meta-llama/Meta-Llama-3.1-8B-Instruct-evals/viewer/Meta-Llama-3.1-8B-Instruct-evals__gsm8k__details?row=0
     - Use this task with --fewshot_as_multiturn and --apply_chat_template to replicate Meta's reported performance.
+- `gsm8k_platinum_think`: `gsm8k_think` (DAPO prompt asking for a final "Answer: $Answer" line; temperature 0.6, top-p 0.95, 16k tokens, 4 samples) on GSM8K Platinum. Use with --apply_chat_template for reasoning models.
