@@ -46,6 +46,7 @@ Homepage: https://github.com/openai/grade-school-math
 - `gsm8k_cot_self_consistency`: GSM8K with Chain-of-Thought and Self-Consistency
 - `gsm8k_cot_llama`: GSM8K with prompt formatting modified to conform to the evaluation settings described by Meta here: https://huggingface.co/datasets/meta-llama/Meta-Llama-3.1-8B-Instruct-evals/viewer/Meta-Llama-3.1-8B-Instruct-evals__gsm8k__details?row=0
     - Use this task with --fewshot_as_multiturn and --apply_chat_template to replicate Meta's reported performance.
+- `gsm8k_think`: `gsm8k_cot_zeroshot_self_consistency` with the DAPO prompt (as `aime24_think`): the model is asked to end with an "Answer: $Answer" line, which is the answer that gets scored
 
 
 ### Checklist

@@ -58119,6 +58119,13 @@
       ],
       "yaml_path": "gsm8k_platinum/gsm8k-platinum-cot-zeroshot.yaml"
     },
+    "gsm8k_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "gsm8k/gsm8k-think.yaml"
+    },
     "gsm_plus": {
       "kind": "TASK",
       "tags": [
@@ -76254,6 +76261,7 @@
         "gsm8k_olmes_cot",
         "gsm8k_platinum",
         "gsm8k_platinum_cot_zeroshot",
+        "gsm8k_think",
         "gsm_plus",
         "gsm_plus_mini",
         "hendrycks_math500",
@@ -119467,6 +119475,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16310,
+  "entry_count": 16311,
   "schema_version": 1
 }

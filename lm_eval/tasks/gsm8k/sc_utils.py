@@ -6,6 +6,9 @@ is required because the built-in ``exact_match`` metric only scores a single
 response per doc (``results[0]``) and cannot average over the k samples needed for
 mean@k — see ``lm_eval/api/task.py``. The maj@k / pass@k filters mirror the AIME
 self-consistency setup, differing only in how the answer is extracted.
+
+``gsm8k_think`` uses the ``think_*`` / ``Think*`` variants, which extract the answer from
+the final "Answer:" line (or a ``\\boxed{}``) via ``extract_answer_marked``.
 """
 
 import re
@@ -37,9 +40,76 @@ def extract_gold(doc: dict) -> str:
     return _clean_number(gold)
 
 
-def _score_response(response: str, gold: str) -> int:
+# Extraction for thinking runs (gsm8k_think), whose prompt asks for a final
+# "Answer: $Answer" line. Unlike extract_answer, which takes the last number anywhere,
+# this prefers where the model says the answer is, so a number in text after the
+# answer line cannot replace it. Same order as the AIME extractor, minus the
+# math-span step (GSM8K answers are bare integers).
+_ANSWER_MARKER_RE = re.compile(
+    r"(?:final\s+answer|answer)\s*(?:is)?\s*[:=]?", re.IGNORECASE
+)
+_BOXED = "\\boxed{"
+
+
+def _last_boxed_content(response: str) -> str | None:
+    """Content of the last ``\\boxed{...}`` (braces balanced), or ``None``."""
+    start = response.rfind(_BOXED)
+    if start < 0:
+        return None
+    begin = start + len(_BOXED)
+    depth, end = 1, begin
+    while end < len(response) and depth:
+        depth += (response[end] == "{") - (response[end] == "}")
+        end += 1
+    return response[begin : end - 1] if depth == 0 else None
+
+
+# int() raises ValueError on digit runs beyond 4300; a looping response can emit one.
+# A GSM8K answer is a few digits, so anything this long counts as "no answer".
+_MAX_ANSWER_DIGITS = 100
+
+
+def _canonical_number(number: str) -> str:
+    """Canonical form of a cleaned number: ``007`` -> ``7``, ``18.00`` -> ``18``.
+
+    A non-integer (``18.5``) is kept as written, so it can never equal the integer
+    gold; a digit run too long to be an answer gives ``''``.
+    """
+    if not re.fullmatch(r"[+-]?\d+(\.\d+)?", number):
+        return number
+    whole, _, fraction = number.partition(".")
+    if len(whole.lstrip("+-")) > _MAX_ANSWER_DIGITS:
+        return ""
+    return number if fraction.strip("0") else str(int(whole))
+
+
+def _first_number(text: str) -> str:
+    """The first number in ``text``, canonical (``''`` if none)."""
+    match = _NUMBER_RE.search(text)
+    return _canonical_number(_clean_number(match.group(0))) if match else ""
+
+
+def extract_answer_marked(response: str) -> str:
+    """Final numeric answer of a thinking-run response (``''`` if it has none).
+
+    Tries, in order: the last ``\\boxed{...}``, the first number after the last
+    "answer" / "final answer" marker, and finally the last number anywhere (as
+    ``extract_answer``).
+    """
+    boxed = _last_boxed_content(response)
+    if boxed is not None and (number := _first_number(boxed)):
+        return number
+
+    markers = list(_ANSWER_MARKER_RE.finditer(response))
+    if markers and (number := _first_number(response[markers[-1].end() :])):
+        return number
+
+    return _canonical_number(extract_answer(response))
+
+
+def _score_response(response: str, gold: str, extract=extract_answer) -> int:
     """1 if the response's extracted answer matches the gold answer, else 0."""
-    pred = extract_answer(response)
+    pred = extract(response)
     return int(pred != "" and pred == gold)
 
 
@@ -53,12 +123,14 @@ class MajorityVoteFilter:
     Chain a ``take_first`` after this filter to unwrap the single voted response.
     """
 
+    extract = staticmethod(extract_answer)
+
     def __init__(self, **kwargs) -> None:
         pass
 
     def apply(self, resps, docs):
         def select(resp_list):
-            answers = [extract_answer(r) for r in resp_list]
+            answers = [self.extract(r) for r in resp_list]
             votable = [a for a in answers if a != ""] or answers
             winner = Counter(votable).most_common(1)[0][0]
             for resp, ans in zip(resp_list, answers):
@@ -80,6 +152,8 @@ class PassAtKFilter:
     Chain a ``take_first`` after this filter to unwrap the selected response.
     """
 
+    extract = staticmethod(extract_answer)
+
     def __init__(self, **kwargs) -> None:
         pass
 
@@ -87,14 +161,26 @@ class PassAtKFilter:
         def select(resp_list, doc):
             gold = extract_gold(doc)
             for resp in resp_list:
-                if _score_response(resp, gold):
+                if _score_response(resp, gold, self.extract):
                     return resp
             return resp_list[0]
 
         return [[select(r, d)] for r, d in zip(resps, docs)]
 
 
-def process_results(doc: dict, results: list) -> dict[str, float]:
+class ThinkMajorityVoteFilter(MajorityVoteFilter):
+    """``MajorityVoteFilter`` voting on ``extract_answer_marked`` answers."""
+
+    extract = staticmethod(extract_answer_marked)
+
+
+class ThinkPassAtKFilter(PassAtKFilter):
+    """``PassAtKFilter`` scoring with ``extract_answer_marked``."""
+
+    extract = staticmethod(extract_answer_marked)
+
+
+def _process_results(doc: dict, results: list, extract) -> dict[str, float]:
     # A filter may collapse the repeats to a single response (take_first, maj@k,
     # pass@k) or pass them all through (take_first_k for mean@k). Normalize to a
     # list so a single metric path handles both.
@@ -105,10 +191,18 @@ def process_results(doc: dict, results: list) -> dict[str, float]:
 
     # For a single response this is 0/1 (per-sample accuracy); for the full set of
     # k samples it is the mean accuracy over the k attempts (mean@k / avg@k).
-    scores = [_score_response(r, gold) for r in responses]
+    scores = [_score_response(r, gold, extract) for r in responses]
     degens = [int(is_degenerating_text(r.lower())) for r in responses]
 
     return {
         "exact_match": sum(scores) / len(scores),
         "degeneration": sum(degens) / len(degens),
     }
+
+
+def process_results(doc: dict, results: list) -> dict[str, float]:
+    return _process_results(doc, results, extract_answer)
+
+
+def think_process_results(doc: dict, results: list) -> dict[str, float]:
+    return _process_results(doc, results, extract_answer_marked)
