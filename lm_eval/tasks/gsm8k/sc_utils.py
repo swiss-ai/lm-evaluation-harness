@@ -64,13 +64,29 @@ def _last_boxed_content(response: str) -> str | None:
     return response[begin : end - 1] if depth == 0 else None
 
 
-def _first_number(text: str) -> str:
-    """The first number in ``text``, cleaned (``''`` if none). ``18.00`` -> ``18``."""
-    match = _NUMBER_RE.search(text)
-    if not match:
+# int() raises ValueError on digit runs beyond 4300; a looping response can emit one.
+# A GSM8K answer is a few digits, so anything this long counts as "no answer".
+_MAX_ANSWER_DIGITS = 100
+
+
+def _canonical_number(number: str) -> str:
+    """Canonical form of a cleaned number: ``007`` -> ``7``, ``18.00`` -> ``18``.
+
+    A non-integer (``18.5``) is kept as written, so it can never equal the integer
+    gold; a digit run too long to be an answer gives ``''``.
+    """
+    if not re.fullmatch(r"[+-]?\d+(\.\d+)?", number):
+        return number
+    whole, _, fraction = number.partition(".")
+    if len(whole.lstrip("+-")) > _MAX_ANSWER_DIGITS:
         return ""
-    number = _clean_number(match.group(0))
-    return number.split(".")[0] if re.fullmatch(r"[+-]?\d+\.0+", number) else number
+    return number if fraction.strip("0") else str(int(whole))
+
+
+def _first_number(text: str) -> str:
+    """The first number in ``text``, canonical (``''`` if none)."""
+    match = _NUMBER_RE.search(text)
+    return _canonical_number(_clean_number(match.group(0))) if match else ""
 
 
 def extract_answer_marked(response: str) -> str:
@@ -88,7 +104,7 @@ def extract_answer_marked(response: str) -> str:
     if markers and (number := _first_number(response[markers[-1].end() :])):
         return number
 
-    return extract_answer(response)
+    return _canonical_number(extract_answer(response))
 
 
 def _score_response(response: str, gold: str, extract=extract_answer) -> int:
