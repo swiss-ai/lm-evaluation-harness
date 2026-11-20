@@ -229,7 +229,11 @@ def _strip_answer_text(text: str) -> str:
     """Peel markdown bold, math delimiters, a \\boxed{} wrapper and a trailing period."""
     text = text.strip().strip("*").strip()
     for left, right in (("$$", "$$"), ("$", "$"), ("\\(", "\\)"), ("\\[", "\\]")):
-        if text.startswith(left) and text.endswith(right) and len(text) > len(left) + len(right) - 1:
+        if (
+            text.startswith(left)
+            and text.endswith(right)
+            and len(text) > len(left) + len(right) - 1
+        ):
             text = text[len(left) : len(text) - len(right)].strip()
             break
     boxed = last_boxed_only_string(text)
