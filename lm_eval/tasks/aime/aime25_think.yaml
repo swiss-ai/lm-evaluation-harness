@@ -1,0 +1,7 @@
+include: aime25.yaml
+task: aime25_think
+# The prompt of BytedTsinghua-SIA/AIME-2024 (DAPO), which asks for a final "Answer: $Answer" line,
+# as in aime24_think. Sampling, repeats, filters and scoring are aime25's.
+doc_to_text: "Solve the following math problem step by step. The last line of your response should be of the form Answer: $Answer (without quotes) where $Answer is the answer to the problem.\n\n{{problem}}\n\nRemember to put your answer on its own line after \"Answer:\"."
+metadata:
+  version: 1.0
