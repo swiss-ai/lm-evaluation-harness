@@ -76275,6 +76275,7 @@
         "mathqa",
         "minerva_math500",
         "minerva_math500_self_consistency",
+        "minerva_math500_think",
         "minerva_math_algebra",
         "minerva_math_counting_and_prob",
         "minerva_math_geometry",
@@ -77168,6 +77169,13 @@
         "math_word_problems"
       ],
       "yaml_path": "minerva_math/minerva_math500_self_consistency.yaml"
+    },
+    "minerva_math500_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "minerva_math/minerva_math500_think.yaml"
     },
     "minerva_math_algebra": {
       "kind": "TASK",
@@ -119475,6 +119483,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16311,
+  "entry_count": 16312,
   "schema_version": 1
 }
