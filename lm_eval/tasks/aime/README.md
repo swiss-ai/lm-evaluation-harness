@@ -50,6 +50,7 @@ The metric and regexes used are taken from the implementation of GSM8K, given th
 
 * `aime`: `AIME 1983-2024 problems`
 * `aime24`: `AIME 2024 problems`
+* `aime24_think`: `aime24` with the DAPO prompt (BytedTsinghua-SIA/AIME-2024): the model is asked to end with an "Answer: $Answer" line
 * `aime25`: `AIME 2025 problems`
 
 ### Checklist

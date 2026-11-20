@@ -12854,6 +12854,13 @@
       ],
       "yaml_path": "aime/aime24.yaml"
     },
+    "aime24_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "aime/aime24_think.yaml"
+    },
     "aime25": {
       "kind": "TASK",
       "tags": [
@@ -76244,6 +76251,7 @@
       "tags": [
         "aime",
         "aime24",
+        "aime24_think",
         "aime25",
         "gsm8k",
         "gsm8k_cot",
@@ -119466,6 +119474,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16311,
+  "entry_count": 16312,
   "schema_version": 1
 }
