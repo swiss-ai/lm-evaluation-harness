@@ -1,0 +1,54 @@
+include: minerva_math500_self_consistency.yaml
+task: minerva_math500_think
+# Same tag as aime24_think / gsm8k_think: not the inherited tags, which would pull this
+# thinking prompt into runs of those tags.
+tag:
+  - math_word_problems
+# The prompt of BytedTsinghua-SIA/AIME-2024 (DAPO), as in aime24_think and gsm8k_think.
+# Repeats and sampling are minerva_math500_self_consistency's.
+doc_to_text: "Solve the following math problem step by step. The last line of your response should be of the form Answer: $Answer (without quotes) where $Answer is the answer to the problem.\n\n{{problem}}\n\nRemember to put your answer on its own line after \"Answer:\"."
+# Scoring reads the final "Answer:" line (or a \boxed{}) and checks it with math_verify;
+# see utils.think_answer / think_process_results. exact_match is deliberately omitted:
+# the Minerva is_equiv path rejects correct tuples/intervals and is slow.
+process_results: !function utils.think_process_results
+metric_list:
+  - metric: math_verify
+    aggregation: mean
+    higher_is_better: true
+repeat_support:
+  math_verify: binary
+# include: replaces generation_kwargs and filter_list wholesale, so both are restated.
+# The base's "Problem:" stop is dropped: this prompt has no "Problem:" turn marker to
+# guard against, and a reasoning model that writes "Problem:" in its thinking would be
+# cut off before its answer.
+generation_kwargs:
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+  max_gen_toks: 16384
+  until:
+    - "</s>"
+    - "<|im_end|>"
+    - "<|eot_id|>"
+filter_list:
+  # single-sample accuracy (first of the 4 samples)
+  - name: "score-first"
+    filter:
+      - function: "take_first"
+  # mean@4 (avg@k): score each of the 4 samples individually and average accuracy
+  - name: "mean@4"
+    filter:
+      - function: "take_first_k"
+        k: 4
+  # self-consistency: majority vote over all 4 sampled answers
+  - name: "maj@4"
+    filter:
+      - function: !function utils.ThinkMajorityVoteFilter
+      - function: "take_first"
+  # pass@4: solved if any of the 4 samples is correct
+  - name: "pass@4"
+    filter:
+      - function: !function utils.ThinkPassAtKFilter
+      - function: "take_first"
+metadata:
+  version: 1.0

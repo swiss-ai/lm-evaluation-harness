@@ -125,7 +125,7 @@ def _score(response: str, gold_answer: str, solution: str) -> tuple[int, int]:
     em = 1 if answer and is_equiv(answer, gold_answer) else 0
     try:
         mv = 1 if verify(gold=_parse_gold(solution), target=parse(response)) else 0
-    except Exception:
+    except Exception:  # noqa: BLE001
         mv = 0
     return em, mv
 
@@ -215,6 +215,129 @@ def process_results_sc(doc: dict, results: list) -> dict[str, float]:
         "exact_match": sum(em for em, _ in scores) / len(scores),
         "math_verify": sum(mv for _, mv in scores) / len(scores),
     }
+
+
+# --- Thinking runs ("Answer: $Answer" prompt) -----------------------------------
+# Same scoring as the self-consistency variant, but the answer is read from the final
+# "Answer:" line the DAPO prompt asks for (falling back to the last \boxed{}), not from
+# the Minerva "Final Answer: The final answer is ..." few-shot format.
+
+_ANSWER_MARKER_RE = re.compile(r"answer\s*:", re.IGNORECASE)
+
+
+def _strip_answer_text(text: str) -> str:
+    """Peel markdown bold, math delimiters, a \\boxed{} wrapper and a trailing period."""
+    text = text.strip().strip("*").strip()
+    for left, right in (("$$", "$$"), ("$", "$"), ("\\(", "\\)"), ("\\[", "\\]")):
+        if (
+            text.startswith(left)
+            and text.endswith(right)
+            and len(text) > len(left) + len(right) - 1
+        ):
+            text = text[len(left) : len(text) - len(right)].strip()
+            break
+    boxed = last_boxed_only_string(text)
+    if boxed is not None:
+        try:
+            text = remove_boxed(boxed)
+        except AssertionError:
+            pass
+    return text.strip().strip("$").strip().rstrip(".").strip()
+
+
+def _think_raw_answer(response: str) -> str:
+    """Unnormalized final answer of a thinking response (``""`` if it has none)."""
+    markers = list(_ANSWER_MARKER_RE.finditer(response))
+    if markers:
+        rest = response[markers[-1].end() :]
+        # The answer is on the marker's line; if that is empty (e.g. "Answer:\n$x$"),
+        # take the next non-empty line.
+        for line in rest.split("\n"):
+            if line.strip():
+                if candidate := _strip_answer_text(line):
+                    return candidate
+                break
+    boxed = last_boxed_only_string(response)
+    if boxed is not None:
+        try:
+            return _strip_answer_text(remove_boxed(boxed))
+        except AssertionError:
+            pass
+    return ""
+
+
+def think_answer(response: str) -> str:
+    """Normalized final answer of a thinking response (``""`` if it has none)."""
+    raw = _think_raw_answer(response)
+    return normalize_final_answer(raw) if raw else ""
+
+
+@cache
+def _think_score(response: str, solution: str) -> int:
+    """math_verify score (0/1) of one thinking response against a doc's gold solution.
+
+    Only math_verify is used: the Minerva ``is_equiv`` / ``normalize_final_answer``
+    path rejects some correct answers (tuples, intervals, ``\\left`` / ``\\infty``
+    mangled by the normalizer), and runs sympy ``simplify`` per response.
+    """
+    raw = _think_raw_answer(response)
+    if not raw:
+        return 0
+    try:
+        return 1 if verify(gold=_parse_gold(solution), target=parse(f"${raw}$")) else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _think_score_doc(response: str, doc: dict) -> int:
+    return _think_score(response, doc["solution"])
+
+
+class ThinkMajorityVoteFilter:
+    """maj@k over ``think_answer`` (empty answers ignored unless all are empty).
+    Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list):
+            answers = [think_answer(r) for r in resp_list]
+            votable = [a for a in answers if a] or answers
+            winner = Counter(votable).most_common(1)[0][0]
+            for resp, ans in zip(resp_list, answers):
+                if ans == winner:
+                    return resp
+            return resp_list[0]
+
+        return [[select(r)] for r in resps]
+
+
+class ThinkPassAtKFilter:
+    """pass@k: returns a correct response if any of the k exists, else the first.
+    Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            for resp in resp_list:
+                if _think_score_doc(resp, doc):
+                    return resp
+            return resp_list[0]
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]
+
+
+def think_process_results(doc: dict, results: list) -> dict[str, float]:
+    """math_verify accuracy for thinking runs: one response, or all k for mean@k."""
+    response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
+
+    scores = [_think_score_doc(cand, doc) for cand in responses]
+
+    return {"math_verify": sum(scores) / len(scores)}
 
 
 def last_boxed_only_string(string: str) -> str | None:
@@ -309,7 +432,7 @@ def is_equiv(x1: str, x2: str) -> bool:
     except ImportError as e:
         eval_logger.error(e)
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         eval_logger.debug(f"Failed comparing {x1} and {x2} with {e}")
         return False
 
