@@ -60,7 +60,7 @@ from lm_eval.api.metrics import is_degenerating_text
 # that simply ends with "Answer: 16" has to be scored too. Order matters below: an
 # explicit answer marker beats trailing inline math, which is often a congruence
 # ("$$2016 \equiv 16 \pmod{1000}$$") whose last number is the modulus.
-_INT_RE = re.compile(r"[+-]?\d[\d,]*")
+_NUM_RE = re.compile(r"[+-]?\d[\d,]*(?:\.\d+)?")
 _ANSWER_MARKER_RE = re.compile(
     r"(?:final\s+answer|answer)\s*(?:is)?\s*[:=]?", re.IGNORECASE
 )
@@ -84,12 +84,35 @@ def _as_int(text: str) -> str | None:
     return str(int(cleaned))
 
 
+def _as_number(text: str) -> str | None:
+    """Canonical form of a bare numeric answer, else ``None``.
+
+    Integers are canonical (``"016"`` -> ``"16"``, ``"1,260"`` -> ``"1260"``) and a
+    whole-valued decimal collapses to one (``"18.00"`` -> ``"18"``). A non-integer
+    (``"18.5"``) is kept as written, so it can never equal an integer answer: reading
+    only the integer part would turn ``Answer: 18.5`` into ``18`` and score it correct
+    against a gold of 18.
+    """
+    integer = _as_int(text)
+    if integer is not None:
+        return integer
+    cleaned = text.strip().strip("$").replace(",", "").replace(" ", "")
+    match = re.fullmatch(r"([+-]?\d+)\.(\d+)", cleaned)
+    if match is None:
+        return None
+    whole, fraction = match.groups()
+    if len(whole.lstrip("+-")) > _MAX_ANSWER_DIGITS:
+        return None
+    return cleaned if fraction.strip("0") else str(int(whole))
+
+
 def extract_answer(response: str) -> str:
     """Extract the final answer from a response (``""`` if it has none).
 
     Tries, in order: ``\\boxed{...}``, the first number after the last explicit
     answer marker, the last ``$...$`` span when it is a bare number, and finally the
-    last number anywhere in the response.
+    last number anywhere in the response. Numbers are read whole, decimals included
+    (see ``_as_number``).
     """
     boxed = last_boxed_only_string(response)
     if boxed is not None:
@@ -98,29 +121,29 @@ def extract_answer(response: str) -> str:
         except (AssertionError, IndexError):
             content = None
         if content:
-            return _as_int(content) or content.strip()
+            return _as_number(content) or content.strip()
 
     markers = list(_ANSWER_MARKER_RE.finditer(response))
     if markers:
-        match = _INT_RE.search(response[markers[-1].end() :])
+        match = _NUM_RE.search(response[markers[-1].end() :])
         if match:
-            return _as_int(match.group(0)) or ""
+            return _as_number(match.group(0)) or ""
 
     spans = _MATH_SPAN_RE.findall(response)
     if spans:
-        value = _as_int(spans[-1])
+        value = _as_number(spans[-1])
         if value is not None:
             return value
 
-    numbers = _INT_RE.findall(response)
-    return _as_int(numbers[-1]) or "" if numbers else ""
+    numbers = _NUM_RE.findall(response)
+    return _as_number(numbers[-1]) or "" if numbers else ""
 
 
 def _normalize_answer(response: str) -> str:
     """Extract and normalize a response's answer so answers can be compared/voted."""
     try:
         return strip_string(extract_answer(response))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return extract_answer(response)
 
 
@@ -149,7 +172,7 @@ class MajorityVoteFilter:
                     return resp
             return resp_list[0]
 
-        return map(lambda r: [select(r)], resps)
+        return [[select(r)] for r in resps]
 
 
 def _score_response(response: str, target: str) -> int:
@@ -226,7 +249,7 @@ def is_equiv(str1, str2, verbose=False):
         if verbose:
             print(ss1, ss2)
         return ss1 == ss2
-    except Exception:
+    except Exception:  # noqa: BLE001
         return str1 == str2
 
 
