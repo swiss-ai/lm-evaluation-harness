@@ -1487,14 +1487,18 @@ def test_clamp_gen_toks_keeps_the_budget_when_the_prompt_is_short():
 
 def test_clamp_gen_toks_lowers_the_budget_to_what_the_context_leaves():
     api = _clamping_api()
-    # 700 prompt tokens + 32 slack leave 1000 - 732 = 268 of the 500 asked for
-    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 268
+    # 700 prompt tokens + the slack leave 1000 - 700 - slack of the 500 asked for
+    slack = api._CLAMP_SLACK_TOKENS
+    assert _sent_max_tokens(api, "word " * 700, {"max_gen_toks": 500}) == 300 - slack
     assert api._n_clamped == 1
 
 
 def test_clamp_gen_toks_clamps_an_explicit_max_tokens():
     api = _clamping_api()
-    assert _sent_max_tokens(api, "word " * 700, {"max_tokens": 500}) == 268
+    assert (
+        _sent_max_tokens(api, "word " * 700, {"max_tokens": 500})
+        == 300 - api._CLAMP_SLACK_TOKENS
+    )
 
 
 def test_clamp_gen_toks_leaves_a_prompt_that_fills_the_context_unclamped():
@@ -1517,7 +1521,81 @@ def test_clamp_gen_toks_counts_a_chat_message_list_through_the_template():
     message = [{"role": "user", "content": "word " * 700}]
     kw = {"max_gen_toks": 500}
     api._clamp_gen_toks(message, kw, generate=True)
-    assert kw["max_gen_toks"] == 1000 - 701 - 32
+    assert kw["max_gen_toks"] == 1000 - 701 - api._CLAMP_SLACK_TOKENS
+
+
+def test_clamp_gen_toks_counts_the_tools_the_server_adds_to_the_prompt():
+    # The tools travel as their own field (a JSON string in gen_kwargs); the server puts
+    # them into the prompt, so a clamp that counted only the messages left the answer a
+    # budget the real prompt then overflowed (a 400 on every bfcl request).
+    api = _clamping_api()
+    tools = json.dumps([{"name": "f", "description": "word " * 700}])
+    kw = {"max_gen_toks": 500, "tools": tools}
+    api._clamp_gen_toks([{"role": "user", "content": "go"}], kw, generate=True)
+    counted = (
+        len(_WordTokenizer().encode(json.dumps(json.loads(tools))))
+        + api._TOOL_WRAPPER_TOKENS
+    )
+    # message: 1 word + 8, plus the tools, plus the slack
+    assert kw["max_gen_toks"] == 1000 - (1 + 8 + counted) - api._CLAMP_SLACK_TOKENS
+    # without tools the same request keeps its budget
+    kw = {"max_gen_toks": 500}
+    api._clamp_gen_toks([{"role": "user", "content": "go"}], kw, generate=True)
+    assert kw["max_gen_toks"] == 500
+
+
+def test_clamp_gen_toks_accepts_tools_as_a_list_and_an_empty_value():
+    api = _clamping_api()
+    assert api._tools_token_count(None) == 0
+    assert api._tools_token_count("[]") == 0
+    assert api._tools_token_count([{"name": "f"}]) > api._TOOL_WRAPPER_TOKENS
+
+
+def _tool_history(arguments):
+    return [
+        {"role": "user", "content": "go"},
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "c0",
+                    "type": "function",
+                    "function": {"name": "cd", "arguments": arguments},
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "c0", "content": "ok"},
+    ]
+
+
+def test_clamp_gen_toks_counts_the_tool_calls_in_the_history():
+    # Without a template the count used to read only message contents, so every step of
+    # a tool loop added tokens the clamp did not see (a 400 once the history was long).
+    api = _clamping_api()
+    plain = [{"role": "user", "content": "go"}, {"role": "tool", "content": "ok"}]
+    with_call = _tool_history("word " * 100)
+    assert api._prompt_token_count(with_call) - api._prompt_token_count(plain) >= (
+        100 + api._TOOL_CALL_FRAMING_TOKENS
+    )
+    # arguments given as an object count as their JSON
+    assert api._prompt_token_count(
+        _tool_history({"folder": "x"})
+    ) > api._prompt_token_count(_tool_history(""))
+
+
+def test_clamp_gen_toks_estimates_when_the_template_cannot_render_the_history():
+    class Refuses(_WordTokenizer):
+        chat_template = "x"
+
+        def apply_chat_template(self, messages, add_generation_prompt, tokenize):
+            raise ValueError("Invalid tool call")
+
+    api = _clamping_api()
+    api.tokenizer = Refuses()
+    kw = {"max_gen_toks": 900}
+    api._clamp_gen_toks(_tool_history("word " * 100), kw, generate=True)
+    assert kw["max_gen_toks"] < 900  # clamped from the estimate, not left alone
 
 
 def test_clamp_gen_toks_only_counts_with_the_huggingface_tokenizer():

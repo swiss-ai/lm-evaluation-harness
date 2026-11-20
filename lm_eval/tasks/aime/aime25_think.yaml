@@ -1,0 +1,20 @@
+include: aime25.yaml
+task: aime25_think
+# The prompt of BytedTsinghua-SIA/AIME-2024 (DAPO), which asks for a final "Answer: $Answer" line,
+# as in aime24_think. Sampling, repeats, filters and scoring are aime25's.
+doc_to_text: "Solve the following math problem step by step. The last line of your response should be of the form Answer: $Answer (without quotes) where $Answer is the answer to the problem.\n\n{{problem}}\n\nRemember to put your answer on its own line after \"Answer:\"."
+# aime25's generation_kwargs without the "Question:" stop: the DAPO prompt has no
+# "Question:" turn marker to guard against, and a reasoning model that restates the
+# problem in its thinking would be cut off before its answer. (include: replaces
+# generation_kwargs wholesale, so the sampling settings are restated.)
+generation_kwargs:
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+  max_gen_toks: 32768
+  until:
+    - "</s>"
+    - "<|im_end|>"
+    - "<|eot_id|>"
+metadata:
+  version: 1.0

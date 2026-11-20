@@ -80,14 +80,20 @@ class Test_VLLM:
     # torch.use_deterministic_algorithms(True)
     task_list = task_manager.load(["arc_easy", "gsm8k", "wikitext"])["tasks"]
     multiple_choice_task = task_list["arc_easy"]  # type: ignore
-    multiple_choice_task.build_all_requests(limit=10, rank=0, world_size=1)
+    multiple_choice_task.build_all_requests(
+        samples=list(range(10)), rank=0, world_size=1
+    )  # the first 10 docs: the expected values below are theirs
     MULTIPLE_CH: list[Instance] = multiple_choice_task.instances
     generate_until_task = task_list["gsm8k"]  # type: ignore
     generate_until_task._config.generation_kwargs["max_gen_toks"] = 10
-    generate_until_task.build_all_requests(limit=10, rank=0, world_size=1)
+    generate_until_task.build_all_requests(
+        samples=list(range(10)), rank=0, world_size=1
+    )  # the first 10 docs: the expected values below are theirs
     generate_until: list[Instance] = generate_until_task.instances
     rolling_task = task_list["wikitext"]  # type: ignore
-    rolling_task.build_all_requests(limit=10, rank=0, world_size=1)
+    rolling_task.build_all_requests(
+        samples=list(range(10)), rank=0, world_size=1
+    )  # the first 10 docs: the expected values below are theirs
     ROLLING: list[Instance] = rolling_task.instances
 
     # TODO: make proper tests

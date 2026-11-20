@@ -12854,6 +12854,13 @@
       ],
       "yaml_path": "aime/aime24.yaml"
     },
+    "aime24_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "aime/aime24_think.yaml"
+    },
     "aime25": {
       "kind": "TASK",
       "tags": [
@@ -12861,20 +12868,12 @@
       ],
       "yaml_path": "aime/aime25.yaml"
     },
-    "aime_2022": {
+    "aime25_think": {
       "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2022.yaml"
-    },
-    "aime_2023": {
-      "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2023.yaml"
-    },
-    "aime_2024": {
-      "kind": "TASK",
-      "tags": [],
-      "yaml_path": "aime/aime_2024.yaml"
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "aime/aime25_think.yaml"
     },
     "alpaca_eval": {
       "kind": "TASK",
@@ -58120,6 +58119,13 @@
       ],
       "yaml_path": "gsm8k_platinum/gsm8k-platinum-cot-zeroshot.yaml"
     },
+    "gsm8k_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "gsm8k/gsm8k-think.yaml"
+    },
     "gsm_plus": {
       "kind": "TASK",
       "tags": [
@@ -76244,7 +76250,9 @@
       "tags": [
         "aime",
         "aime24",
+        "aime24_think",
         "aime25",
+        "aime25_think",
         "gsm8k",
         "gsm8k_cot",
         "gsm8k_cot_zeroshot",
@@ -76253,6 +76261,7 @@
         "gsm8k_olmes_cot",
         "gsm8k_platinum",
         "gsm8k_platinum_cot_zeroshot",
+        "gsm8k_think",
         "gsm_plus",
         "gsm_plus_mini",
         "hendrycks_math500",
@@ -76618,6 +76627,11 @@
       "kind": "TASK",
       "tags": [],
       "yaml_path": "medqa/medqa.yaml"
+    },
+    "medqa_4options_cot": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "medqa/medqa_4options_cot.yaml"
     },
     "medtext": {
       "kind": "TASK",
@@ -119461,6 +119475,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16310,
+  "entry_count": 16311,
   "schema_version": 1
 }

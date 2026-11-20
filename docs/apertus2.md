@@ -37,8 +37,9 @@ lm_eval --model apertus2-completions \
    `after_think` continuation derives its own seed from the think's, so it does
    not replay the think's sampling noise. A task or `--gen_kwargs` `seed=None`
    sends unseeded requests.
-3. **Response.** Parse think, reply, call and claim messages. Score only the
-   reply, cut at the first task `until` string; append tool calls as OpenAI JSON
+3. **Response.** Parse think, reply, call and claim messages. Score the reply,
+   cut at the first task `until` string (or, with `answer_frame=claim`, the last
+   claim; see [model arguments](#model-arguments)); append tool calls as OpenAI JSON
    after `TOOL_CALLS_MARKER`, matching `local-chat-completions`
    (`bfcl_v3_fc` works unchanged). Truncated replies keep their partial answer;
    truncated thinking yields an empty answer. A closing output token omitted
@@ -138,6 +139,7 @@ Besides the `local-chat-completions` arguments (`base_url`, `model`,
 | `max_model_len`          | unset         | Server `--max-model-len`: clamp `max_tokens` or skip generation if the prompt fills the context; see [token budgets](#token-budgets)     |
 | `log_native`             | `output`      | `output` stores the raw native output and a hash of the first request's prompt per sample; `full` stores that prompt itself              |
 | `replay_reasoning`       | `true`        | Replay the model's earlier thinks in multi-turn histories; see [replay](#multi-turn-reasoning-replay)                                    |
+| `answer_frame`           | `reply`       | `reply` scores the reply (and tool calls); `claim` scores the payload of the last closed claim, as the Apertus 2 RL math reward does: no claim, or an answer cut at the token limit, scores as an empty answer |
 
 Likelihood and multiple-choice tasks are not supported and raise.
 
@@ -172,7 +174,7 @@ result saving.
 | `generation_reasoning_replayed`                                | Think messages replayed into the prompt; only on sent requests whose history holds an earlier answer of the model                     |
 | `generation_reasoning_unmatched`                               | 1 when the task changed an earlier answer of the model, so its thinks were not replayed (also on every later request); same requests  |
 | `generation_prompt_mismatch`                                   | Returned prompt IDs differ from native IDs; only when the server returns them                                                         |
-| `generation_unknown_output` / `generation_has_claim`           | Unknown output types / claims, both dropped                                                                                           |
+| `generation_unknown_output` / `generation_has_claim`           | Unknown output types (dropped) / claims (dropped unless `answer_frame=claim`)                                                         |
 | `generation_call_counter_reused`, `generation_unexpected_call` | Tool calls dropped: reused call counter, or calls without `tools` in the request                                                      |
 | `thinking_format_*`, `thinking_length_*`, `response_length_*`  | Parsed payloads, excluding controls, harness prefills/empty think and tool calls; thinking length only when `thinking_format_correct` |
 | `apertus2_prefill_mode`, `apertus2_output`, `apertus2_prompt`  | Strings: prefill mode, raw native output, prompt (or its hash)                                                                        |
@@ -182,7 +184,8 @@ result saving.
 - Replayed thinks precede the reply and calls of their response; a response
   that interleaved them is reordered. Replay lengthens prompts, so more
   requests may be clamped or skipped (e.g. BFCL long context).
-- Claims are dropped, not scored.
+- Claims are scored only with `answer_frame=claim`; tool calls are then not part
+  of the answer.
 - `--use_cache` keys ignore the model: use one cache path per model
   configuration (tokenizer, effort, prefill, masking, `max_model_len`,
   `replay_reasoning`).

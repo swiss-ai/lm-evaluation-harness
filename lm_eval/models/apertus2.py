@@ -1,8 +1,10 @@
 """Apertus 2 native chat format over a text ``/v1/completions`` endpoint.
 
 Tasks see a chat model (messages in; reply plus tool calls after
-``TOOL_CALLS_MARKER`` out). Prompts are rendered and outputs parsed on the client
-with ``apertus-common``; the server only completes text. See docs/apertus2.md.
+``TOOL_CALLS_MARKER`` out, or with ``answer_frame="claim"`` the last claim, the
+frame the Apertus 2 RL math reward grades). Prompts are rendered and outputs
+parsed on the client with ``apertus-common``; the server only completes text.
+See docs/apertus2.md.
 """
 
 import hashlib
@@ -33,6 +35,7 @@ _REQUEST = "_apertus2_request"
 _INFO = "_apertus2_info"
 _CALL_ID = re.compile(r"apertus_(\d+)")
 _PREFILL_MODES = ("after_think", "empty_think", "reject")
+_ANSWER_FRAMES = ("reply", "claim")
 _INFO_KEYS = (
     "generation_request_failed",
     "generation_prompt_too_long",
@@ -231,6 +234,7 @@ class Apertus2Completions(LocalChatCompletion):
         max_model_len=None,
         log_native="output",
         replay_reasoning=True,
+        answer_frame="reply",
         tokenizer_backend=None,
         tokenized_requests=None,
         think_end_token=None,
@@ -253,6 +257,7 @@ class Apertus2Completions(LocalChatCompletion):
             ("prefill", prefill, _PREFILL_MODES),
             ("literal_special_tokens", literal_special_tokens, ("flag", "reject")),
             ("log_native", log_native, ("output", "full")),
+            ("answer_frame", answer_frame, _ANSWER_FRAMES),
         ):
             if value not in allowed:
                 raise ValueError(f"{name} must be one of {allowed}, got {value!r}")
@@ -267,6 +272,7 @@ class Apertus2Completions(LocalChatCompletion):
         self.max_model_len = int(max_model_len) if max_model_len else None
         self.log_native = log_native
         self.replay_reasoning = bool(replay_reasoning)
+        self.answer_frame = answer_frame
         # scope -> history digest -> stripped answer -> think payloads
         self._memory: dict[tuple, dict] = {}
         self._pending: dict[int, list[tuple]] = {}
@@ -707,6 +713,9 @@ class Apertus2Completions(LocalChatCompletion):
         if request.out_of_budget:
             finish_reason = "length"
         answer, thinks, replies = self._answer(request, items)
+        if self.answer_frame == "claim" and finish_reason == "length":
+            # As the RL math reward: an answer cut at the token limit scores nothing.
+            answer = ""
         self._remember(request, answer, items)
         return {
             "choices": [
@@ -715,18 +724,24 @@ class Apertus2Completions(LocalChatCompletion):
         }
 
     def _answer(self, request: _Request, items: list) -> tuple[str, list, list]:
-        """Task answer from parsed items, plus think and generated reply payloads."""
+        """Task answer from parsed items, plus think and generated reply payloads.
+
+        The answer is the reply and tool calls, or with ``answer_frame="claim"`` the
+        payload of the last closed claim (empty without one).
+        """
         lib = self._lib
         info = request.info
         # The prefix is the task's text, not generated; it is not part of the answer.
         prefix = request.prefix if request.head else None
-        kept, thinks, replies = [], [], []
+        kept, thinks, replies, claims = [], [], [], []
         for item in items:
             if isinstance(item, lib.UnknownOutput):
                 info["generation_unknown_output"] = 1
                 continue
             if isinstance(item, lib.Claim):
                 info["generation_has_claim"] = 1
+                if not item.open:
+                    claims.append(item.payload)
                 continue
             if isinstance(item, lib.Think):
                 thinks.append(item.payload)
@@ -744,6 +759,8 @@ class Apertus2Completions(LocalChatCompletion):
             if isinstance(item, lib.Reply):
                 item = item.model_copy(update={"open": False})
             kept.append(item)
+        if self.answer_frame == "claim":
+            return (claims[-1] if claims else ""), thinks, replies
         try:
             mapped = lib.to_openai_output(
                 lib.Conversation(items=kept),

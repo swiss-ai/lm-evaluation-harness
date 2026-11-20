@@ -210,6 +210,7 @@ def run(model, instances, responses):
         ({"chat_template_args": {"enable_thinking": False}}, "cannot be disabled"),
         ({"chat_template_args": {"foo": 1}}, "unsupported chat_template_args"),
         ({"reasoning_effort": "extreme"}, "extreme"),
+        ({"answer_frame": "think"}, "answer_frame"),
     ],
 )
 def test_setup_rejects_invalid_configuration(synthetic, kwargs, match):
@@ -506,6 +507,50 @@ def test_open_reused_and_unknown_items_are_dropped(synthetic):
     assert reused.length_info[0]["generation_call_counter_reused"] == 1
     assert odd.length_info[0]["generation_has_claim"] == 1
     assert odd.length_info[0]["generation_unknown_output"] == 1
+
+
+def test_claim_frame_is_the_answer_when_asked(synthetic):
+    model = make(synthetic, answer_frame="claim")
+    enc = model.encoding
+    claimed, unclaimed, cut = (chat_request(QUESTION) for _ in range(3))
+    responses = [
+        answer(
+            enc,
+            lib.Think(payload="48/2 = 24."),
+            lib.Claim(payload="72"),
+            lib.Reply(payload="The answer is 72."),
+        ),
+        answer(enc, lib.Think(payload="48/2 = 24."), lib.Reply(payload="72")),
+        completion(
+            enc,
+            native(
+                enc,
+                lib.Think(payload="48/2 = 24."),
+                lib.Claim(payload="72"),
+                lib.Reply(payload="The answer", open=True),
+            ),
+            length=True,
+        ),
+    ]
+    result, _ = run(model, [claimed, unclaimed, cut], responses)
+    # As the RL math reward: the claim, nothing without one or after a cut.
+    assert result == ["72", "", ""]
+    assert claimed.length_info[0]["generation_has_claim"] == 1
+    assert unclaimed.length_info[0]["generation_has_claim"] == 0
+    assert claimed.length_info[0]["response_length_words"] == 3 + 4
+
+
+def test_reply_frame_is_the_default(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    reply = answer(
+        enc,
+        lib.Think(payload="t"),
+        lib.Claim(payload="72"),
+        lib.Reply(payload="The answer is 72."),
+    )
+    result, _ = run(model, [chat_request(QUESTION)], [reply])
+    assert result == ["The answer is 72."]
 
 
 # Prefill
