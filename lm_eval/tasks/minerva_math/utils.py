@@ -125,7 +125,7 @@ def _score(response: str, gold_answer: str, solution: str) -> tuple[int, int]:
     em = 1 if answer and is_equiv(answer, gold_answer) else 0
     try:
         mv = 1 if verify(gold=_parse_gold(solution), target=parse(response)) else 0
-    except Exception:
+    except Exception:  # noqa: BLE001
         mv = 0
     return em, mv
 
@@ -285,7 +285,7 @@ def _think_score(response: str, solution: str) -> int:
         return 0
     try:
         return 1 if verify(gold=_parse_gold(solution), target=parse(f"${raw}$")) else 0
-    except Exception:
+    except Exception:  # noqa: BLE001
         return 0
 
 
@@ -432,7 +432,7 @@ def is_equiv(x1: str, x2: str) -> bool:
     except ImportError as e:
         eval_logger.error(e)
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         eval_logger.debug(f"Failed comparing {x1} and {x2} with {e}")
         return False
 
