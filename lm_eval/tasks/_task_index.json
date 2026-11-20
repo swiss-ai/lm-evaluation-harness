@@ -58119,6 +58119,13 @@
       ],
       "yaml_path": "gsm8k_platinum/gsm8k-platinum-cot-zeroshot.yaml"
     },
+    "gsm8k_platinum_think": {
+      "kind": "TASK",
+      "tags": [
+        "math_word_problems"
+      ],
+      "yaml_path": "gsm8k_platinum/gsm8k-platinum-think.yaml"
+    },
     "gsm8k_think": {
       "kind": "TASK",
       "tags": [
@@ -76261,6 +76268,7 @@
         "gsm8k_olmes_cot",
         "gsm8k_platinum",
         "gsm8k_platinum_cot_zeroshot",
+        "gsm8k_platinum_think",
         "gsm8k_think",
         "gsm_plus",
         "gsm_plus_mini",

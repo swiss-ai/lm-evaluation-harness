@@ -1,0 +1,11 @@
+include: ../gsm8k/gsm8k-think.yaml
+task: gsm8k_platinum_think
+# Same as gsm8k_think (DAPO-style "Answer: $Answer" prompt, temperature 0.6 / top-p 0.95,
+# 16k tokens, 4 samples, answer-line extraction), on the revised GSM8K Platinum test set.
+dataset_path: madrylab/gsm8k-platinum
+dataset_name: main
+training_split: test
+fewshot_split: test
+test_split: test
+metadata:
+  version: 1.0
