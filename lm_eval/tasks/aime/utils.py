@@ -69,7 +69,7 @@ def _normalize_answer(response: str) -> str:
     """Extract and normalize a response's answer so answers can be compared/voted."""
     try:
         return strip_string(extract_answer(response))
-    except Exception:
+    except Exception:  # noqa: BLE001
         return extract_answer(response)
 
 
@@ -98,7 +98,7 @@ class MajorityVoteFilter:
                     return resp
             return resp_list[0]
 
-        return map(lambda r: [select(r)], resps)
+        return [[select(r)] for r in resps]
 
 
 def _score_response(response: str, target: str) -> int:
@@ -175,7 +175,7 @@ def is_equiv(str1, str2, verbose=False):
         if verbose:
             print(ss1, ss2)
         return ss1 == ss2
-    except Exception:
+    except Exception:  # noqa: BLE001
         return str1 == str2
 
 
