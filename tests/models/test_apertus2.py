@@ -25,7 +25,7 @@ from lm_eval.api.instance import Instance
 from lm_eval.api.task import ConfigurableTask
 from lm_eval.evaluator import evaluate
 from lm_eval.models.apertus2 import _REQUEST as REQUEST, Apertus2Completions
-from lm_eval.models.api_models import JsonChatStr
+from lm_eval.models.api_models import JsonChatStr, rollout_seed
 from lm_eval.tasks.bfcl_v3.task import _fc_calls, _split_tool_calls
 
 
@@ -124,6 +124,11 @@ def chat_request(messages, task="task", doc=0, episode=0, **gen_kwargs):
         episode=episode,
         repeat_index=episode,
     )
+
+
+def seed(repeat, doc=0, base=1234):
+    """The seed of a `chat_request` request's attempt."""
+    return rollout_seed(base, repeat, ("task", doc, 0))
 
 
 def attempts(request, count):
@@ -918,13 +923,14 @@ def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
 @pytest.mark.parametrize("temperature", [0, 0.8])
 def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperature):
     # A seeded server returns one sample for all of a document's repeats (pass@k,
-    # maj@k) unless each has its own seed: single-turn repeats share one context
-    # object, multi-turn episodes have one each, and a retry keeps its seed.
+    # maj@k) unless each has its own seed, and documents sharing a seed lean the
+    # same way: single-turn repeats share one context object, multi-turn episodes
+    # have one each, and a retry keeps its seed.
     model = make(synthetic, num_concurrent=num_concurrent)
     seeds, failed = [], []
 
     def server(payload):
-        if payload["seed"] == 1235 and not failed:
+        if payload["seed"] == seed(1) and not failed:
             failed.append(payload["seed"])
             raise ConnectionError("transient")
         seeds.append(payload["seed"])
@@ -946,7 +952,9 @@ def test_repeats_sample_with_their_own_seed(synthetic, num_concurrent, temperatu
             attempts(repeated, 3) + episodes + [chat_request(QUESTION, doc=2)]
         )
     assert failed
-    assert sorted(seeds) == [1234, 1234, 1234, 1235, 1235, 1236]
+    expected = [seed(0), seed(1), seed(2), seed(0, 1), seed(1, 1), seed(0, 2)]
+    assert sorted(seeds) == sorted(expected)
+    assert len(set(seeds)) == 6
 
 
 @pytest.mark.parametrize("shared", [False, True])
@@ -968,7 +976,7 @@ def test_episodes_keep_their_own_reasoning(synthetic, shared):
         return sent
 
     first = turn(QUESTION)
-    assert sorted(payload["seed"] for payload in first) == [1234, 1235]
+    assert sorted(payload["seed"] for payload in first) == sorted([seed(0), seed(1)])
     follow = turn([*QUESTION, {"role": "assistant", "content": "A"}, *QUESTION])
     for payload in follow:
         assert f"think<|hdr|>think {payload['seed']}<|/out|>" in payload["prompt"]
@@ -983,13 +991,37 @@ def test_task_seed_is_the_base_and_none_is_unseeded(
     enc = model.encoding
     seeded = chat_request(QUESTION, seed=7, temperature=temperature)
     _, sent = run(model, attempts(seeded, 2), [answer(enc, lib.Reply(payload="A"))] * 2)
-    assert sorted(payload["seed"] for payload in sent) == [7, 8]
+    assert sorted(p["seed"] for p in sent) == sorted([seed(0, base=7), seed(1, base=7)])
     reply = enc.encode_text(" B.") + [enc.controls.output_end]
     unseeded = chat_request(PREFILLED, until=["."], seed=None, temperature=temperature)
     responses = [phase_one(enc), completion(enc, reply, stop=enc.controls.wait)]
     result, sent = run(model, [unseeded], responses)
     assert result == [" B"]  # the after_think continuation ran
     assert [payload["seed"] for payload in sent] == [None, None]
+
+
+def test_documents_and_replies_get_their_own_seeds(synthetic):
+    # Documents of one repeat must not share a seed, and neither may the replies
+    # sampled after their thinks.
+    model = make(synthetic)
+    enc = model.encoding
+
+    def server(payload):
+        if enc.controls.output_end in payload["stop_token_ids"]:
+            return phase_one(enc)
+        reply = enc.encode_text(" B.") + [enc.controls.output_end]
+        return completion(enc, reply, stop=enc.controls.wait)
+
+    requests = [
+        chat_request(PREFILLED, doc=doc, until=["."], temperature=0.8)
+        for doc in range(3)
+    ]
+    result, sent = run(model, requests, [server] * 6)
+    assert result == [" B"] * 3
+    thinks = [p["seed"] for p in sent if enc.controls.output_end in p["stop_token_ids"]]
+    replies = [p["seed"] for p in sent if p["seed"] not in thinks]
+    assert sorted(thinks) == sorted(seed(0, doc) for doc in range(3))
+    assert len(set(replies)) == 3
 
 
 # End to end with in-memory tasks
@@ -1074,4 +1106,4 @@ def test_explicit_attempt_identity_survives_reordering(synthetic):
     for request, index in zip(requests, [2, 0, 1], strict=True):
         request.repeat_index = index
     _, sent = run(model, requests, [answer(model.encoding, lib.Reply(payload="A"))] * 3)
-    assert [payload["seed"] for payload in sent] == [9, 7, 8]
+    assert [p["seed"] for p in sent] == [seed(i, base=7) for i in (2, 0, 1)]

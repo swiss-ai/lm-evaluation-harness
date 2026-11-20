@@ -30,11 +30,13 @@ lm_eval --model apertus2-completions \
 2. **Request.** `skip_special_tokens: false` preserves output framing;
    `return_token_ids: true` enables exact parsing. `stop_token_ids` holds the
    wait token. Apply task `until` strings after parsing to avoid cutting reasoning.
-   `seed` is the harness seed (or the task's `seed` gen kwarg) plus the repeat
-   index (multi-turn: the episode; retries keep it), so repeats (`pass@k`,
-   `maj@k`) sample independently and reproducibly. An `after_think`
-   continuation adds a fixed offset, so it does not replay the think's sampling
-   noise. A task or `--gen_kwargs` `seed=None` sends unseeded requests.
+   `seed` is derived from the harness seed (or the task's `seed` gen kwarg),
+   the document, the turn and the repeat index (multi-turn: the episode;
+   retries keep it), so repeats (`pass@k`, `maj@k`) and documents sample
+   independently and reproducibly ([seeds](repeated_sampling.md)). An
+   `after_think` continuation derives its own seed from the think's, so it does
+   not replay the think's sampling noise. A task or `--gen_kwargs` `seed=None`
+   sends unseeded requests.
 3. **Response.** Parse think, reply, call and claim messages. Score the reply,
    cut at the first task `until` string (or, with `answer_frame=claim`, the last
    claim; see [model arguments](#model-arguments)); append tool calls as OpenAI JSON
