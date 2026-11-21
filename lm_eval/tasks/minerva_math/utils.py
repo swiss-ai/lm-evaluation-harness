@@ -8,6 +8,8 @@ from importlib.util import find_spec
 
 import datasets
 
+from lm_eval.api.metrics import is_degenerating_text
+
 
 eval_logger = logging.getLogger(__name__)
 
@@ -331,13 +333,18 @@ class ThinkPassAtKFilter:
 
 
 def think_process_results(doc: dict, results: list) -> dict[str, float]:
-    """math_verify accuracy for thinking runs: one response, or all k for mean@k."""
+    """math_verify accuracy and degeneration rate for thinking runs: one response, or
+    all k for mean@k."""
     response = results[0]
     responses = list(response) if isinstance(response, list) else [response]
 
     scores = [_think_score_doc(cand, doc) for cand in responses]
+    degens = [int(is_degenerating_text(cand.lower())) for cand in responses]
 
-    return {"math_verify": sum(scores) / len(scores)}
+    return {
+        "math_verify": sum(scores) / len(scores),
+        "degeneration": sum(degens) / len(degens),
+    }
 
 
 def last_boxed_only_string(string: str) -> str | None:

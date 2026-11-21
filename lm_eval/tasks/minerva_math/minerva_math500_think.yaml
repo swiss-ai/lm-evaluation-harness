@@ -10,13 +10,18 @@ doc_to_text: "Solve the following math problem step by step. The last line of yo
 # Scoring reads the final "Answer:" line (or a \boxed{}) and checks it with math_verify;
 # see utils.think_answer / think_process_results. exact_match is deliberately omitted:
 # the Minerva is_equiv path rejects correct tuples/intervals and is slow.
+# degeneration is the repetition rate, as in gsm8k_think / aime24_think.
 process_results: !function utils.think_process_results
 metric_list:
   - metric: math_verify
     aggregation: mean
     higher_is_better: true
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
 repeat_support:
   math_verify: binary
+  degeneration: mean
 # include: replaces generation_kwargs and filter_list wholesale, so both are restated.
 # The base's "Problem:" stop is dropped: this prompt has no "Problem:" turn marker to
 # guard against, and a reasoning model that writes "Problem:" in its thinking would be
