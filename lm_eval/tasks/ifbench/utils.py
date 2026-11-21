@@ -1,5 +1,6 @@
 import dataclasses
 
+from lm_eval.api.metrics import is_degenerating_text
 from lm_eval.tasks.ifbench import instructions_registry
 
 
@@ -131,3 +132,94 @@ def agg_inst_level_acc(items):
     flat_items = [item for sublist in items for item in sublist]
     inst_level_acc = sum(flat_items) / len(flat_items)
     return inst_level_acc
+
+
+# --- Thinking runs ---------------------------------------------------------------
+# Constraints (word counts, "no commas", ...) apply to the final reply, not to the
+# reasoning, so the reasoning is stripped before scoring. This is idempotent with the
+# model-level strip (`think_end_token` / `autodetect_think_tokens`): a response that
+# no longer contains "</think>" is scored as is.
+
+THINK_START = "<think>"
+THINK_END = "</think>"
+
+
+def strip_thinking(response: str) -> str:
+    """Final reply of a thinking response.
+
+    The text after the last ``</think>``. A reply that opens ``<think>`` but never
+    closes it (truncated mid-reasoning) has no final reply, so it is empty and fails.
+    A response with no think tags at all is returned unchanged.
+    """
+    if THINK_END in response:
+        return response.rpartition(THINK_END)[2].strip()
+    if response.lstrip().startswith(THINK_START):
+        return ""
+    return response
+
+
+def _input_example(doc):
+    return InputExample(
+        key=doc["key"],
+        instruction_id_list=doc["instruction_id_list"],
+        prompt=doc["prompt"],
+        kwargs=doc["kwargs"],
+    )
+
+
+def think_process_results(doc, results):
+    """``process_results`` for thinking runs, over the final reply of each response.
+
+    Handles a single response (take_first / pass@k) or the full set of k samples
+    (take_first_k for mean@k): prompt-level metrics are averaged over the samples and
+    the instruction-level lists are concatenated. ``degeneration`` is computed on the
+    raw response, since looping happens in the reasoning.
+    """
+    response = results[0]
+    responses = list(response) if isinstance(response, list) else [response]
+    inp = _input_example(doc)
+
+    finals = [strip_thinking(r) for r in responses]
+    strict = [test_instruction_following_strict(inp, r) for r in finals]
+    loose = [test_instruction_following_loose(inp, r) for r in finals]
+    degens = [int(is_degenerating_text(r.lower())) for r in responses]
+    n = len(responses)
+
+    return {
+        "prompt_level_strict_acc": sum(o.follow_all_instructions for o in strict) / n,
+        "inst_level_strict_acc": [b for o in strict for b in o.follow_instruction_list],
+        "prompt_level_loose_acc": sum(o.follow_all_instructions for o in loose) / n,
+        "inst_level_loose_acc": [b for o in loose for b in o.follow_instruction_list],
+        "degeneration": sum(degens) / n,
+    }
+
+
+class ThinkPassAtKFilter:
+    """pass@k: returns a response whose final reply follows every instruction, else
+    the first. Strict success is preferred over loose, so the strict and loose
+    prompt-level metrics are both a true pass@k whenever one response satisfies both.
+    Chain a ``take_first`` after this filter."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def apply(self, resps, docs):
+        def select(resp_list, doc):
+            inp = _input_example(doc)
+
+            def score(resp):
+                final = strip_thinking(resp)
+                return (
+                    test_instruction_following_strict(
+                        inp, final
+                    ).follow_all_instructions,
+                    test_instruction_following_loose(
+                        inp, final
+                    ).follow_all_instructions,
+                )
+
+            # `max` keeps the first maximal element, so an all-failing set of samples
+            # falls back to the first response.
+            return max(resp_list, key=score)
+
+        return [[select(r, d)] for r, d in zip(resps, docs)]

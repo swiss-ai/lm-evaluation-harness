@@ -1,0 +1,60 @@
+include: ifeval.yaml
+task: ifeval_think
+# Thinking-model variant: same prompt and instruction checks, scored on the final reply
+# (the reasoning is stripped, see utils.strip_thinking), sampled instead of greedy and
+# repeated 4 times. No maj@k: there is no single answer to vote on.
+#
+# max_gen_toks is deliberately NOT set, so reasoning is not capped by the task. The
+# harness default is only 256 tokens, so pass `max_gen_toks` for the run (model_args /
+# --gen_kwargs), sized to the model's context window.
+process_results: !function utils.think_process_results
+metric_list:
+  - metric: prompt_level_strict_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: inst_level_strict_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: prompt_level_loose_acc
+    aggregation: mean
+    higher_is_better: true
+  - metric: inst_level_loose_acc
+    aggregation: !function utils.agg_inst_level_acc
+    higher_is_better: true
+  - metric: degeneration
+    aggregation: mean
+    higher_is_better: false
+# include: replaces generation_kwargs wholesale, so it is restated (without max_gen_toks).
+generation_kwargs:
+  do_sample: true
+  temperature: 0.6
+  top_p: 0.95
+  until:
+    - "</s>"
+    - "<|im_end|>"
+    - "<|eot_id|>"
+repeats: 4
+filter_list:
+  # single-sample accuracy (first of the 4 samples)
+  - name: "score-first"
+    filter:
+      - function: "take_first"
+  # mean@4 (avg@k): score each of the 4 samples individually and average
+  - name: "mean@4"
+    filter:
+      - function: "take_first_k"
+        k: 4
+  # pass@4: solved if any of the 4 samples follows every instruction
+  - name: "pass@4"
+    filter:
+      - function: !function utils.ThinkPassAtKFilter
+      - function: "take_first"
+repeat_support:
+  prompt_level_strict_acc: binary
+  inst_level_strict_acc: native
+  prompt_level_loose_acc: binary
+  inst_level_loose_acc: native
+  degeneration: mean
+repeat_filter: score-first
+metadata:
+  version: 1.0
