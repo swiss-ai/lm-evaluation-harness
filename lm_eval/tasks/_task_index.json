@@ -58620,6 +58620,11 @@
       "tags": [],
       "yaml_path": "ifbench/ifbench.yaml"
     },
+    "ifbench_think": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifbench/ifbench_think.yaml"
+    },
     "ifeval": {
       "kind": "TASK",
       "tags": [],
@@ -58634,6 +58639,11 @@
       "kind": "TASK",
       "tags": [],
       "yaml_path": "ifeval/multilingual/ifeval_es.yaml"
+    },
+    "ifeval_think": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval/ifeval_think.yaml"
     },
     "include_2_albanian_gen_0shot": {
       "kind": "TASK",
@@ -119491,6 +119501,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16313,
+  "entry_count": 16315,
   "schema_version": 1
 }
