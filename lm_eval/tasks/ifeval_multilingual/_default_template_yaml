@@ -1,4 +1,4 @@
-dataset_path: ilannissim/ifeval-multilingual
+dataset_path: swiss-ai/ifeval-multilingual
 output_type: generate_until
 test_split: train
 num_fewshot: 0

@@ -3,8 +3,8 @@
 Instruction-following prompts written natively in 11 languages (ar, de, el, es, fr, hi, ja, ko, pl, sr, zh;
 2,183 prompts), in the format of IFEval: IFEval's own instructions plus language-specific ones (local date and number
 formats, quotation marks, formal / informal address, scripts, letters, radicals, honorifics, grammatical forms).
-Dataset: [ilannissim/ifeval-multilingual](https://huggingface.co/datasets/ilannissim/ifeval-multilingual) (v15),
-one config per language.
+Dataset: [swiss-ai/ifeval-multilingual](https://huggingface.co/datasets/swiss-ai/ifeval-multilingual) (v15),
+one config per language. Private: loading needs `HF_TOKEN` of a swiss-ai member.
 
 ## Tasks
 
