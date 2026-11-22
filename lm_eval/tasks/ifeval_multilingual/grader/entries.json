@@ -1,0 +1,564 @@
+{
+ "ar": {
+  "arabizi": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "broken_plurals": {
+   "checker": "PluralFormChecker",
+   "type": "broken_plurals"
+  },
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "full_marks": {
+   "checker": "DiacriticsChecker",
+   "type": "letters:diacritics"
+  },
+  "guillemets": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  },
+  "idafa_chains": {
+   "checker": "IdafaChainChecker",
+   "type": "idafa_chains"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "native_digits": {
+   "checker": "NativeDigitsChecker",
+   "type": "numbers:native_digits"
+  },
+  "nouns_or_pronouns_in_the_dual_number": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "questions": {
+   "checker": "NativeMarkChecker",
+   "type": "punctuation:question_exclamation"
+  },
+  "verbal_sentences": {
+   "checker": "VerbalSentenceChecker",
+   "type": "verbal_sentences"
+  },
+  "verbs_in_the_jussive_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_subjunctive_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "de": {
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "diminutives": {
+   "checker": "LemmaEndingChecker",
+   "type": "diminutives"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "PatternChecker",
+   "type": "formal_address"
+  },
+  "gender_star": {
+   "checker": "PatternChecker",
+   "type": "gender_star"
+  },
+  "genitive_prepositions": {
+   "checker": "PatternChecker",
+   "type": "genitive_prepositions"
+  },
+  "informal_address": {
+   "checker": "PatternChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "long_compounds": {
+   "checker": "PatternChecker",
+   "type": "long_compounds"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  },
+  "verbs_in_the_subjunctive_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "el": {
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_plural": {
+   "checker": "AddressNumberChecker",
+   "type": "formal_plural"
+  },
+  "greeklish": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "questions": {
+   "checker": "NativeMarkChecker",
+   "type": "punctuation:question_exclamation"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  }
+ },
+ "es": {
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "doubling": {
+   "checker": "PatternChecker",
+   "type": "doubling"
+  },
+  "exclamations": {
+   "checker": "NativeMarkChecker",
+   "type": "punctuation:question_exclamation"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "WordsChecker",
+   "type": "formal_address"
+  },
+  "inclusive_at_x": {
+   "checker": "PatternChecker",
+   "type": "inclusive_at_x"
+  },
+  "inclusive_e": {
+   "checker": "PatternChecker",
+   "type": "inclusive_e"
+  },
+  "informal_address": {
+   "checker": "WordsChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "questions": {
+   "checker": "NativeMarkChecker",
+   "type": "punctuation:question_exclamation"
+  },
+  "verbs_in_the_conditional_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_imperfect_tense": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_subjunctive_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "fr": {
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "WordsChecker",
+   "type": "formal_address"
+  },
+  "informal_address": {
+   "checker": "WordsChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "no_accents": {
+   "checker": "PatternChecker",
+   "type": "no_accents"
+  },
+  "point_median": {
+   "checker": "PatternChecker",
+   "type": "point_median"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  },
+  "space_before_punctuation": {
+   "checker": "PatternChecker",
+   "type": "space_before_punctuation"
+  },
+  "verbs_in_the_imperfect_tense": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "hi": {
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "WordsChecker",
+   "type": "formal_address"
+  },
+  "informal_address": {
+   "checker": "WordsChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "latin_script": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "native_digits": {
+   "checker": "NativeDigitsChecker",
+   "type": "numbers:native_digits"
+  },
+  "no_latin_letters": {
+   "checker": "PatternChecker",
+   "type": "no_latin_letters"
+  },
+  "no_nukta": {
+   "checker": "PatternChecker",
+   "type": "no_nukta"
+  },
+  "sentences_end_devanagari_danda": {
+   "checker": "SentenceEndChecker",
+   "type": "punctuation:sentence_end"
+  },
+  "verbs_in_the_converb_adverbial_participl": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_imperfective_aspect": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_subjunctive_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "ja": {
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "furigana": {
+   "checker": "PatternChecker",
+   "type": "furigana"
+  },
+  "handakuten_count": {
+   "checker": "PatternChecker",
+   "type": "handakuten_count"
+  },
+  "hiragana_only": {
+   "checker": "PatternChecker",
+   "type": "hiragana_only"
+  },
+  "katakana_only": {
+   "checker": "PatternChecker",
+   "type": "katakana_only"
+  },
+  "no_dakuten": {
+   "checker": "PatternChecker",
+   "type": "no_dakuten"
+  },
+  "no_handakuten": {
+   "checker": "PatternChecker",
+   "type": "no_handakuten"
+  },
+  "no_hiragana": {
+   "checker": "PatternChecker",
+   "type": "no_hiragana"
+  },
+  "no_katakana": {
+   "checker": "PatternChecker",
+   "type": "no_katakana"
+  },
+  "numbers_in_kanji": {
+   "checker": "PatternChecker",
+   "type": "numbers_in_kanji"
+  },
+  "plain_style": {
+   "checker": "PatternChecker",
+   "type": "plain_style"
+  },
+  "polite_style": {
+   "checker": "PatternChecker",
+   "type": "polite_style"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  }
+ },
+ "ko": {
+  "consonant_abbreviations": {
+   "checker": "PatternChecker",
+   "type": "consonant_abbreviations"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "formal_polite_style": {
+   "checker": "RegisterLevelChecker",
+   "type": "register:level"
+  },
+  "informal_polite_style": {
+   "checker": "RegisterLevelChecker",
+   "type": "register:level"
+  },
+  "numbers_in_hangul": {
+   "checker": "PatternChecker",
+   "type": "numbers_in_hangul"
+  },
+  "subject_honorific": {
+   "checker": "PatternChecker",
+   "type": "subject_honorific"
+  }
+ },
+ "pl": {
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "WordsChecker",
+   "type": "formal_address"
+  },
+  "informal_address": {
+   "checker": "WordsChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "nonvirile_past": {
+   "checker": "PastPluralEndingChecker",
+   "type": "nonvirile_past"
+  },
+  "nouns_or_pronouns_in_the_instrumental_ca": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "okolo_genitive": {
+   "checker": "PatternChecker",
+   "type": "okolo_genitive"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  },
+  "verbs_in_the_converb_adverbial_participl": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "verbs_in_the_impersonal_form": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "sr": {
+  "aorist_narration": {
+   "checker": "SimplePastChecker",
+   "type": "aorist_narration"
+  },
+  "currency": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:currency"
+  },
+  "cyrillic_script": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "ekavian": {
+   "checker": "VariantFormsChecker",
+   "type": "ekavian"
+  },
+  "forbidden_letters": {
+   "checker": "ForbiddenLettersChecker",
+   "type": "letters:forbidden_letters"
+  },
+  "formal_address": {
+   "checker": "WordsChecker",
+   "type": "formal_address"
+  },
+  "informal_address": {
+   "checker": "WordsChecker",
+   "type": "informal_address"
+  },
+  "large_numbers": {
+   "checker": "LocalFormatChecker",
+   "type": "numbers:large_numbers"
+  },
+  "latin_script": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "letter_frequency": {
+   "checker": "NativeLetterFrequencyChecker",
+   "type": "letters:native_letter_frequency"
+  },
+  "nouns_or_pronouns_in_inanimate": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "nouns_or_pronouns_in_the_instrumental_ca": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  },
+  "quotes": {
+   "checker": "NativeQuotesChecker",
+   "type": "punctuation:native_quotes"
+  },
+  "verbs_in_the_conditional_mood": {
+   "checker": "GrammarFormChecker",
+   "type": "grammar:form"
+  }
+ },
+ "zh": {
+  "count_of_radical_40": {
+   "checker": "RadicalCountChecker",
+   "type": "han:radical_count"
+  },
+  "count_of_radical_61": {
+   "checker": "RadicalCountChecker",
+   "type": "han:radical_count"
+  },
+  "dates": {
+   "checker": "LocalFormatChecker",
+   "type": "dates:numeric_date"
+  },
+  "formal_address": {
+   "checker": "PatternChecker",
+   "type": "formal_address"
+  },
+  "informal_address": {
+   "checker": "PatternChecker",
+   "type": "informal_address"
+  },
+  "latin_script": {
+   "checker": "TargetScriptChecker",
+   "type": "script:target_script"
+  },
+  "native_digits": {
+   "checker": "NativeDigitsChecker",
+   "type": "numbers:native_digits"
+  },
+  "no_latin_letters": {
+   "checker": "PatternChecker",
+   "type": "no_latin_letters"
+  },
+  "no_radical_106": {
+   "checker": "ForbiddenRadicalChecker",
+   "type": "han:forbidden_radical"
+  },
+  "no_radical_30": {
+   "checker": "ForbiddenRadicalChecker",
+   "type": "han:forbidden_radical"
+  },
+  "numbers_in_characters": {
+   "checker": "PatternChecker",
+   "type": "numbers_in_characters"
+  },
+  "stroke_limit": {
+   "checker": "MaxStrokesChecker",
+   "type": "han:max_strokes"
+  },
+  "traditional_characters": {
+   "checker": "ScriptVariantChecker",
+   "type": "script:script_variant"
+  }
+ }
+}

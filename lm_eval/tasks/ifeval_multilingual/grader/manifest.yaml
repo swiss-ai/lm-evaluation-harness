@@ -1,0 +1,129 @@
+# How each IFEval instruction is handled when translating into a language.
+#
+# action:
+#   keep             nothing language-specific; the checker works on any language
+#   translate_kwarg  string kwargs the checker looks for in the response, translated with the prompt
+#   rewrite_checker  instruction is valid, the English checker is not: score with `checker` instead
+#   drop             instruction is meaningless in the language: removed from the item
+# translate: kwargs translated with the prompt (translate_kwarg); all other kwargs are kept as is
+#
+# For prompts written from scratch in the language (native/generate_prompts.py):
+#   generate: false  the instruction is not used in new prompts
+#   describe         what the writer model is told the instruction asks, in place of IFEval's English description:
+#                    when that description does not match the checker used for the language, or is worded in a way
+#                    the writer copies into the request (a Python list, "'\n\n' in python"). {name} is replaced by the
+#                    setting of that name; a list is written "a and b" ({name}) or "a or b" ({name_or}). It must say
+#                    what the checker tests, no more and no less.
+#
+# Defaults apply to every language, then the overrides of each group the language is in,
+# then the overrides of the language itself. Languages are ISO 639-1 codes.
+# Format markers (***, << >>, [ ], *) are kept unchanged by the template and validate_pair, not here.
+
+instructions:
+  change_case:capital_word_frequency:        {action: keep}
+  # English checkers also require langdetect == "en"
+  change_case:english_capital:
+    {action: rewrite_checker, checker: uppercase_any_language, describe: "Your entire response should be in all capital letters."}
+  change_case:english_lowercase:
+    {action: rewrite_checker, checker: lowercase_any_language, describe: "Your entire response should be in lowercase letters. No capital letters are allowed."}
+  # new prompts: the text to repeat is the request itself without this instruction, known only once the prompt is written
+  combination:repeat_prompt:                 {action: translate_kwarg, translate: [prompt_to_repeat], generate: false}
+  combination:two_responses:
+    {action: keep, describe: "Give two different answers, separated by six asterisks: ******"}
+  # describe: the term with its symbol, as Marco-Bench-MIF and M-IFEval state it (IFEval's English left el "brackets",
+  # hi "(comma)", invented el μεταγραφό; ablation history 222, 224)
+  detectable_content:number_placeholders:
+    {action: keep, describe: "The response must contain at least {num_placeholders} placeholders: spots to fill in later, written between [ and ], for example [address]."}
+  # checker matches "P.S." / "P.P.S" literally: the marker is kept, not translated
+  detectable_content:postscript:
+    {action: keep, describe: "At the end of the response, add a postscript: a short final note that starts with {postscript_marker}"}
+  # options are hardcoded in English ("My answer is yes.")
+  detectable_format:constrained_response:
+    action: rewrite_checker
+    checker: constrained_response_translated
+    describe: "Answer with one of a few fixed options. The request gives each option between quotation marks and puts nothing else between quotation marks (for example the equivalents of 'My answer is yes.', 'My answer is no.', 'My answer is maybe.')."
+  detectable_format:json_format:
+    {action: keep, describe: "The entire response must be in JSON format. It may be put between ``` marks."}
+  detectable_format:multiple_sections:
+    action: translate_kwarg
+    translate: [section_spliter]
+    describe: "The response must have {num_sections} sections. Each section begins with {section_spliter} followed by its number: {section_spliter} 1, {section_spliter} 2, and so on."
+  detectable_format:number_bullet_lists:
+    {action: keep, describe: "The response must contain exactly {num_bullets} list items, each on its own line starting with *, for example:\n* This is point 1."}
+  detectable_format:number_highlighted_sections:
+    {action: keep, describe: "Highlight at least {num_highlights} parts of the response by putting each between asterisks *, for example *highlighted part*."}
+  detectable_format:title:
+    {action: keep, describe: "The response must have a title written between << and >>, for example <<poem of joy>>."}
+  keywords:existence:
+    {action: translate_kwarg, translate: [keywords], describe: "The response must include the words {keywords}."}
+  # IFEval's \b misses a word ending in a combining mark (hi कचरा): whole words with marks inside (history 277)
+  keywords:forbidden_words:
+    {action: translate_kwarg, translate: [forbidden_words], checker: forbidden_words_multilingual, describe: "The response must not contain the words {forbidden_words_or}."}
+  keywords:frequency:                        {action: translate_kwarg, translate: [keyword]}
+  # the letter is chosen for English text; its frequency means nothing after translation
+  keywords:letter_frequency:                 {action: drop}
+  # new prompts: an answer in another language contradicts a prompt set in its own language
+  language:response_language:                {action: keep, generate: false}
+  length_constraints:nth_paragraph_first_word:
+    action: translate_kwarg
+    translate: [first_word]
+    # IFEval cuts the word at . , ? ! ' " only: „Zaključak" or Fazit: never matched (pilot 3956996)
+    checker: nth_paragraph_first_word_multilingual
+    describe: "The response must have {num_paragraphs} paragraphs, separated from each other by one blank line and by nothing else. Paragraph {nth_paragraph} must start with the word {first_word}."
+  length_constraints:number_paragraphs:      {action: keep}
+  length_constraints:number_sentences:       {action: keep}
+  length_constraints:number_words:           {action: keep}
+  # every comma the checker bans that the language uses (CLDR punctuation, data_route.commas_of): ja 、 ， , (history 272)
+  punctuation:no_comma:
+    {action: keep, describe: "Do not use any comma ({commas}) anywhere in the response."}
+  # the phrase may be closed by the marks the request showed it in (« », < >, 「」), history 255, H
+  startend:end_checker:                      {action: translate_kwarg, translate: [end_phrase], checker: end_checker_multilingual}
+  startend:quotation:                        {action: keep}
+
+# Languages sharing a property that breaks an English checker
+groups:
+  # unicameral scripts: no upper / lower case
+  no_case: [am, ar, bn, fa, gu, he, hi, ja, ka, km, kn, ko, lo, ml, mr, my, ne, pa, si, ta, te, th, ur, zh]
+  # words not separated by spaces: word counts are meaningless
+  no_word_spaces: [ja, km, lo, my, th, zh]
+  # comma other than "," (，、 ، etc.)
+  own_comma: [ar, fa, ja, ur, zh]
+  # sentence end other than . ! ? (。 । ۔ ։ ። ။)
+  own_sentence_end: [am, bn, hi, hy, ja, km, my, ne, ur, zh]
+  # particles or endings written onto the word, after spaces between words (ko 지하철을): a word is matched at a word start
+  attached_particles: [ko]
+  # grammar words written onto the word before and after it (ar والكتاب, كتابي); the lists per script: scoring.CLITICS
+  attached_clitics: [ar]
+
+overrides:
+  no_case:
+    change_case:capital_word_frequency: {action: drop}
+    change_case:english_capital:        {action: drop}
+    change_case:english_lowercase:      {action: drop}
+  no_word_spaces:
+    # counted in characters, and asked in characters: num_words x 1.5, rounded up (history 271)
+    length_constraints:number_words:    {action: rewrite_checker, checker: number_characters, describe: "Answer with {relation} {num_characters} characters."}
+    # no space: IFEval's first word is the whole sentence (ja, zh 0 of 9 answers followed, pilot 3956996)
+    length_constraints:nth_paragraph_first_word: {checker: nth_paragraph_starts_with}
+    # no word boundary without spaces: a forbidden word is found anywhere (IFEval's \b never fired, history 277)
+    keywords:forbidden_words:           {checker: forbidden_words_anywhere}
+  own_comma:
+    # the language's own comma: shown with "," (ar wrote ، when shown "," alone and the judge rejected it, history 224;
+    # with no symbol at all, ja wrote カンマ, which is "," only, history 272)
+    punctuation:no_comma:               {action: rewrite_checker, checker: no_comma_multilingual, describe: "Do not use any comma ({commas}) anywhere in the response."}
+  own_sentence_end:
+    length_constraints:number_sentences: {action: rewrite_checker, checker: number_sentences_multilingual}
+  attached_particles:
+    # 지하철을 is a use of the forbidden 지하철 (history 280)
+    keywords:forbidden_words:           {checker: forbidden_words_at_word_start}
+  attached_clitics:
+    # والكتاب is a use of the forbidden كتاب, كتابة is another word (history 284)
+    keywords:forbidden_words:           {checker: forbidden_words_clitics}
+
+# Per-language overrides (applied last)
+languages:
+  ko:
+    # particles attach to the word: 보안은 starts paragraph 2 asked to start with 보안 (history 255, E)
+    length_constraints:nth_paragraph_first_word: {checker: nth_paragraph_first_word_prefix}
+    # IFEval's sentence count splits the date 2026. 11. 25. into three sentences (history 255, D)
+    length_constraints:number_sentences: {action: rewrite_checker, checker: number_sentences_multilingual}

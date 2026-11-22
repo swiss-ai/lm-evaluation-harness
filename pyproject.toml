@@ -169,6 +169,7 @@ exclude = [
     "lm_eval/tasks/ifbench/instructions.py",
     "lm_eval/tasks/ifbench/instructions_util.py",
     "lm_eval/tasks/ifbench/instructions_registry.py",
+    "lm_eval/tasks/ifeval_multilingual/grader/*.py",
 ]
 
 [tool.ruff.lint]
@@ -218,6 +219,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
+# vendored from ritranslation-hooks (configs/benchmark/ifeval), kept close to the source for syncing
+"lm_eval/tasks/ifeval_multilingual/grader/*.py" = ["ALL"]
 "__init__.py" = [
     "F401",   # unused-import
     "F402",   # import-shadowed-by-loop-var

@@ -58640,6 +58640,66 @@
       "tags": [],
       "yaml_path": "ifeval/multilingual/ifeval_es.yaml"
     },
+    "ifeval_multilingual": {
+      "kind": "GROUP",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/_ifeval_multilingual.yaml"
+    },
+    "ifeval_multilingual_ar": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_ar.yaml"
+    },
+    "ifeval_multilingual_de": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_de.yaml"
+    },
+    "ifeval_multilingual_el": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_el.yaml"
+    },
+    "ifeval_multilingual_es": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_es.yaml"
+    },
+    "ifeval_multilingual_fr": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_fr.yaml"
+    },
+    "ifeval_multilingual_hi": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_hi.yaml"
+    },
+    "ifeval_multilingual_ja": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_ja.yaml"
+    },
+    "ifeval_multilingual_ko": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_ko.yaml"
+    },
+    "ifeval_multilingual_pl": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_pl.yaml"
+    },
+    "ifeval_multilingual_sr": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_sr.yaml"
+    },
+    "ifeval_multilingual_zh": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "ifeval_multilingual/ifeval_multilingual_zh.yaml"
+    },
     "ifeval_think": {
       "kind": "TASK",
       "tags": [],
@@ -119501,6 +119561,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16315,
+  "entry_count": 16327,
   "schema_version": 1
 }

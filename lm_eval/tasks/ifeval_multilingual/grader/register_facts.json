@@ -1,0 +1,2544 @@
+{
+ "languages": {
+  "ar": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 2,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "lang": "ar",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Arabic-PADT",
+    "unimorph": "ara"
+   },
+   "stanza": "ar"
+  },
+  "bg": {
+   "dropped": {
+    "вас": "informal: plural pronoun in 11 of 20 uses",
+    "ви": "informal: plural pronoun in 25 of 56 uses",
+    "вие": "informal: plural pronoun in 13 of 39 uses"
+   },
+   "formal": [
+    "ви",
+    "вие",
+    "вас"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "ти",
+    "те",
+    "тебе",
+    "теб"
+   ],
+   "lang": "bg",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "вас": {
+     "other_reading": 0.45,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "ви": {
+     "other_reading": 0.71,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "вие": {
+     "other_reading": 0.68,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "те": {
+     "other_reading": 0.78,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.011,
+     "forms": 1236,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": true,
+     "n": 70,
+     "precision": 0.958,
+     "recall": 0.971
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Bulgarian-BTB",
+    "unimorph": "bul"
+   },
+   "stanza": "bg"
+  },
+  "ca": {
+   "dropped": {
+    "'t": "informal: subtitle share 0.0e+00",
+    "t'": "informal: subtitle share 0.0e+00",
+    "teus": "informal: treebank count 1",
+    "teva": "informal: treebank count 1",
+    "ti": "informal: treebank count 1"
+   },
+   "formal": [
+    "vostè",
+    "vostès"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "et",
+    "tu",
+    "te",
+    "teu"
+   ],
+   "lang": "ca",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.167,
+     "forms": 10531,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 6,
+     "precision": null,
+     "recall": 0.0
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Catalan-AnCora",
+    "unimorph": "cat"
+   },
+   "stanza": "ca"
+  },
+  "cs": {
+   "dropped": {
+    "tvoje": "informal: treebank count 1",
+    "tvých": "informal: treebank count 1",
+    "tvůj": "informal: treebank count 1",
+    "vašim": "formal: treebank count 1",
+    "vašimi": "formal: treebank count 1"
+   },
+   "formal": [
+    "vám",
+    "vás",
+    "vaší",
+    "vaše",
+    "vy",
+    "vašeho",
+    "vaši",
+    "váš",
+    "vašich",
+    "vašem",
+    "vámi",
+    "vašemu"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 5,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "ti",
+    "tě",
+    "ty",
+    "tebou",
+    "tebe"
+   ],
+   "lang": "cs",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "ti": {
+     "other_reading": 0.87,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "ty": {
+     "other_reading": 0.98,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.0,
+     "forms": 851,
+     "sentences": 621
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 4,
+     "precision": 0.5,
+     "recall": 0.5
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Czech-CAC",
+    "unimorph": "ces"
+   },
+   "stanza": "cs"
+  },
+  "cy": {
+   "dropped": {
+    "'th": "informal: treebank count 1",
+    "chdi": "informal: plural pronoun in 4 of 19 uses",
+    "chwi": "formal: treebank count 1"
+   },
+   "formal": [
+    "chi",
+    "chdi",
+    "eich"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 3,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "ti",
+    "dy",
+    "di"
+   ],
+   "lang": "cy",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "chdi": {
+     "other_reading": 0.79,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "eich": {
+     "other_reading": 0.96,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.0375,
+     "forms": 890,
+     "sentences": 906
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 34,
+     "precision": 0.905,
+     "recall": 0.559
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Welsh-CCG",
+    "unimorph": "cym"
+   },
+   "stanza": "cy"
+  },
+  "da": {
+   "dropped": {
+    "dine": "informal: treebank count 1"
+   },
+   "formal": [
+    "de",
+    "deres",
+    "dem"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "du",
+    "dig",
+    "din",
+    "dit"
+   ],
+   "lang": "da",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "de": {
+     "other_reading": 0.98,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    },
+    "dem": {
+     "other_reading": 0.96,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    },
+    "deres": {
+     "other_reading": 0.95,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Danish-DDT",
+    "unimorph": "dan"
+   },
+   "stanza": "da"
+  },
+  "de": {
+   "dropped": {
+    "dich": "informal: treebank count 1",
+    "ihrer": "formal: treebank count 1"
+   },
+   "formal": [
+    "sie",
+    "ihre",
+    "ihnen",
+    "ihrem"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "du",
+    "deinen",
+    "dir",
+    "dein"
+   ],
+   "lang": "de",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "ihnen": {
+     "other_reading": 0.93,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    },
+    "ihre": {
+     "other_reading": 0.98,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    },
+    "ihrem": {
+     "other_reading": 0.97,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    },
+    "sie": {
+     "other_reading": 0.99,
+     "rules": [
+      "case_sensitive",
+      "not_sentence_initial"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.0887,
+     "forms": 16147,
+     "sentences": 970
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 6,
+     "precision": 1.0,
+     "recall": 0.333
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_German-GSD",
+    "unimorph": "deu"
+   },
+   "stanza": "de"
+  },
+  "el": {
+   "dropped": {},
+   "formal": [
+    "σας",
+    "εσείς",
+    "εσάς"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [],
+   "lang": "el",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {
+    "σας": {
+     "other_reading": 0.6,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.011,
+     "forms": 3223,
+     "sentences": 456
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Greek-GDT",
+    "unimorph": "ell"
+   },
+   "stanza": "el"
+  },
+  "en": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 1,
+    "unimorph_polite": false,
+    "wals": "none"
+   },
+   "lang": "en",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_English-EWT",
+    "unimorph": "eng"
+   },
+   "stanza": "en"
+  },
+  "es": {
+   "dropped": {
+    "tuyo": "informal: treebank count 1"
+   },
+   "formal": [
+    "usted",
+    "ustedes"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 7,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "te",
+    "tu",
+    "tú",
+    "ti",
+    "tus",
+    "tuya",
+    "contigo"
+   ],
+   "lang": "es",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.036,
+     "forms": 159884,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 11,
+     "precision": null,
+     "recall": 0.0
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Spanish-AnCora",
+    "unimorph": "spa"
+   },
+   "stanza": "es"
+  },
+  "et": {
+   "dropped": {
+    "sinua": "informal: treebank count 1",
+    "sinule": "informal: treebank count 1",
+    "sinult": "informal: treebank count 1",
+    "sinuta": "informal: treebank count 1",
+    "teieni": "formal: treebank count 1",
+    "teilegi": "formal: treebank count 1",
+    "teist": "formal: treebank count 1"
+   },
+   "formal": [
+    "te",
+    "teie",
+    "teid",
+    "teil",
+    "teile",
+    "teiega"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 11,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "sa",
+    "sinu",
+    "sulle",
+    "sul",
+    "sind",
+    "sina",
+    "su",
+    "sinust",
+    "sinuga",
+    "sult",
+    "sinul"
+   ],
+   "lang": "et",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.144,
+     "forms": 415,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 104,
+     "precision": 0.91,
+     "recall": 0.683
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Estonian-EDT",
+    "unimorph": "est"
+   },
+   "stanza": "et"
+  },
+  "eu": {
+   "dropped": {
+    "heure": "informal: treebank count 1",
+    "zeuk": "informal: treebank count 1",
+    "zeure": "informal: treebank count 1"
+   },
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": true,
+    "wals": "binary"
+   },
+   "informal": [],
+   "lang": "eu",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Basque-BDT",
+    "unimorph": "eus"
+   },
+   "stanza": "eu"
+  },
+  "fa": {
+   "dropped": {
+    "توی": "informal: treebank count 1",
+    "تو‌": "informal: treebank count 1",
+    "خود": "informal: plural pronoun in 93 of 139 uses",
+    "ش": "informal: treebank count 1",
+    "شان": "formal: treebank count 1",
+    "شما": "informal: plural pronoun in 1311 of 1316 uses",
+    "شماهایی": "formal: subtitle share 0.0e+00",
+    "شمایی": "formal: treebank count 1",
+    "یت": "informal: subtitle share 0.0e+00",
+    "یتان": "formal: subtitle share 0.0e+00"
+   },
+   "formal": [
+    "شما",
+    "تان",
+    "خود",
+    "شماها"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 3,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "تو",
+    "ت",
+    "ات"
+   ],
+   "lang": "fa",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "خود": {
+     "other_reading": 0.97,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.031,
+     "forms": 503,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": true,
+     "n": 83,
+     "precision": 0.965,
+     "recall": 0.988
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Persian-PerDT",
+    "unimorph": "fas"
+   },
+   "stanza": "fa"
+  },
+  "fi": {
+   "dropped": {
+    "itsesi": "informal: treebank count 1",
+    "itsestäsi": "informal: treebank count 1",
+    "itseäsi": "informal: treebank count 1",
+    "sinulta": "informal: treebank count 1",
+    "sinuna": "informal: treebank count 1",
+    "sinunkin": "informal: treebank count 1",
+    "sinussa": "informal: treebank count 1",
+    "sinutkin": "informal: treebank count 1",
+    "sinähän": "informal: treebank count 1",
+    "sinäkään": "informal: treebank count 1",
+    "sinäpä": "informal: treebank count 1",
+    "sul": "informal: treebank count 1",
+    "sunkin": "informal: treebank count 1",
+    "säkään": "informal: treebank count 1",
+    "teihin": "formal: treebank count 1",
+    "teiltä": "formal: treebank count 1",
+    "teistä": "formal: treebank count 1",
+    "toisistanne": "formal: treebank count 1"
+   },
+   "formal": [
+    "te",
+    "teitä",
+    "teille",
+    "teidän",
+    "teillä",
+    "teidät"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 16,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "sinä",
+    "sä",
+    "sinun",
+    "sinua",
+    "sinulle",
+    "sun",
+    "sinulla",
+    "sinut",
+    "sua",
+    "sut",
+    "sulla",
+    "sinusta",
+    "sulle",
+    "sinäkin",
+    "sinäkö",
+    "sää"
+   ],
+   "lang": "fi",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "sää": {
+     "other_reading": 0.5,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.113,
+     "forms": 32872,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 83,
+     "precision": 0.916,
+     "recall": 0.916
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Finnish-TDT",
+    "unimorph": "fin"
+   },
+   "stanza": "fi"
+  },
+  "fr": {
+   "dropped": {
+    "-toi": "informal: subtitle share 0.0e+00",
+    "-tu": "informal: subtitle share 0.0e+00",
+    "-vous": "formal: subtitle share 0.0e+00",
+    "tes": "informal: treebank count 1"
+   },
+   "formal": [
+    "vous",
+    "votre",
+    "vos"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 5,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "tu",
+    "ton",
+    "toi",
+    "te",
+    "t'"
+   ],
+   "lang": "fr",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "ton": {
+     "other_reading": 0.47,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.1401,
+     "forms": 30900,
+     "sentences": 414
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 2,
+     "precision": 1.0,
+     "recall": 1.0
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_French-GSD",
+    "unimorph": "fra"
+   },
+   "stanza": "fr"
+  },
+  "ga": {
+   "dropped": {
+    "thusa": "informal: treebank count 1"
+   },
+   "formal": [
+    "sibh"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "wals_disagrees",
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 3,
+    "unimorph_polite": false,
+    "wals": "none"
+   },
+   "informal": [
+    "tú",
+    "tusa",
+    "thú"
+   ],
+   "lang": "ga",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.0831,
+     "forms": 1148,
+     "sentences": 421
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 24,
+     "precision": 0.667,
+     "recall": 0.583
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Irish-IDT",
+    "unimorph": "gle"
+   },
+   "stanza": "ga"
+  },
+  "he": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 2,
+    "unimorph_polite": false,
+    "wals": "none"
+   },
+   "lang": "he",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Hebrew-HTB",
+    "unimorph": "heb"
+   },
+   "stanza": "he"
+  },
+  "hi": {
+   "dropped": {
+    "आपके": "informal: treebank count 1",
+    "आपने": "informal: treebank count 1",
+    "तुम्हारे": "informal: treebank count 1"
+   },
+   "formal": [
+    "आप",
+    "आपको",
+    "आपके",
+    "आपकी",
+    "आपका",
+    "आपने"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [
+     "needs_model_list",
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 1,
+    "unimorph_polite": false,
+    "wals": "multiple"
+   },
+   "informal": [
+    "तुमने"
+   ],
+   "lang": "hi",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.115,
+     "forms": 163,
+     "sentences": 1000
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 3,
+     "precision": null,
+     "recall": 0.0
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Hindi-HDTB",
+    "unimorph": "hin"
+   },
+   "stanza": "hi"
+  },
+  "hr": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 2,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "lang": "hr",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Croatian-SET",
+    "unimorph": "hbs"
+   },
+   "stanza": "hr"
+  },
+  "hu": {
+   "dropped": {
+    "néktek": "formal: treebank count 1",
+    "téged": "informal: treebank count 1"
+   },
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "multiple"
+   },
+   "informal": [],
+   "lang": "hu",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.0,
+     "forms": 25229,
+     "sentences": 449
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Hungarian-Szeged",
+    "unimorph": "hun"
+   },
+   "stanza": "hu"
+  },
+  "hy": {
+   "dropped": {
+    "ձեզանից": "formal: treebank count 1",
+    "քեզնից": "informal: treebank count 1"
+   },
+   "formal": [
+    "ձեզ",
+    "դուք",
+    "ինքներդ",
+    "ձեր",
+    "ձեզնից"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 3,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "դու",
+    "քեզ",
+    "քո"
+   ],
+   "lang": "hy",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "ձեր": {
+     "other_reading": 0.92,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "քո": {
+     "other_reading": 0.95,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.0,
+     "forms": 8059,
+     "sentences": 551
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 101,
+     "precision": 0.924,
+     "recall": 0.723
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Armenian-ArmTDP",
+    "unimorph": "hye"
+   },
+   "stanza": "hy"
+  },
+  "id": {
+   "decompose": false,
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": "avoided"
+   },
+   "lang": "id",
+   "levels": {},
+   "measurements": null,
+   "route": "ending",
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Indonesian-GSD",
+    "unimorph": "ind"
+   },
+   "stanza": "id"
+  },
+  "is": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 1,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "lang": "is",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Icelandic-Modern",
+    "unimorph": "isl"
+   },
+   "stanza": "is"
+  },
+  "it": {
+   "dropped": {
+    "ve": "formal: treebank count 1"
+   },
+   "formal": [
+    "vi",
+    "voi"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 3,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "ti",
+    "te",
+    "tu"
+   ],
+   "lang": "it",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "vi": {
+     "other_reading": 0.65,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.073,
+     "forms": 34849,
+     "sentences": 466
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 17,
+     "precision": 1.0,
+     "recall": 1.0
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Italian-ISDT",
+    "unimorph": "ita"
+   },
+   "stanza": "it"
+  },
+  "ja": {
+   "decompose": false,
+   "gate": {
+    "flags": [
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": true,
+    "wals": "avoided"
+   },
+   "lang": "ja",
+   "levels": {
+    "FORM": {
+     "built": false,
+     "coverage": 0.383,
+     "endings": [
+      "になる",
+      "になった",
+      "せていただく",
+      "せていただいた",
+      "にならない",
+      "にならなかった",
+      "りする",
+      "せていただかない",
+      "りした"
+     ],
+     "forms": 1498,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "せていただいた": "0/0 sentences end in a predicate",
+      "せていただかない": "0/0 sentences end in a predicate",
+      "せていただく": "0/0 sentences end in a predicate",
+      "にならない": "1/1 sentences end in a predicate",
+      "にならなかった": "0/0 sentences end in a predicate",
+      "りした": "1/1 sentences end in a predicate",
+      "りする": "3/3 sentences end in a predicate"
+     },
+     "verified": [
+      "になる",
+      "になった"
+     ],
+     "verified_coverage": 0.134
+    },
+    "FORM+POL": {
+     "built": false,
+     "coverage": 0.389,
+     "endings": [
+      "せていただきました",
+      "せていただきます",
+      "になります",
+      "になりました",
+      "になりません",
+      "りください",
+      "になりませんでした",
+      "りします",
+      "きください",
+      "りしました"
+     ],
+     "forms": 1374,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "きください": "0/0 sentences end in a predicate",
+      "せていただきました": "1/1 sentences end in a predicate",
+      "せていただきます": "4/4 sentences end in a predicate",
+      "になりません": "0/0 sentences end in a predicate",
+      "になりませんでした": "0/0 sentences end in a predicate",
+      "りください": "0/0 sentences end in a predicate",
+      "りしました": "2/2 sentences end in a predicate",
+      "りします": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "になります",
+      "になりました"
+     ],
+     "verified_coverage": 0.128
+    },
+    "POL": {
+     "built": false,
+     "coverage": 0.028,
+     "endings": [
+      "せられません",
+      "たがりませんでした"
+     ],
+     "forms": 3726,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "せられません": "0/0 sentences end in a predicate",
+      "たがりませんでした": "0/0 sentences end in a predicate"
+     },
+     "verified": [],
+     "verified_coverage": 0.0
+    },
+    "any:FORM": {
+     "built": false,
+     "coverage": 0.337,
+     "endings": [
+      "になる",
+      "になった",
+      "せていただきました",
+      "せていただきます",
+      "せていただく",
+      "になります",
+      "せていただいた",
+      "になりました",
+      "にならない",
+      "になりません",
+      "にならなかった",
+      "りください"
+     ],
+     "forms": 2872,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "せていただいた": "0/0 sentences end in a predicate",
+      "せていただきました": "1/1 sentences end in a predicate",
+      "せていただきます": "4/4 sentences end in a predicate",
+      "せていただく": "0/0 sentences end in a predicate",
+      "にならない": "1/1 sentences end in a predicate",
+      "にならなかった": "0/0 sentences end in a predicate",
+      "になりません": "0/0 sentences end in a predicate",
+      "りください": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "になる",
+      "になった",
+      "になります",
+      "になりました"
+     ],
+     "verified_coverage": 0.131
+    },
+    "any:POL": {
+     "built": true,
+     "coverage": 1.0,
+     "endings": [
+      "ます",
+      "ました",
+      "ません",
+      "です",
+      "しょう",
+      "ませんでした",
+      "さい"
+     ],
+     "forms": 5100,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "さい": "28/30 sentences end in a predicate"
+     },
+     "verified": [
+      "ます",
+      "ました",
+      "ません",
+      "です",
+      "しょう",
+      "ませんでした"
+     ],
+     "verified_coverage": 0.899
+    },
+    "plain": {
+     "built": false,
+     "coverage": 0.012,
+     "endings": [
+      "せられなかった"
+     ],
+     "forms": 4250,
+     "overlap": 0.0,
+     "pos": [
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "せられなかった": "0/0 sentences end in a predicate"
+     },
+     "verified": [],
+     "verified_coverage": 0.0
+    }
+   },
+   "measurements": null,
+   "route": "ending",
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Japanese-GSD",
+    "unimorph": "jpn"
+   },
+   "stanza": "ja"
+  },
+  "ko": {
+   "decompose": true,
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": true,
+    "wals": "avoided"
+   },
+   "lang": "ko",
+   "levels": {
+    "FORM": {
+     "built": true,
+     "coverage": 0.954,
+     "endings": [
+      "ᆻ다",
+      "냐",
+      "라",
+      "ᆫ다",
+      "자",
+      "하시다",
+      "하다"
+     ],
+     "forms": 34056,
+     "overlap": 0.0001,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "하시다": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "ᆻ다",
+      "냐",
+      "라",
+      "ᆫ다",
+      "자",
+      "하다"
+     ],
+     "verified_coverage": 0.943
+    },
+    "FORM+POL": {
+     "built": true,
+     "coverage": 0.985,
+     "endings": [
+      "ᆸ니다",
+      "ᆸ니까",
+      "ᆸ시오",
+      "ᆸ시다",
+      "mnida"
+     ],
+     "forms": 32458,
+     "overlap": 0.0,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "mnida": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "ᆸ니다",
+      "ᆸ니까",
+      "ᆸ시오",
+      "ᆸ시다"
+     ],
+     "verified_coverage": 0.969
+    },
+    "INFM": {
+     "built": false,
+     "coverage": 0.928,
+     "endings": [
+      "ᆻ어",
+      "ᅧ",
+      "해",
+      "sseo"
+     ],
+     "forms": 15949,
+     "overlap": 0.0003,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "sseo": "0/0 sentences end in a predicate",
+      "ᅧ": "3/4 sentences end in a predicate",
+      "ᆻ어": "6/6 sentences end in a predicate",
+      "해": "3/3 sentences end in a predicate"
+     },
+     "verified": [],
+     "verified_coverage": 0.0
+    },
+    "INFM+POL": {
+     "built": true,
+     "coverage": 1.0,
+     "endings": [
+      "요",
+      "yo"
+     ],
+     "forms": 19347,
+     "overlap": 0.0,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "yo": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "요"
+     ],
+     "verified_coverage": 0.971
+    },
+    "any:FORM": {
+     "built": true,
+     "coverage": 0.986,
+     "endings": [
+      "다",
+      "냐",
+      "ᆸ니까",
+      "라",
+      "ᆸ시오",
+      "자",
+      "da"
+     ],
+     "forms": 66514,
+     "overlap": 0.0001,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "da": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "다",
+      "냐",
+      "ᆸ니까",
+      "라",
+      "ᆸ시오",
+      "자"
+     ],
+     "verified_coverage": 0.97
+    },
+    "any:INFM": {
+     "built": false,
+     "coverage": 0.958,
+     "endings": [
+      "요",
+      "ᆻ어",
+      "ᅧ",
+      "해",
+      "yo"
+     ],
+     "forms": 35296,
+     "overlap": 0.0001,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "yo": "0/0 sentences end in a predicate",
+      "ᅧ": "3/4 sentences end in a predicate",
+      "ᆻ어": "6/6 sentences end in a predicate",
+      "해": "3/3 sentences end in a predicate"
+     },
+     "verified": [
+      "요"
+     ],
+     "verified_coverage": 0.532
+    },
+    "any:POL": {
+     "built": true,
+     "coverage": 0.981,
+     "endings": [
+      "요",
+      "ᆸ니다",
+      "ᆸ니까",
+      "ᆸ시오",
+      "ᆸ시다",
+      "yo"
+     ],
+     "forms": 51805,
+     "overlap": 0.0,
+     "pos": [
+      "ADJ",
+      "AUX",
+      "VERB"
+     ],
+     "rejected": {
+      "yo": "0/0 sentences end in a predicate"
+     },
+     "verified": [
+      "요",
+      "ᆸ니다",
+      "ᆸ니까",
+      "ᆸ시오",
+      "ᆸ시다"
+     ],
+     "verified_coverage": 0.97
+    }
+   },
+   "measurements": null,
+   "route": "ending",
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Korean-Kaist",
+    "unimorph": "kor"
+   },
+   "stanza": "ko"
+  },
+  "lt": {
+   "dropped": {},
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "multiple"
+   },
+   "informal": [],
+   "lang": "lt",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.0155,
+     "forms": 1372,
+     "sentences": 646
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 35,
+     "precision": 0.529,
+     "recall": 0.257
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Lithuanian-ALKSNIS",
+    "unimorph": "lit"
+   },
+   "stanza": "lt"
+  },
+  "lv": {
+   "dropped": {
+    "jūsos": "formal: treebank count 1"
+   },
+   "formal": [
+    "jūs",
+    "jums",
+    "jūsu"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 5,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "tu",
+    "tev",
+    "tevi",
+    "tevis",
+    "tevī"
+   ],
+   "lang": "lv",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.033,
+     "forms": 1269,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 129,
+     "precision": 0.728,
+     "recall": 0.643
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Latvian-LVTB",
+    "unimorph": "lav"
+   },
+   "stanza": "lv"
+  },
+  "nl": {
+   "dropped": {},
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [],
+   "lang": "nl",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Dutch-Alpino",
+    "unimorph": "nld"
+   },
+   "stanza": "nl"
+  },
+  "no": {
+   "dropped": {},
+   "formal": [
+    "dere"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 2,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "du",
+    "deg"
+   ],
+   "lang": "no",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Norwegian-Bokmaal",
+    "unimorph": "nob"
+   },
+   "stanza": "nb"
+  },
+  "pl": {
+   "dropped": {
+    "twego": "informal: treebank count 1",
+    "twem": "informal: treebank count 1",
+    "wasi": "formal: treebank count 1",
+    "wasza": "formal: treebank count 1",
+    "waszej": "formal: treebank count 1",
+    "waszych": "formal: treebank count 1",
+    "waszym": "formal: treebank count 1",
+    "waszą": "formal: treebank count 1"
+   },
+   "formal": [
+    "was",
+    "wam",
+    "wasze",
+    "wasz",
+    "wy",
+    "wami",
+    "waszego"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 18,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "ci",
+    "cię",
+    "ty",
+    "ciebie",
+    "twój",
+    "twoje",
+    "tobą",
+    "twoim",
+    "tobie",
+    "twoja",
+    "twoją",
+    "twojego",
+    "twoich",
+    "twojej",
+    "twoi",
+    "twą",
+    "twej",
+    "twoimi"
+   ],
+   "lang": "pl",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.009,
+     "forms": 4983,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": true,
+     "n": 156,
+     "precision": 0.987,
+     "recall": 0.994
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Polish-PDB",
+    "unimorph": "pol"
+   },
+   "stanza": "pl"
+  },
+  "pt": {
+   "dropped": {},
+   "formal": [
+    "vós",
+    "vos"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 2,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "te",
+    "ti"
+   ],
+   "lang": "pt",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.141,
+     "forms": 36002,
+     "sentences": 1000
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Portuguese-Bosque",
+    "unimorph": "por"
+   },
+   "stanza": "pt"
+  },
+  "ro": {
+   "dropped": {
+    "-te": "informal: subtitle share 0.0e+00",
+    "-vă": "formal: subtitle share 0.0e+00",
+    "-ți": "informal: subtitle share 0.0e+00",
+    "dumneatale": "informal: treebank count 1",
+    "te-": "informal: subtitle share 0.0e+00",
+    "tăi": "informal: treebank count 1",
+    "v-": "formal: subtitle share 0.0e+00",
+    "voastre": "formal: treebank count 1",
+    "voștri": "formal: subtitle share 7.2e-07",
+    "ți": "informal: subtitle share 4.6e-06",
+    "ți-": "informal: subtitle share 0.0e+00",
+    "ție": "informal: subtitle share 2.3e-06"
+   },
+   "formal": [
+    "vă",
+    "vi",
+    "voi",
+    "voastră",
+    "vostru"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 9,
+    "unimorph_polite": false,
+    "wals": "multiple"
+   },
+   "informal": [
+    "te",
+    "îți",
+    "tu",
+    "ta",
+    "tău",
+    "tine",
+    "dumneata",
+    "dumitale",
+    "tale"
+   ],
+   "lang": "ro",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "vi": {
+     "other_reading": 0.37,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "voi": {
+     "other_reading": 0.64,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.0142,
+     "forms": 4139,
+     "sentences": 704
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 31,
+     "precision": 0.935,
+     "recall": 0.935
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Romanian-RRT",
+    "unimorph": "ron"
+   },
+   "stanza": "ro"
+  },
+  "ru": {
+   "dropped": {},
+   "formal": [
+    "вы",
+    "вас",
+    "вам",
+    "вами"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 5,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "ты",
+    "тебя",
+    "тебе",
+    "тобой",
+    "тобою"
+   ],
+   "lang": "ru",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.045,
+     "forms": 14012,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 215,
+     "precision": 0.883,
+     "recall": 0.916
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Russian-SynTagRus",
+    "unimorph": "rus"
+   },
+   "stanza": "ru"
+  },
+  "sk": {
+   "dropped": {
+    "tvojej": "informal: treebank count 1",
+    "tvojmu": "informal: treebank count 1",
+    "tvojom": "informal: treebank count 1",
+    "tvojou": "informal: treebank count 1",
+    "tvoju": "informal: treebank count 1",
+    "vaša": "informal: treebank count 1",
+    "vaši": "formal: treebank count 1",
+    "vašu": "formal: treebank count 1",
+    "vaším": "formal: treebank count 1",
+    "váš": "informal: treebank count 1"
+   },
+   "formal": [
+    "vás",
+    "vám",
+    "vy",
+    "vaše",
+    "vami",
+    "vašej",
+    "vaša"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "no_unimorph"
+    ],
+    "treebank_informal_forms": 11,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "ťa",
+    "ty",
+    "ti",
+    "teba",
+    "tebou",
+    "tvoj",
+    "tebe",
+    "tvoje",
+    "tvojho",
+    "tvoja",
+    "tvojím"
+   ],
+   "lang": "sk",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "vaša": {
+     "other_reading": 0.33,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 2,
+     "precision": 0.5,
+     "recall": 1.0
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Slovak-SNK",
+    "unimorph": null
+   },
+   "stanza": "sk"
+  },
+  "sl": {
+   "dropped": {
+    "nate": "informal: treebank count 1",
+    "tabo": "informal: treebank count 1",
+    "teu": "informal: treebank count 1",
+    "zate": "informal: treebank count 1",
+    "štvoj": "informal: subtitle share 0.0e+00"
+   },
+   "formal": [
+    "vam",
+    "vas",
+    "vi",
+    "vaš",
+    "vaša",
+    "vaše",
+    "vašo",
+    "vami",
+    "vaši",
+    "vaših",
+    "vašega",
+    "vašem",
+    "vašim"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 9,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "ti",
+    "te",
+    "tvoje",
+    "tvoja",
+    "tebe",
+    "tvoj",
+    "tvojega",
+    "tebi",
+    "tvoji"
+   ],
+   "lang": "sl",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "te": {
+     "other_reading": 0.86,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "ti": {
+     "other_reading": 0.48,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.0,
+     "forms": 194,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 10,
+     "precision": 1.0,
+     "recall": 0.6
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Slovenian-SSJ",
+    "unimorph": "slv"
+   },
+   "stanza": "sl"
+  },
+  "sr": {
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "lang": "sr",
+   "measurements": null,
+   "route": null,
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Serbian-SET",
+    "unimorph": "hbs"
+   },
+   "stanza": "sr"
+  },
+  "sv": {
+   "dropped": {},
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [],
+   "lang": "sv",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Swedish-Talbanken",
+    "unimorph": "swe"
+   },
+   "stanza": "sv"
+  },
+  "tr": {
+   "dropped": {
+    "birinizle": "formal: treebank count 1",
+    "kendiniz": "informal: plural pronoun in 2 of 4 uses",
+    "kendinize": "informal: plural pronoun in 2 of 4 uses",
+    "kendinizi": "informal: plural pronoun in 3 of 6 uses",
+    "kendinle": "informal: treebank count 1",
+    "neyin": "informal: treebank count 1",
+    "senden": "informal: treebank count 1",
+    "sizler": "formal: treebank count 1",
+    "sizleri": "formal: treebank count 1"
+   },
+   "formal": [
+    "siz",
+    "size",
+    "sizi",
+    "sizin",
+    "sizinle",
+    "kendinizi",
+    "sizlere",
+    "sizden",
+    "kendinize",
+    "kendiniz"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 7,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [
+    "sen",
+    "sana",
+    "senin",
+    "seni",
+    "seninle",
+    "kendini",
+    "kendine"
+   ],
+   "lang": "tr",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {
+    "kendine": {
+     "other_reading": 0.6,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "kendini": {
+     "other_reading": 0.76,
+     "rules": [
+      "require_pos"
+     ]
+    },
+    "siz": {
+     "other_reading": 0.44,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.151,
+     "forms": 18583,
+     "sentences": 1000
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 89,
+     "precision": 0.93,
+     "recall": 0.899
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Turkish-IMST",
+    "unimorph": "tur"
+   },
+   "stanza": "tr"
+  },
+  "uk": {
+   "dropped": {},
+   "formal": [
+    "ви",
+    "вам",
+    "вас",
+    "вами"
+   ],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [],
+    "treebank_informal_forms": 4,
+    "unimorph_polite": false,
+    "wals": null
+   },
+   "informal": [
+    "ти",
+    "тебе",
+    "тобі",
+    "тобою"
+   ],
+   "lang": "uk",
+   "list_source": "treebank",
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": true,
+     "fa": 0.0011,
+     "forms": 147,
+     "sentences": 875
+    },
+    "pronoun_list": true,
+    "tagger": {
+     "enabled": false,
+     "n": 18,
+     "precision": 0.938,
+     "recall": 0.833
+    }
+   },
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Ukrainian-IU",
+    "unimorph": "ukr"
+   },
+   "stanza": "uk"
+  },
+  "ur": {
+   "dropped": {
+    "تجھے": "informal: treebank count 1",
+    "تم": "informal: plural pronoun in 6 of 11 uses",
+    "تمہارے": "informal: treebank count 1",
+    "تمہیں": "formal: treebank count 1"
+   },
+   "formal": [
+    "آپ"
+   ],
+   "formal_source": "treebank Polite=Form",
+   "gate": {
+    "flags": [
+     "needs_model_list",
+     "no_subtitle_list"
+    ],
+    "treebank_informal_forms": 1,
+    "unimorph_polite": false,
+    "wals": "multiple"
+   },
+   "informal": [
+    "تمہاری"
+   ],
+   "lang": "ur",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {
+    "آپ": {
+     "other_reading": 0.64,
+     "rules": [
+      "require_pos"
+     ]
+    }
+   },
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": 0.3252,
+     "forms": 37,
+     "sentences": 535
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Urdu-UDTB",
+    "unimorph": "urd"
+   },
+   "stanza": "ur"
+  },
+  "vi": {
+   "decompose": false,
+   "gate": {
+    "flags": [
+     "no_unimorph"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "avoided"
+   },
+   "lang": "vi",
+   "levels": {},
+   "measurements": null,
+   "route": "ending",
+   "sources": {
+    "subtitles": "hermitdave/FrequencyWords 2018 50k",
+    "treebank": "UD_Vietnamese-VTB",
+    "unimorph": null
+   },
+   "stanza": "vi"
+  },
+  "zh": {
+   "dropped": {},
+   "formal": [],
+   "formal_source": "second person plural",
+   "gate": {
+    "flags": [
+     "needs_model_list",
+     "no_subtitle_list",
+     "no_unimorph"
+    ],
+    "treebank_informal_forms": 0,
+    "unimorph_polite": false,
+    "wals": "binary"
+   },
+   "informal": [],
+   "lang": "zh",
+   "list_source": null,
+   "measurements": null,
+   "restrictions": {},
+   "route": "pronoun",
+   "signals": {
+    "lookup": {
+     "enabled": false,
+     "fa": null,
+     "forms": 0
+    },
+    "pronoun_list": false,
+    "tagger": {
+     "enabled": false,
+     "n": 0,
+     "precision": null,
+     "recall": null
+    }
+   },
+   "sources": {
+    "subtitles": null,
+    "treebank": "UD_Chinese-GSDSimp",
+    "unimorph": null
+   },
+   "stanza": "zh-hans"
+  }
+ },
+ "thresholds": {
+  "KEEP": 0.9,
+  "MAX_ENDING": 9,
+  "MAX_FA": 0.01,
+  "MAX_LEVEL_OVERLAP": 0.001,
+  "MAX_OTHER_READING": 0.3,
+  "MAX_PLURAL_READING": 0.2,
+  "MIN_ENDING_N": 8,
+  "MIN_ENDING_P": 0.95,
+  "MIN_LEVEL_COVERAGE": 0.8,
+  "MIN_LIST": 3,
+  "MIN_SHARE": 0.01,
+  "MIN_SUB_FREQ": 5e-06,
+  "MIN_TAGGER_N": 50,
+  "MIN_TAGGER_P": 0.95,
+  "MIN_TB_COUNT": 2,
+  "PURITY": 0.99
+ }
+}

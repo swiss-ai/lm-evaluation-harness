@@ -1,0 +1,3 @@
+include: _default_template_yaml
+task: ifeval_multilingual_ar
+dataset_name: ar

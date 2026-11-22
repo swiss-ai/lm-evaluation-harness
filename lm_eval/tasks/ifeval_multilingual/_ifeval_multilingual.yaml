@@ -1,0 +1,28 @@
+group: ifeval_multilingual
+task:
+  - ifeval_multilingual_ar
+  - ifeval_multilingual_de
+  - ifeval_multilingual_el
+  - ifeval_multilingual_es
+  - ifeval_multilingual_fr
+  - ifeval_multilingual_hi
+  - ifeval_multilingual_ja
+  - ifeval_multilingual_ko
+  - ifeval_multilingual_pl
+  - ifeval_multilingual_sr
+  - ifeval_multilingual_zh
+aggregate_metric_list:
+  - metric: prompt_level_strict_acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: inst_level_strict_acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: prompt_level_loose_acc
+    aggregation: mean
+    weight_by_size: false
+  - metric: inst_level_loose_acc
+    aggregation: mean
+    weight_by_size: false
+metadata:
+  version: 1.0

@@ -1,0 +1,3 @@
+include: _default_template_yaml
+task: ifeval_multilingual_pl
+dataset_name: pl
