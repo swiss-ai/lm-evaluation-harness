@@ -40,8 +40,7 @@ lm_eval --model apertus2-completions \
 3. **Response.** Parse think, reply, call and claim messages. Score the reply,
    cut at the first task `until` string (or, with `answer_frame=claim`, the last
    claim; see [model arguments](#model-arguments)); append tool calls as OpenAI JSON
-   after `TOOL_CALLS_MARKER`, matching `local-chat-completions`
-   (`bfcl_v3_fc` works unchanged). Truncated replies keep their partial answer;
+   after `TOOL_CALLS_MARKER`, matching `local-chat-completions`. Truncated replies keep their partial answer;
    truncated thinking yields an empty answer. A closing output token omitted
    by the server is restored only when `finish_reason=stop` and `stop_reason`
    identifies that token; raw output logging remains unchanged.
@@ -69,7 +68,7 @@ truncated answer.
 ## Multi-turn reasoning replay
 
 The Apertus 2 profile keeps every earlier think in context ("Context and Memory
-Policy"). Multi-turn tasks (e.g. `bfcl_v3_fc` multi-turn,
+Policy"). Multi-turn tasks (e.g.
 `realguardrails_s_rules`) store only content and tool calls, so the model
 restores its own reasoning:
 
@@ -112,7 +111,7 @@ On harness side the budget comes from, highest first:
 
 1. A task's `max_tokens` gen kwarg (no suite task sets one)
 2. `--gen_kwargs max_gen_toks=N`, applied to every task
-3. The task's `max_gen_toks` (BFCL raises it to at least 2048)
+3. The task's `max_gen_toks` (a task may raise it)
 4. The `max_gen_toks` model argument (default 256)
 
 Task budgets assume direct answers (`arc_challenge_chat` 100, `ifeval` 1280).
@@ -183,7 +182,7 @@ result saving.
 
 - Replayed thinks precede the reply and calls of their response; a response
   that interleaved them is reordered. Replay lengthens prompts, so more
-  requests may be clamped or skipped (e.g. BFCL long context).
+  requests may be clamped or skipped (e.g. long-context tasks).
 - Claims are scored only with `answer_frame=claim`; tool calls are then not part
   of the answer.
 - `--use_cache` keys ignore the model: use one cache path per model

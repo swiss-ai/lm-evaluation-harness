@@ -26,7 +26,7 @@ from lm_eval.api.task import ConfigurableTask
 from lm_eval.evaluator import evaluate
 from lm_eval.models.apertus2 import _REQUEST as REQUEST, Apertus2Completions
 from lm_eval.models.api_models import JsonChatStr, rollout_seed
-from lm_eval.tasks.bfcl_v3.task import _fc_calls, _split_tool_calls
+from lm_eval.models.openai_completions import TOOL_CALLS_MARKER
 
 
 PREFIX = "The best answer is"
@@ -462,7 +462,12 @@ def test_thinking_lengths_need_well_formed_output(synthetic):
     assert "thinking_length_chars" not in info
 
 
-def test_tool_calls_follow_the_marker_for_bfcl(synthetic):
+def _split_tool_calls(text):
+    content, marker, payload = (text or "").partition(TOOL_CALLS_MARKER)
+    return content, json.loads(payload) if marker else []
+
+
+def test_tool_calls_follow_the_marker(synthetic):
     model = make(synthetic)
     enc = model.encoding
     call = lib.Call(name="get_weather", counter=0, payload='{"city":"Bern"}')
@@ -472,8 +477,8 @@ def test_tool_calls_follow_the_marker_for_bfcl(synthetic):
     result, _ = run(model, [with_tools, without], [reply, reply])
     content, calls = _split_tool_calls(result[0])
     assert content == "" and calls[0]["id"] == "apertus_0"
-    functions = [{"name": "get_weather"}]
-    assert _fc_calls(calls, functions) == [{"get_weather": {"city": "Bern"}}]
+    assert calls[0]["function"]["name"] == "get_weather"
+    assert json.loads(calls[0]["function"]["arguments"]) == {"city": "Bern"}
     assert result[1] == ""
     assert without.length_info[0]["generation_unexpected_call"] == 1
 
@@ -686,7 +691,7 @@ def test_earlier_reasoning_is_replayed(synthetic):
     second = [lib.Think(payload="It is sunny."), lib.Reply(payload="Sunny.\n")]
     turn0 = chat_request(QUESTION, tools=tools)
     result, sent0 = run(model, [turn0], [answer(enc, *first)])
-    # The history as bfcl_v3_fc builds it: content and calls split at the marker.
+    # A tool-calling task's history: content and calls split at the marker.
     content, calls = _split_tool_calls(result[0])
     history = [
         *QUESTION,
@@ -877,7 +882,7 @@ def test_replay_can_be_disabled(synthetic):
 @pytest.mark.parametrize("num_concurrent", [1, 2])
 def test_reasoning_memory_is_scoped(synthetic, num_concurrent):
     # Conversations with the same history and answer keep their own thinks, e.g.
-    # bfcl_v3_fc miss_func docs, which share their first turn with base docs.
+    # docs that share their first turn with other docs.
     model = make(synthetic, num_concurrent=num_concurrent)
     enc = model.encoding
     names = {

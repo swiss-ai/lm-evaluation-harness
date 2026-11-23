@@ -1527,7 +1527,7 @@ def test_clamp_gen_toks_counts_a_chat_message_list_through_the_template():
 def test_clamp_gen_toks_counts_the_tools_the_server_adds_to_the_prompt():
     # The tools travel as their own field (a JSON string in gen_kwargs); the server puts
     # them into the prompt, so a clamp that counted only the messages left the answer a
-    # budget the real prompt then overflowed (a 400 on every bfcl request).
+    # budget the real prompt then overflowed (a 400 on every tool-calling request).
     api = _clamping_api()
     tools = json.dumps([{"name": "f", "description": "word " * 700}])
     kw = {"max_gen_toks": 500, "tools": tools}
