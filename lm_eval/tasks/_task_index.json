@@ -57912,6 +57912,11 @@
       ],
       "yaml_path": "gpqa/n_shot/gpqa_diamond_n_shot.yaml"
     },
+    "gpqa_diamond_think": {
+      "kind": "TASK",
+      "tags": [],
+      "yaml_path": "gpqa/think/gpqa_diamond_think.yaml"
+    },
     "gpqa_diamond_zeroshot": {
       "kind": "TASK",
       "tags": [
@@ -119501,6 +119506,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16315,
+  "entry_count": 16316,
   "schema_version": 1
 }
