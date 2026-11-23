@@ -42,6 +42,7 @@ None
 * `gpqa_{main, diamond, extended}_generative_n_shot`
 * `gpqa_{main, diamond, extended}_cot_zeroshot`
 * `gpqa_{main, diamond, extended}_cot_n_shot`
+* `gpqa_diamond_think`: for reasoning models. Zero-shot `cot_zeroshot` prompt, sampled at temperature 0.6 / top-p 0.95 with 4 repeats (`max_gen_toks` 131072), reporting score-first, mean@4, maj@4 and pass@4 plus a degeneration rate. The reasoning is stripped before the answer is read, and the choice order is seeded per question. Not part of the `gpqa` tag.
 
 ### Changelog
 
