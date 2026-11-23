@@ -483,6 +483,205 @@ def test_tool_calls_follow_the_marker(synthetic):
     assert without.length_info[0]["generation_unexpected_call"] == 1
 
 
+def test_open_reused_and_unknown_items_are_dropped(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    tools = json.dumps(TOOLS)
+    reused, open_call = (chat_request(CALL_HISTORY, tools=tools) for _ in range(2))
+    odd = chat_request(QUESTION)
+    responses = [
+        answer(enc, lib.Call(name="get_weather", counter=0, payload="{}")),
+        completion(
+            enc,
+            native(
+                enc,
+                lib.Reply(payload="ok"),
+                lib.Call(name="get_weather", counter=1, payload='{"ci', open=True),
+            ),
+            length=True,
+        ),
+        answer(
+            enc,
+            lib.Claim(payload="4"),
+            lib.UnknownOutput(output_type="memo", payload="x"),
+            lib.Reply(payload="4"),
+        ),
+    ]
+    result, _ = run(model, [reused, open_call, odd], responses)
+    assert result == ["", "ok", "4"]
+    assert reused.length_info[0]["generation_call_counter_reused"] == 1
+    assert odd.length_info[0]["generation_has_claim"] == 1
+    assert odd.length_info[0]["generation_unknown_output"] == 1
+
+
+def test_claim_frame_is_the_answer_when_asked(synthetic):
+    model = make(synthetic, answer_frame="claim")
+    enc = model.encoding
+    claimed, unclaimed, cut = (chat_request(QUESTION) for _ in range(3))
+    responses = [
+        answer(
+            enc,
+            lib.Think(payload="48/2 = 24."),
+            lib.Claim(payload="72"),
+            lib.Reply(payload="The answer is 72."),
+        ),
+        answer(enc, lib.Think(payload="48/2 = 24."), lib.Reply(payload="72")),
+        completion(
+            enc,
+            native(
+                enc,
+                lib.Think(payload="48/2 = 24."),
+                lib.Claim(payload="72"),
+                lib.Reply(payload="The answer", open=True),
+            ),
+            length=True,
+        ),
+    ]
+    result, _ = run(model, [claimed, unclaimed, cut], responses)
+    # As the RL math reward: the claim, nothing without one or after a cut.
+    assert result == ["72", "", ""]
+    assert claimed.length_info[0]["generation_has_claim"] == 1
+    assert unclaimed.length_info[0]["generation_has_claim"] == 0
+    assert claimed.length_info[0]["response_length_words"] == 3 + 4
+
+
+def test_reply_frame_is_the_default(synthetic):
+    model = make(synthetic)
+    enc = model.encoding
+    reply = answer(
+        enc,
+        lib.Think(payload="t"),
+        lib.Claim(payload="72"),
+        lib.Reply(payload="The answer is 72."),
+    )
+    result, _ = run(model, [chat_request(QUESTION)], [reply])
+    assert result == ["The answer is 72."]
+
+
+# Prefill
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+def test_after_think_prefill_continues_the_reply(synthetic, with_ids):
+    model = make(synthetic, return_token_ids=with_ids)
+    enc = model.encoding
+    instance = chat_request(PREFILLED, until=["."], max_gen_toks=200)
+    first = phase_one(enc, with_ids=with_ids)
+    first["usage"] = {"completion_tokens": 150}
+    second = enc.encode_text(" B.") + [enc.controls.output_end]
+    responses = [
+        first,
+        completion(enc, second, stop=enc.controls.wait, with_ids=with_ids),
+    ]
+    result, sent = run(model, [instance], responses)
+    assert result == [" B"]
+    assert sent[0]["prompt"].endswith("<|in|>user<|hdr|>Q?<|/in|>")
+    assert sent[0]["stop_token_ids"] == [enc.controls.output_end, enc.controls.wait]
+    assert sent[1]["stop_token_ids"] == [enc.controls.wait]
+    assert sent[1]["prompt"].endswith(
+        f"<|out|>think<|hdr|>B fits.<|/out|><|out|>reply<|hdr|>{PREFIX}"
+    )
+    assert sent[1]["seed"] != sent[0]["seed"]  # no replay of the think's noise
+    if with_ids:  # phase two stays within phase one's prompt + budget
+        total = server_len(synthetic, sent[0]["prompt"]) + 200
+        assert server_len(synthetic, sent[1]["prompt"]) + sent[1]["max_tokens"] == total
+    else:  # without token IDs, the reported usage counts phase one's tokens
+        assert sent[1]["max_tokens"] == 200 - 150
+    info = instance.length_info[0]
+    assert info["generation_prefill_skipped"] == 0
+    assert info["thinking_format_correct"] == 1
+    assert info["response_length_chars"] == len("B fits.") + len(" B.")
+
+
+@pytest.mark.parametrize("with_ids", [True, False])
+def test_after_think_prefill_skipped_cut_or_out_of_budget(synthetic, with_ids):
+    model = make(synthetic)
+    enc = model.encoding
+    skipped, cut, malformed = (chat_request(PREFILLED) for _ in range(3))
+    used = len(phase_one(enc)["choices"][0]["token_ids"])
+    exhausted = chat_request(PREFILLED, max_gen_toks=used)
+    responses = [
+        completion(
+            enc,
+            native(enc, lib.Reply(payload="D"))[:-1],
+            stop=enc.controls.output_end,
+            with_ids=with_ids,
+        ),
+        completion(
+            enc,
+            native(enc, lib.Think(payload="t", open=True)),
+            length=True,
+            with_ids=with_ids,
+        ),
+        phase_one(enc, with_ids=with_ids),
+        {},
+        phase_one(enc, with_ids=with_ids),
+    ]
+    result, sent = run(model, [skipped, cut, malformed, exhausted], responses)
+    assert result == ["D", "", "", ""] and len(sent) == 5
+    assert skipped.length_info[0]["generation_prefill_skipped"] == 1
+    assert malformed.length_info[0]["generation_parse_failed"] == 1
+    assert cut.length_info[0]["generation_think_truncated"] == 1
+    # The budget ran out after a closed think: truncated, but not in thinking.
+    info = exhausted.length_info[0]
+    assert info["generation_truncated"] == 1
+    assert info["generation_think_truncated"] == 0
+    assert info["thinking_format_has_close"] == 1
+
+
+def test_failed_phase_two_retries_the_generation(synthetic):
+    model = make(synthetic, max_retries=2)
+    enc = model.encoding
+    second = completion(
+        enc, enc.encode_text(" C") + [enc.controls.output_end], stop=enc.controls.wait
+    )
+    responses = [phase_one(enc), ConnectionError("lost"), phase_one(enc), second]
+    with patch("tenacity.nap.time.sleep"):
+        result, sent = run(model, [chat_request(PREFILLED)], responses)
+    assert result == [" C"] and len(sent) == 4
+
+
+def test_empty_think_prefill_keeps_code_indentation(synthetic):
+    model = make(synthetic, prefill="empty_think")
+    enc = model.encoding
+    prompt = "def f(x):\n"
+    prefix = f"Here is the completed function:\n```python\n{prompt}\n"
+    instance = chat_request(
+        [*QUESTION, {"role": "assistant", "content": prefix}], until=["\n```"]
+    )
+    ids = enc.encode_text("    return x + 1\n```\nDone.") + [enc.controls.output_end]
+    result, sent = run(
+        model, [instance], [completion(enc, ids, stop=enc.controls.wait)]
+    )
+    assert len(sent) == 1 and result == ["    return x + 1"]
+    assert sent[0]["prompt"].endswith(
+        f"<|/in|><|out|>think<|hdr|><|/out|><|out|>reply<|hdr|>{prefix}"
+    )
+    assert sent[0]["stop_token_ids"] == [enc.controls.wait]
+    assert instance.length_info[0]["thinking_format_has_open"] == 0
+
+
+def test_async_path_runs_both_prefill_phases(synthetic):
+    model = make(synthetic, num_concurrent=2)
+    enc = model.encoding
+    second = completion(
+        enc, enc.encode_text(" C") + [enc.controls.output_end], stop=enc.controls.wait
+    )
+    replies = iter([phase_one(enc), second])
+    sent = []
+
+    async def fake_post(session, payload):
+        sent.append(payload)
+        return next(replies)
+
+    with patch.object(model, "_apost", side_effect=fake_post):
+        assert model.generate_until([chat_request(PREFILLED)]) == [" C"]
+    assert len(sent) == 2 and all(REQUEST not in p for p in sent)
+
+
+# Multi-turn reasoning replay
+
+
 def test_earlier_reasoning_is_replayed(synthetic):
     model = make(synthetic)
     enc = model.encoding
@@ -492,7 +691,7 @@ def test_earlier_reasoning_is_replayed(synthetic):
     second = [lib.Think(payload="It is sunny."), lib.Reply(payload="Sunny.\n")]
     turn0 = chat_request(QUESTION, tools=tools)
     result, sent0 = run(model, [turn0], [answer(enc, *first)])
-    # The history as a tool-calling task builds it: content and calls split at the marker.
+    # A tool-calling task's history: content and calls split at the marker.
     content, calls = _split_tool_calls(result[0])
     history = [
         *QUESTION,
