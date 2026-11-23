@@ -3,7 +3,19 @@
 Loads the dataset straight from the Hugging Face Hub (config = language pair,
 e.g. ``en-de_DE``), drops the canary row and segments flagged ``is_bad_source``,
 and builds the same translation prompt as ``wmt_translation``.
+
+BLEU tokenizes with sacrebleu's default ``13a``, which splits on spaces: for
+Japanese and Chinese, written without them, a whole sentence is one token and
+BLEU is close to 0 whatever the translation. Their tasks aggregate BLEU with
+sacrebleu's own tokenizers instead (``bleu_ja``: ``ja-mecab``; ``bleu_zh``:
+``zh``), as in WMT's own scoring. ``ja-mecab`` needs MeCab
+(``pip install lm_eval[wmt24pp]``, i.e. ``sacrebleu[ja]``); a Japanese task
+checks for it when its documents load, before anything is generated. chrF works
+on characters and is the same for every language.
 """
+
+from lm_eval.api.metrics import _sacreformat
+
 
 LANG_NAMES = {
     "en": "English",
@@ -151,8 +163,46 @@ def _make_prompt(src, src_lang, tgt_lang):
     )
 
 
+# Target language (the part before the locale) -> sacrebleu tokenizer for BLEU.
+BLEU_TOKENIZERS = {"ja": "ja-mecab", "zh": "zh"}
+
+
+def _corpus_bleu(items, tokenize):
+    import sacrebleu
+
+    refs, preds = zip(*items)
+    refs, preds = _sacreformat(refs, preds)
+    return sacrebleu.corpus_bleu(preds, refs, tokenize=tokenize).score
+
+
+def bleu_ja(items):
+    return _corpus_bleu(items, BLEU_TOKENIZERS["ja"])
+
+
+def bleu_zh(items):
+    return _corpus_bleu(items, BLEU_TOKENIZERS["zh"])
+
+
+def require_bleu_tokenizer(tgt_lang):
+    """Fail now, not after generation, when the language's BLEU tokenizer cannot run."""
+    tokenize = BLEU_TOKENIZERS.get(tgt_lang.split("_")[0])
+    if tokenize is None:
+        return
+    import sacrebleu
+
+    try:
+        sacrebleu.corpus_bleu(["テスト"], [["テスト"]], tokenize=tokenize)
+    except Exception as exc:
+        raise RuntimeError(
+            f"WMT24++ BLEU for {tgt_lang} uses sacrebleu's {tokenize!r} tokenizer, which "
+            f"cannot run here ({exc}); install lm_eval[wmt24pp] (sacrebleu[ja])"
+        ) from exc
+
+
 def process_docs(dataset):
     dataset = dataset.filter(lambda d: not d["is_bad_source"])
+    if len(dataset):
+        require_bleu_tokenizer(dataset[0]["lp"].split("-", 1)[1])
 
     def _add_prompt(doc):
         src_lang, tgt_lang = doc["lp"].split("-", 1)

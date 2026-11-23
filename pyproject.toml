@@ -96,6 +96,8 @@ math = ["sympy>=1.12", "antlr4-python3-runtime==4.11", "math_verify[antlr4_11_0]
 multilingual = ["nagisa>=0.2.7", "jieba>=0.42.1", "pycountry"]
 ruler = ["nltk", "wonderwords", "scipy"]
 wmt_translation = ["subset2evaluate", "unbabel-comet"]
+# BLEU for WMT24++ Japanese (ja-mecab: mecab-python3 + ipadic)
+wmt24pp = ["sacrebleu[ja]>=2.0"]
 # SystemCheck / RealGuardrails single-turn sub-suites. `openai` powers the
 # OpenAI-compatible `local-chat-completions` backend used to serve models
 # for these tasks; the IFEval verifier registry powers S-IFEval.
@@ -123,6 +125,7 @@ tasks = [
     "lm_eval[multilingual]",
     "lm_eval[ruler]",
     "lm_eval[wmt_translation]",
+    "lm_eval[wmt24pp]",
 ]
 
 [dependency-groups]
