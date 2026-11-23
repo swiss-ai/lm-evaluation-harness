@@ -93,7 +93,7 @@ class LocalCompletionsAPI(TemplateAPI):
         # explicit template override.
         #
         # Extra kwargs come from tasks that render tool schemas into the prompt
-        # (e.g. bfcl_v3_apertus passes tools=[...]).
+        # (e.g. a task passing tools=[...]).
         if self.tokenizer_backend == "huggingface":
             full = self.tokenizer.apply_chat_template(
                 chat_history,

@@ -3,8 +3,7 @@
 `output_type: multi_turn_generate` is a task-level capability for
 **multi-turn benchmarks** — datasets where the model must respond to a
 sequence of turns, with each generation conditioned on the model's own
-prior responses. It powers MT-Bench (turn 1 + turn 2), BFCL v3's
-multi-turn function-calling categories, and the S-RuLES sub-suite of
+prior responses. It powers MT-Bench (turn 1 + turn 2) and the S-RuLES sub-suite of
 `realguardrails`, and is the foundation for further multi-turn suites
 (SysBench, Multi-IF turns 2-3, MT-Eval, …).
 
@@ -49,8 +48,8 @@ short.
 
 The driver consults these five hooks. The task owns its episode state
 (any object it likes) and returns the next **fully-rendered** prompt, so
-agentic tasks — e.g. BFCL, which issues several model calls per user turn
-and feeds tool-execution results back into the conversation — are
+agentic tasks — which issue several model calls per user turn
+and feed tool-execution results back into the conversation — are
 expressible.
 
 ```python
@@ -75,8 +74,7 @@ def multiturn_result(self, state):
 
 `chat_template` is the model's `lm.apply_chat_template` callable (or
 `None` if `--apply_chat_template` was not passed); the task renders its
-own history with it. See `lm_eval/tasks/bfcl_v3/task.py` and
-`lm_eval/tasks/mt_bench/task.py` for worked examples.
+own history with it. See `lm_eval/tasks/mt_bench/task.py` for a worked example.
 
 ### Scripted convenience hooks
 
@@ -144,7 +142,7 @@ Key properties:
   task.
 
 `MAX_MULTITURN_STEPS` is a per-task class attribute (a defensive cap;
-MT-Bench sets `2`, BFCL `128`, the default is `64`). It also bounds the
+MT-Bench sets `2`, the default is `64`). It also bounds the
 number of waves for agentic tasks that issue multiple model calls per
 user turn.
 
@@ -279,8 +277,7 @@ paper-comparison scripts that assume one string per doc need updating.
 
    For an **agentic** benchmark (multiple model calls per turn, tool
    execution, custom rendering), override the five core hooks instead and
-   keep whatever episode state object you need. See
-   `lm_eval/tasks/bfcl_v3/task.py`.
+   keep whatever episode state object you need.
 
 3. **`process_results(doc, results)`.** `results[0]` is the object your
    `multiturn_result` returned (for scripted tasks, the list of assistant
@@ -307,7 +304,7 @@ paper-comparison scripts that assume one string per doc need updating.
 + `lm_eval/evaluator.py` — `run_multi_turn_rollout` driver + dispatch.
 + `lm_eval/config/task.py` — multi-turn default `generation_kwargs` (`until=[]`)
   and CLI `--gen_kwargs` override.
-+ Tasks: `lm_eval/tasks/mt_bench/`, `lm_eval/tasks/bfcl_v3/`,
++ Tasks: `lm_eval/tasks/mt_bench/`,
   `lm_eval/tasks/realguardrails/s_rules/`.
 + Tests: `tests/test_multiturn.py`, `tests/test_mt_bench.py`,
-  `tests/test_bfcl_v3.py`, `tests/test_s_rules.py`.
+  `tests/test_s_rules.py`.

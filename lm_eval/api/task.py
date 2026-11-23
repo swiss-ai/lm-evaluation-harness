@@ -328,7 +328,7 @@ class Task(abc.ABC):
     # The evaluator's ``run_multi_turn_rollout`` driver consults these five
     # hooks. They are the general (state-machine) contract: the task owns
     # episode state and returns the next fully-rendered prompt, so agentic
-    # tasks (e.g. BFCL's tool-execution loop) that issue several model calls
+    # tasks (e.g. a tool-execution loop) that issue several model calls
     # per user turn are expressible. ``ConfigurableTask`` provides convenience
     # implementations of all five that delegate to the simpler scripted hooks
     # (``build_initial_messages`` / ``next_user_turn`` / ``should_stop``), so
@@ -1533,7 +1533,7 @@ class ConfigurableTask(Task):
     # scripted episode through these methods, so the evaluator's
     # ``run_multi_turn_rollout`` driver only ever sees the core contract.
     # Agentic tasks that issue several model calls per user turn (e.g.
-    # BFCL) override the core hooks directly and ignore these three.
+    # tool-execution loops) override the core hooks directly and ignore these three.
 
     def build_initial_messages(self, doc: dict) -> list[Message]:
         """Return the conversation prefix BEFORE any model generation.
@@ -1592,7 +1592,7 @@ class ConfigurableTask(Task):
     # =========================================================================
     # Concrete implementations of the five core hooks (declared abstract on
     # ``Task``) that drive a scripted episode via the three convenience hooks
-    # above. A task that overrides the core hooks (e.g. BFCL) bypasses these.
+    # above. A task that overrides the core hooks (e.g. a tool-execution loop) bypasses these.
 
     def init_multiturn_state(
         self,

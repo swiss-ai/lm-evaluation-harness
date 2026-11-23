@@ -4,7 +4,7 @@
 for scripted multi-turn tasks (those that override ``build_initial_messages`` /
 ``next_user_turn`` / ``should_stop`` rather than the core ``multiturn_*`` hooks).
 The evaluator's ``run_multi_turn_rollout`` driver treats episode state opaquely,
-so agentic tasks (e.g. BFCL) may use their own state object instead.
+so agentic tasks (e.g. tool-execution loops) may use their own state object instead.
 
 Standalone module to avoid the ``api.task`` ↔ ``evaluator`` import cycle.
 """

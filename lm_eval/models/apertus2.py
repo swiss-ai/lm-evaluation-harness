@@ -127,7 +127,7 @@ def _history_answer(message: dict) -> str | None:
     """The answer an assistant history message was built from, stripped.
 
     Tasks store the returned answer verbatim (or stripped), or split at
-    ``TOOL_CALLS_MARKER`` into content and parsed tool calls (BFCL).
+    ``TOOL_CALLS_MARKER`` into content and parsed tool calls.
     """
     content = message.get("content")
     if content is not None and not isinstance(content, str):
