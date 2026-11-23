@@ -1592,7 +1592,7 @@ class ConfigurableTask(Task):
     # =========================================================================
     # Concrete implementations of the five core hooks (declared abstract on
     # ``Task``) that drive a scripted episode via the three convenience hooks
-    # above. A task that overrides the core hooks (e.g. a tool-execution loop) bypasses these.
+    # above. A task that overrides the core hooks (e.g. a tool loop) bypasses these.
 
     def init_multiturn_state(
         self,
