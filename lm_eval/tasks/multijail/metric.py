@@ -5,6 +5,7 @@ import time
 
 import requests
 
+from lm_eval.api.judge_guard import check_judge_failures
 from lm_eval.api.model_resolver import get_judge_model
 from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
@@ -178,20 +179,26 @@ def harmfulness_score(doc, predictions, **kwargs):
 # ============================================================================
 
 
-def safe_agg(items, max_workers=16):
+def _agg(key, items, max_workers):
     results = _run_all(items, max_workers)
-    scores = [r["safe"] for r in results if r["safe"] is not None]
+    scores = [r[key] for r in results if r[key] is not None]
     print(f"Got {len(scores)} valid scores out of {len(items)} items.")
-    return sum(scores) / len(scores) if scores else 0
+    check_judge_failures(
+        "multijail",
+        os.getenv("MULTIJAIL_JUDGE_MODEL", DEFAULT_MODEL_NAME),
+        len(scores),
+        len(items),
+    )
+    return sum(scores) / len(scores)
+
+
+def safe_agg(items, max_workers=16):
+    return _agg("safe", items, max_workers)
 
 
 def invalid_agg(items, max_workers=16):
-    results = _run_all(items, max_workers)
-    scores = [r["invalid"] for r in results if r["invalid"] is not None]
-    return sum(scores) / len(scores) if scores else 0
+    return _agg("invalid", items, max_workers)
 
 
 def unsafe_agg(items, max_workers=16):
-    results = _run_all(items, max_workers)
-    scores = [r["unsafe"] for r in results if r["unsafe"] is not None]
-    return sum(scores) / len(scores) if scores else 0
+    return _agg("unsafe", items, max_workers)

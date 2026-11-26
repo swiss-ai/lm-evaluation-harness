@@ -4,6 +4,7 @@ import time
 
 import requests
 
+from lm_eval.api.judge_guard import check_judge_failures
 from lm_eval.api.model_resolver import get_judge_model
 from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
@@ -133,10 +134,12 @@ def harmfulness_agg(items, max_workers=16):
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         scores = list(executor.map(_call_judge, items))
     valid_scores = [s for s in scores if s is not None]
-
-    if not valid_scores:
-        print("WARNING: No valid scores obtained from judges, returning 0.")
-        return 0
+    check_judge_failures(
+        "aya_redteaming",
+        os.getenv("AYA_REDTEAMING_JUDGE_MODEL", DEFAULT_MODEL_NAME),
+        len(valid_scores),
+        len(items),
+    )
     if len(valid_scores) < len(items):
         print(
             f"WARNING: Only {len(valid_scores)}/{len(items)} valid scores obtained from judges, ignoring failed calls."
