@@ -1,0 +1,5 @@
+include: _wmt24pp_metricx_yaml
+task: wmt24pp_metricx_en-fi_FI
+dataset_name: en-fi_FI
+tag:
+- wmt24pp_metricx

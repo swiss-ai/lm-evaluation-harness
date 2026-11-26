@@ -1,0 +1,5 @@
+include: _wmt24pp_metricx_yaml
+task: wmt24pp_metricx_en-ta_IN
+dataset_name: en-ta_IN
+tag:
+- wmt24pp_metricx
