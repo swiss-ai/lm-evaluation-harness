@@ -168,3 +168,26 @@ def test_launched_model_match_ignores_other_models_and_ambiguity():
 
     assert model_resolver._select_hosted_model(base, preferred, other) == preferred
     assert model_resolver._select_hosted_model(base, preferred, two) == preferred
+
+
+INFERENCE_API_BASE = "https://api.inference.cscs.ch/v1"
+
+
+def test_inference_endpoint_resolves_its_unscoped_model():
+    with patch(
+        "lm_eval.api.model_resolver._hosted_model_ids",
+        return_value=("google/gemma-4-31B-it", "swiss-ai/Apertus-v1.5-8B"),
+    ):
+        resolved = resolve_judge_model(
+            "google/gemma-4-31B-it", api_base=INFERENCE_API_BASE
+        )
+
+    assert resolved == "google/gemma-4-31B-it"
+
+
+def test_judge_api_base_env_replaces_the_default(monkeypatch):
+    default = CSCS_API_BASE
+    monkeypatch.delenv("JUDGE_API_BASE", raising=False)
+    assert model_resolver.judge_api_base(default) == default
+    monkeypatch.setenv("JUDGE_API_BASE", INFERENCE_API_BASE + "/")
+    assert model_resolver.judge_api_base(default) == INFERENCE_API_BASE

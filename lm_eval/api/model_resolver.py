@@ -19,6 +19,7 @@ CSCS_PROVIDER_PREFIX = "CSCS-Inference"
 JUDGE_MODEL_PREFIX_ENV = "JUDGE_MODEL_PREFIX"
 JUDGE_MODEL_DISCOVERY_ENV = "LM_EVAL_JUDGE_MODEL_DISCOVERY"
 JUDGE_MODEL_DISCOVERY_TIMEOUT_ENV = "LM_EVAL_JUDGE_MODEL_DISCOVERY_TIMEOUT"
+JUDGE_API_BASE_ENV = "JUDGE_API_BASE"
 
 _RESOLUTION_CACHE: dict[tuple[str, str, str, str, str], str] = {}
 _RESOLUTION_LOCK = threading.Lock()
@@ -29,6 +30,25 @@ def _is_cscs_endpoint(api_base: str | None) -> bool:
         return False
     hostname = (urlparse(api_base).hostname or "").lower()
     return hostname == "cscs.ch" or hostname.endswith(".cscs.ch")
+
+
+# Endpoints whose /models lists callable models by their plain name
+# (api.inference.cscs.ch: "google/gemma-4-31B-it"); on the older gateway an unscoped
+# listing is not what to call.
+UNSCOPED_ENDPOINTS = {"api.inference.cscs.ch"}
+
+
+def _serves_unscoped(api_base: str | None) -> bool:
+    return (urlparse(api_base or "").hostname or "").lower() in UNSCOPED_ENDPOINTS
+
+
+def judge_api_base(default: str) -> str:
+    """The OpenAI-compatible endpoint a task's judge is called at.
+
+    ``JUDGE_API_BASE`` (e.g. ``https://api.inference.cscs.ch/v1``) replaces the task's
+    default for every task that reads it; the key is still ``CSCS_SERVING_API``.
+    """
+    return (os.getenv(JUDGE_API_BASE_ENV) or default).strip().rstrip("/")
 
 
 def _username() -> str:
@@ -104,12 +124,15 @@ def _select_hosted_model(
     configured_model: str,
     preferred_model: str,
     hosted_models: tuple[str, ...],
+    unscoped_ok: bool = False,
 ) -> str:
     base_model = configured_model
     candidates = [
         preferred_model,
         f"{CSCS_PROVIDER_PREFIX}/{base_model}",
     ]
+    if unscoped_ok:
+        candidates.append(base_model)
 
     for candidate in dict.fromkeys(candidates):
         if candidate in hosted_models:
@@ -196,6 +219,7 @@ def resolve_judge_model(
                 configured_model,
                 preferred_model,
                 hosted_models,
+                unscoped_ok=_serves_unscoped(api_base),
             )
         except Exception as exc:  # noqa: BLE001 - discovery must not block judging.
             eval_logger.warning(
