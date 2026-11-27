@@ -118151,6 +118151,452 @@
       ],
       "yaml_path": "wmt_translation/wmt24pp_en-zu_ZA.yaml"
     },
+    "wmt24pp_metricx": {
+      "kind": "GROUP",
+      "tags": [
+        "wmt24pp_metricx_en-ar_EG",
+        "wmt24pp_metricx_en-ar_SA",
+        "wmt24pp_metricx_en-bg_BG",
+        "wmt24pp_metricx_en-bn_IN",
+        "wmt24pp_metricx_en-ca_ES",
+        "wmt24pp_metricx_en-cs_CZ",
+        "wmt24pp_metricx_en-da_DK",
+        "wmt24pp_metricx_en-de_DE",
+        "wmt24pp_metricx_en-el_GR",
+        "wmt24pp_metricx_en-es_MX",
+        "wmt24pp_metricx_en-et_EE",
+        "wmt24pp_metricx_en-fa_IR",
+        "wmt24pp_metricx_en-fi_FI",
+        "wmt24pp_metricx_en-fil_PH",
+        "wmt24pp_metricx_en-fr_CA",
+        "wmt24pp_metricx_en-fr_FR",
+        "wmt24pp_metricx_en-gu_IN",
+        "wmt24pp_metricx_en-he_IL",
+        "wmt24pp_metricx_en-hi_IN",
+        "wmt24pp_metricx_en-hr_HR",
+        "wmt24pp_metricx_en-hu_HU",
+        "wmt24pp_metricx_en-id_ID",
+        "wmt24pp_metricx_en-is_IS",
+        "wmt24pp_metricx_en-it_IT",
+        "wmt24pp_metricx_en-ja_JP",
+        "wmt24pp_metricx_en-kn_IN",
+        "wmt24pp_metricx_en-ko_KR",
+        "wmt24pp_metricx_en-lt_LT",
+        "wmt24pp_metricx_en-lv_LV",
+        "wmt24pp_metricx_en-ml_IN",
+        "wmt24pp_metricx_en-mr_IN",
+        "wmt24pp_metricx_en-nl_NL",
+        "wmt24pp_metricx_en-no_NO",
+        "wmt24pp_metricx_en-pa_IN",
+        "wmt24pp_metricx_en-pl_PL",
+        "wmt24pp_metricx_en-pt_BR",
+        "wmt24pp_metricx_en-pt_PT",
+        "wmt24pp_metricx_en-ro_RO",
+        "wmt24pp_metricx_en-ru_RU",
+        "wmt24pp_metricx_en-sk_SK",
+        "wmt24pp_metricx_en-sl_SI",
+        "wmt24pp_metricx_en-sr_RS",
+        "wmt24pp_metricx_en-sv_SE",
+        "wmt24pp_metricx_en-sw_KE",
+        "wmt24pp_metricx_en-sw_TZ",
+        "wmt24pp_metricx_en-ta_IN",
+        "wmt24pp_metricx_en-te_IN",
+        "wmt24pp_metricx_en-th_TH",
+        "wmt24pp_metricx_en-tr_TR",
+        "wmt24pp_metricx_en-uk_UA",
+        "wmt24pp_metricx_en-ur_PK",
+        "wmt24pp_metricx_en-vi_VN",
+        "wmt24pp_metricx_en-zh_CN",
+        "wmt24pp_metricx_en-zh_TW",
+        "wmt24pp_metricx_en-zu_ZA"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx.yaml"
+    },
+    "wmt24pp_metricx_en-ar_EG": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ar_EG.yaml"
+    },
+    "wmt24pp_metricx_en-ar_SA": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ar_SA.yaml"
+    },
+    "wmt24pp_metricx_en-bg_BG": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-bg_BG.yaml"
+    },
+    "wmt24pp_metricx_en-bn_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-bn_IN.yaml"
+    },
+    "wmt24pp_metricx_en-ca_ES": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ca_ES.yaml"
+    },
+    "wmt24pp_metricx_en-cs_CZ": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-cs_CZ.yaml"
+    },
+    "wmt24pp_metricx_en-da_DK": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-da_DK.yaml"
+    },
+    "wmt24pp_metricx_en-de_DE": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-de_DE.yaml"
+    },
+    "wmt24pp_metricx_en-el_GR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-el_GR.yaml"
+    },
+    "wmt24pp_metricx_en-es_MX": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-es_MX.yaml"
+    },
+    "wmt24pp_metricx_en-et_EE": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-et_EE.yaml"
+    },
+    "wmt24pp_metricx_en-fa_IR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-fa_IR.yaml"
+    },
+    "wmt24pp_metricx_en-fi_FI": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-fi_FI.yaml"
+    },
+    "wmt24pp_metricx_en-fil_PH": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-fil_PH.yaml"
+    },
+    "wmt24pp_metricx_en-fr_CA": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-fr_CA.yaml"
+    },
+    "wmt24pp_metricx_en-fr_FR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-fr_FR.yaml"
+    },
+    "wmt24pp_metricx_en-gu_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-gu_IN.yaml"
+    },
+    "wmt24pp_metricx_en-he_IL": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-he_IL.yaml"
+    },
+    "wmt24pp_metricx_en-hi_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-hi_IN.yaml"
+    },
+    "wmt24pp_metricx_en-hr_HR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-hr_HR.yaml"
+    },
+    "wmt24pp_metricx_en-hu_HU": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-hu_HU.yaml"
+    },
+    "wmt24pp_metricx_en-id_ID": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-id_ID.yaml"
+    },
+    "wmt24pp_metricx_en-is_IS": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-is_IS.yaml"
+    },
+    "wmt24pp_metricx_en-it_IT": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-it_IT.yaml"
+    },
+    "wmt24pp_metricx_en-ja_JP": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ja_JP.yaml"
+    },
+    "wmt24pp_metricx_en-kn_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-kn_IN.yaml"
+    },
+    "wmt24pp_metricx_en-ko_KR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ko_KR.yaml"
+    },
+    "wmt24pp_metricx_en-lt_LT": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-lt_LT.yaml"
+    },
+    "wmt24pp_metricx_en-lv_LV": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-lv_LV.yaml"
+    },
+    "wmt24pp_metricx_en-ml_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ml_IN.yaml"
+    },
+    "wmt24pp_metricx_en-mr_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-mr_IN.yaml"
+    },
+    "wmt24pp_metricx_en-nl_NL": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-nl_NL.yaml"
+    },
+    "wmt24pp_metricx_en-no_NO": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-no_NO.yaml"
+    },
+    "wmt24pp_metricx_en-pa_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-pa_IN.yaml"
+    },
+    "wmt24pp_metricx_en-pl_PL": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-pl_PL.yaml"
+    },
+    "wmt24pp_metricx_en-pt_BR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-pt_BR.yaml"
+    },
+    "wmt24pp_metricx_en-pt_PT": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-pt_PT.yaml"
+    },
+    "wmt24pp_metricx_en-ro_RO": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ro_RO.yaml"
+    },
+    "wmt24pp_metricx_en-ru_RU": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ru_RU.yaml"
+    },
+    "wmt24pp_metricx_en-sk_SK": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sk_SK.yaml"
+    },
+    "wmt24pp_metricx_en-sl_SI": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sl_SI.yaml"
+    },
+    "wmt24pp_metricx_en-sr_RS": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sr_RS.yaml"
+    },
+    "wmt24pp_metricx_en-sv_SE": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sv_SE.yaml"
+    },
+    "wmt24pp_metricx_en-sw_KE": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sw_KE.yaml"
+    },
+    "wmt24pp_metricx_en-sw_TZ": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-sw_TZ.yaml"
+    },
+    "wmt24pp_metricx_en-ta_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ta_IN.yaml"
+    },
+    "wmt24pp_metricx_en-te_IN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-te_IN.yaml"
+    },
+    "wmt24pp_metricx_en-th_TH": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-th_TH.yaml"
+    },
+    "wmt24pp_metricx_en-tr_TR": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-tr_TR.yaml"
+    },
+    "wmt24pp_metricx_en-uk_UA": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-uk_UA.yaml"
+    },
+    "wmt24pp_metricx_en-ur_PK": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-ur_PK.yaml"
+    },
+    "wmt24pp_metricx_en-vi_VN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-vi_VN.yaml"
+    },
+    "wmt24pp_metricx_en-zh_CN": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-zh_CN.yaml"
+    },
+    "wmt24pp_metricx_en-zh_TW": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-zh_TW.yaml"
+    },
+    "wmt24pp_metricx_en-zu_ZA": {
+      "kind": "TASK",
+      "tags": [
+        "wmt24pp_metricx"
+      ],
+      "yaml_path": "wmt24pp_chrf/wmt24pp_metricx_en-zu_ZA.yaml"
+    },
     "wmt24pp_translation": {
       "kind": "TAG",
       "tags": [
@@ -119912,6 +120358,6 @@
       "yaml_path": "zhoblimp/you_yige.yaml"
     }
   },
-  "entry_count": 16367,
+  "entry_count": 16423,
   "schema_version": 1
 }
