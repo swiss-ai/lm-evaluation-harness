@@ -20,6 +20,7 @@ JUDGE_MODEL_PREFIX_ENV = "JUDGE_MODEL_PREFIX"
 JUDGE_MODEL_DISCOVERY_ENV = "LM_EVAL_JUDGE_MODEL_DISCOVERY"
 JUDGE_MODEL_DISCOVERY_TIMEOUT_ENV = "LM_EVAL_JUDGE_MODEL_DISCOVERY_TIMEOUT"
 JUDGE_API_BASE_ENV = "JUDGE_API_BASE"
+JUDGE_API_KEY_ENV = "JUDGE_API_KEY"
 
 _RESOLUTION_CACHE: dict[tuple[str, str, str, str, str], str] = {}
 _RESOLUTION_LOCK = threading.Lock()
@@ -40,6 +41,12 @@ UNSCOPED_ENDPOINTS = {"api.inference.cscs.ch"}
 
 def _serves_unscoped(api_base: str | None) -> bool:
     return (urlparse(api_base or "").hostname or "").lower() in UNSCOPED_ENDPOINTS
+
+
+def judge_api_key() -> str | None:
+    """The judges' key: JUDGE_API_KEY when the judge has its own endpoint and key
+    (JUDGE_API_BASE), else CSCS_SERVING_API, the key of the model under test."""
+    return os.getenv(JUDGE_API_KEY_ENV) or os.getenv("CSCS_SERVING_API")
 
 
 def judge_api_base(default: str) -> str:
