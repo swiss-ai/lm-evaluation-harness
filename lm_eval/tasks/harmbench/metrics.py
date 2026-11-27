@@ -14,7 +14,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from lm_eval.api.judge_guard import check_judge_failures
-from lm_eval.api.model_resolver import get_judge_model, judge_api_base
+from lm_eval.api.model_resolver import get_judge_model, judge_api_base, judge_api_key
 from lm_eval.tasks.harmbench.prompt_utils import prepare_prompt
 from lm_eval.tasks.harmbench.remote import (
     CHAT_JUDGE_MAX_TOKENS,
@@ -35,7 +35,7 @@ nlp.max_length = 10000000
 
 # Remote classifier config
 API_URL = judge_api_base("https://api.swissai.svc.cscs.ch/v1")
-API_KEY = os.getenv("CSCS_SERVING_API")
+API_KEY = judge_api_key()
 DEFAULT_MODEL_NAME = "cais/HarmBench-Llama-2-13b-cls"
 MAX_COMPLETION_TOKENS = 512
 LLAMA2_MAX_CONTEXT = 2048

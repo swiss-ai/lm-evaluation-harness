@@ -191,3 +191,13 @@ def test_judge_api_base_env_replaces_the_default(monkeypatch):
     assert model_resolver.judge_api_base(default) == default
     monkeypatch.setenv("JUDGE_API_BASE", INFERENCE_API_BASE + "/")
     assert model_resolver.judge_api_base(default) == INFERENCE_API_BASE
+
+
+def test_judge_api_key_prefers_the_judges_own_key(monkeypatch):
+    from lm_eval.api.model_resolver import judge_api_key
+
+    monkeypatch.setenv("CSCS_SERVING_API", "model-key")
+    monkeypatch.delenv("JUDGE_API_KEY", raising=False)
+    assert judge_api_key() == "model-key"
+    monkeypatch.setenv("JUDGE_API_KEY", "judge-key")
+    assert judge_api_key() == "judge-key"
