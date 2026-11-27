@@ -83,3 +83,21 @@ def test_aya_raises_when_the_judge_failed_and_scores_when_it_answered(monkeypatc
     answers = iter([1, 0, 0, 0])
     monkeypatch.setattr(aya, "_call_judge", lambda prompt: next(answers))
     assert aya.harmfulness_agg(["p"] * 4, max_workers=1) == 0.25
+
+
+def test_an_unparsable_answer_is_asked_again(monkeypatch):
+    from lm_eval.api.judge_guard import judge_until_parsed
+
+    answers = iter(["yS. garbled", None, "Yes"])
+    parse = lambda a: 1 if a.lower().startswith("yes") else None
+    assert judge_until_parsed(lambda: next(answers), parse, attempts=3) == 1
+    assert judge_until_parsed(lambda: "garbled", parse, attempts=4) is None
+
+
+def test_judge_workers_follow_the_environment(monkeypatch):
+    from lm_eval.api.judge_guard import max_workers
+
+    monkeypatch.delenv("JUDGE_MAX_WORKERS", raising=False)
+    assert max_workers(16) == 16
+    monkeypatch.setenv("JUDGE_MAX_WORKERS", "1")
+    assert max_workers(16) == 1

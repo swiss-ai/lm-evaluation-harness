@@ -45,3 +45,31 @@ def check_judge_failures(task: str, judge: str, n_valid: int, n_total: int) -> N
             f"Check that the judge is served (see <TASK>_JUDGE_MODEL), or raise "
             f"{MAX_FAILED_FRACTION_ENV} to accept more failures."
         )
+
+
+# A judge under load can return a garbled answer for a prompt it answers fine on its
+# own (api.inference.cscs.ch's Gemma-4-31B-it, 2026-11-27): ask it again before
+# counting the item as failed.
+JUDGE_PARSE_ATTEMPTS_ENV = "JUDGE_PARSE_ATTEMPTS"
+JUDGE_MAX_WORKERS_ENV = "JUDGE_MAX_WORKERS"
+
+
+def parse_attempts(default: int = 5) -> int:
+    return max(1, int(os.getenv(JUDGE_PARSE_ATTEMPTS_ENV) or default))
+
+
+def max_workers(default: int = 16) -> int:
+    """How many judge requests run at once: JUDGE_MAX_WORKERS, else the task's default."""
+    return max(1, int(os.getenv(JUDGE_MAX_WORKERS_ENV) or default))
+
+
+def judge_until_parsed(ask, parse, attempts=None):
+    """parse(ask()) until it is not None, at most `attempts` times; None if never.
+    ask() returning None (unreachable after its own retries) also counts as an attempt."""
+    for _ in range(attempts or parse_attempts()):
+        answer = ask()
+        if answer is not None:
+            parsed = parse(answer)
+            if parsed is not None:
+                return parsed
+    return None

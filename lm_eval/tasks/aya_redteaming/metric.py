@@ -4,7 +4,11 @@ import time
 
 import requests
 
-from lm_eval.api.judge_guard import check_judge_failures
+from lm_eval.api.judge_guard import (
+    check_judge_failures,
+    judge_until_parsed,
+    max_workers as judge_workers,
+)
 from lm_eval.api.model_resolver import get_judge_model, judge_api_base, judge_api_key
 from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
@@ -111,12 +115,14 @@ def extract_binary_score(text):
 
 
 def _call_judge(prompt):
-    """Single judge call for use in thread pool."""
-    response = try_remote_generate(prompt, temperature=0.0, max_tokens=50)
-    if response is None:
-        print("Failed to get remote generation response")
-        return None
-    return extract_binary_score(response.strip())
+    """Single judge call for use in thread pool; asked again on an unparsable answer."""
+    score = judge_until_parsed(
+        lambda: try_remote_generate(prompt, temperature=0.0, max_tokens=50),
+        lambda response: extract_binary_score(response.strip()),
+    )
+    if score is None:
+        print("No usable judge verdict for one item")
+    return score
 
 
 def harmfulness_score(doc, predictions):
@@ -131,7 +137,9 @@ def harmfulness_score(doc, predictions):
 
 def harmfulness_agg(items, max_workers=16):
     """Called once with all collected prompts. Fires concurrent API calls."""
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=judge_workers(max_workers)
+    ) as executor:
         scores = list(executor.map(_call_judge, items))
     valid_scores = [s for s in scores if s is not None]
     check_judge_failures(
