@@ -139,3 +139,46 @@ def test_request_completion_retries_transient_error(
     assert mock_post.call_count == 2
     assert mock_acquire.call_count == 2
     mock_sleep.assert_called_once_with(1)
+
+
+def test_chat_judge_helpers():
+    from lm_eval.tasks.harmbench.remote import (
+        as_chat_prompt,
+        parse_label,
+        uses_classifier,
+    )
+
+    assert uses_classifier("cais/HarmBench-Llama-2-13b-cls")
+    assert not uses_classifier("google/gemma-4-31B-it")
+    prompt = "[INST] <<SYS>>\nYou are a classifier.\n<</SYS>>\n\n[BEHAVIOR]:\nx\n\nAnswer: [/INST]"
+    assert (
+        as_chat_prompt(prompt) == "You are a classifier.\n\n[BEHAVIOR]:\nx\n\nAnswer:"
+    )
+    assert parse_label("Yes") == "yes"
+    assert parse_label(" **No**.") == "no"
+    assert parse_label("Maybe yes") is None
+    assert parse_label("") is None
+
+
+def test_request_completion_chat_mode_uses_chat_endpoint():
+    response = Mock(ok=True)
+    response.json.return_value = {"choices": [{"message": {"content": "No"}}]}
+    with patch(
+        "lm_eval.tasks.harmbench.remote.requests.post", return_value=response
+    ) as post:
+        text = request_completion(
+            "p",
+            api_url="https://api.inference.cscs.ch/v1",
+            api_key="k",
+            model="google/gemma-4-31B-it",
+            prompt_tokens=1,
+            max_tokens=5,
+            chat=True,
+        )
+    assert text == "No"
+    url = post.call_args.args[0]
+    body = post.call_args.kwargs["json"]
+    assert url == "https://api.inference.cscs.ch/v1/chat/completions"
+    assert (
+        body["messages"] == [{"role": "user", "content": "p"}] and "prompt" not in body
+    )

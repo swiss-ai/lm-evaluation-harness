@@ -5,13 +5,13 @@ import time
 import requests
 
 from lm_eval.api.judge_guard import check_judge_failures
-from lm_eval.api.model_resolver import get_judge_model
+from lm_eval.api.model_resolver import get_judge_model, judge_api_base
 from lm_eval.api.rate_limiter import acquire_judge_rate_limit
 
 
 DEFAULT_MODEL_NAME = "meta-llama/Llama-3.3-70B-Instruct"
 
-API_URL = "https://api.swissai.svc.cscs.ch/v1"
+API_URL = judge_api_base("https://api.swissai.svc.cscs.ch/v1")
 API_KEY = os.getenv("CSCS_SERVING_API")
 # check if the cscs serving API key is set and raise an error if not
 if API_KEY is None or API_KEY.strip() == "":
