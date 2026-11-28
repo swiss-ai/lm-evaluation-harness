@@ -4,7 +4,14 @@ import os
 from importlib.util import find_spec
 
 
-__version__ = importlib.metadata.version("lm_eval")
+try:
+    __version__ = importlib.metadata.version("lm_eval")
+except importlib.metadata.PackageNotFoundError:
+    # Allow the vendored checkout to run directly from PYTHONPATH without an
+    # installed lm_eval distribution. The launcher in this repo points at
+    # third_party/lm-evaluation-harness, so local imports should work even when
+    # package metadata is absent.
+    __version__ = "0.0.0+local"
 
 
 # Enable high-performance transfers
